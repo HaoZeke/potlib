@@ -31,6 +31,21 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [cuh2]
     endif
 
+    if has_xtb
+        subdir('rgpot/XTBPot')  # 'xtbpot'
+        rgpotentials += [xtbpot]
+    endif
+
+    if has_tblite
+        subdir('rgpot/TBLitePot')  # 'tblitepot'
+        rgpotentials += [tblitepot]
+    endif
+
+    if has_metatomic
+        subdir('rgpot/MetatomicPot')  # 'metatomicpot'
+        rgpotentials += [metatomicpot]
+    endif
+
     _linkto += rgpotentials
 
     # Create library
@@ -115,6 +130,21 @@ if get_option('with_tests')
         test_array += [  #
             ['CacheTest', 'cache_test', 'CacheTest.cc', ''],
             ['InvarianceTest', 'invariance_test', 'InvarianceTest.cc', ''],
+        ]
+    endif
+    if has_xtb
+        test_array += [
+            ['XTBtest', 'xtb_test', 'XTBPotTest.cc', ''],
+        ]
+    endif
+    if has_tblite
+        test_array += [
+            ['TBLitetest', 'tblite_test', 'TBLitePotTest.cc', ''],
+        ]
+    endif
+    if has_metatomic
+        test_array += [
+            ['MetatomicTest', 'metatomic_test', 'MetatomicPotTest.cc', '/CppCore/tests'],
         ]
     endif
     if rpc_enabled

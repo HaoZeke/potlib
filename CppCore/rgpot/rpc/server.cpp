@@ -16,6 +16,18 @@
 #include "rgpot/CuH2/CuH2Pot.hpp"
 #endif // RGPOT_HAS_FORTRAN
 
+#ifdef RGPOT_HAS_XTB
+#include "rgpot/XTBPot/XTBPot.hpp"
+#endif // RGPOT_HAS_XTB
+
+#ifdef RGPOT_HAS_TBLITE
+#include "rgpot/TBLitePot/TBLitePot.hpp"
+#endif // RGPOT_HAS_TBLITE
+
+#ifdef RGPOT_HAS_METATOMIC
+#include "rgpot/MetatomicPot/MetatomicPot.hpp"
+#endif // RGPOT_HAS_METATOMIC
+
 #include "rgpot/LennardJones/LJPot.hpp"
 #include "rgpot/Potential.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
@@ -100,7 +112,17 @@ public:
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0] << " <port> <PotentialType>" << std::endl;
-    std::cerr << "  Available PotentialTypes: CuH2, LJ" << std::endl;
+    std::cerr << "  Available PotentialTypes: CuH2, LJ"
+#ifdef RGPOT_HAS_XTB
+              << ", XTB, GFNFF, GFN0xTB, GFN1xTB"
+#endif
+#ifdef RGPOT_HAS_TBLITE
+              << ", TBLite, TBLiteGFN1, TBLiteIPEA1"
+#endif
+#ifdef RGPOT_HAS_METATOMIC
+              << ", Metatomic:<model_path>"
+#endif
+              << std::endl;
     return 1;
   }
 
@@ -121,6 +143,50 @@ int main(int argc, char *argv[]) {
   } else if (pot_type == "LJ") {
     std::cout << "Loading LJ potential..." << std::endl;
     potential_to_use = std::make_unique<rgpot::LJPot>();
+#ifdef RGPOT_HAS_XTB
+  } else if (pot_type == "XTB") {
+    std::cout << "Loading XTB potential (GFN2-xTB)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::XTBPot>();
+  } else if (pot_type == "GFNFF") {
+    rgpot::XTBConfig cfg;
+    cfg.method = rgpot::GFNMethod::GFNFF;
+    std::cout << "Loading XTB potential (GFNFF)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::XTBPot>(cfg);
+  } else if (pot_type == "GFN1xTB") {
+    rgpot::XTBConfig cfg;
+    cfg.method = rgpot::GFNMethod::GFN1xTB;
+    std::cout << "Loading XTB potential (GFN1-xTB)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::XTBPot>(cfg);
+  } else if (pot_type == "GFN0xTB") {
+    rgpot::XTBConfig cfg;
+    cfg.method = rgpot::GFNMethod::GFN0xTB;
+    std::cout << "Loading XTB potential (GFN0-xTB)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::XTBPot>(cfg);
+#endif // RGPOT_HAS_XTB
+#ifdef RGPOT_HAS_TBLITE
+  } else if (pot_type == "TBLite" || pot_type == "TBLiteGFN2") {
+    std::cout << "Loading TBLite potential (GFN2)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::TBLitePot>();
+  } else if (pot_type == "TBLiteGFN1") {
+    rgpot::TBLiteConfig cfg;
+    cfg.method = rgpot::TBLiteMethod::GFN1;
+    std::cout << "Loading TBLite potential (GFN1)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::TBLitePot>(cfg);
+  } else if (pot_type == "TBLiteIPEA1") {
+    rgpot::TBLiteConfig cfg;
+    cfg.method = rgpot::TBLiteMethod::IPEA1;
+    std::cout << "Loading TBLite potential (IPEA1)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::TBLitePot>(cfg);
+#endif // RGPOT_HAS_TBLITE
+#ifdef RGPOT_HAS_METATOMIC
+  } else if (pot_type.rfind("Metatomic:", 0) == 0) {
+    auto model_path = pot_type.substr(10);
+    rgpot::MetatomicConfig cfg;
+    cfg.model_path = model_path;
+    std::cout << "Loading Metatomic potential from '" << model_path << "'..."
+              << std::endl;
+    potential_to_use = std::make_unique<rgpot::MetatomicPot>(cfg);
+#endif // RGPOT_HAS_METATOMIC
   } else {
     std::cerr << "Error: Unknown potential type '" << pot_type << "'"
               << std::endl;
