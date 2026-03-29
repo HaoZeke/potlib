@@ -130,7 +130,11 @@ if get_option('with_metatomic')
         check: true,
     ).stdout().strip()
     _deps += declare_dependency(
-        link_args: ['-L' + _torch_libdir, '-Wl,-rpath,' + _torch_libdir],
+        link_args: [
+            '-L' + _torch_libdir,
+            '-Wl,-rpath,' + _torch_libdir,
+            '-ltorch_cpu',
+        ],
     )
 
     # metatensor-torch: try pkg-config, then cmake, then find_library
