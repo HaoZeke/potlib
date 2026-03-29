@@ -60,6 +60,8 @@ private:
   std::string m_energy_key;
 
   mutable std::mutex m_mutex;
+  mutable torch::Tensor m_cached_types;  //!< Cached atomic types tensor.
+  mutable size_t m_cached_natoms = 0;    //!< Atom count for cached types.
 
   metatensor_torch::TensorBlock
   computeNeighbors(metatomic_torch::NeighborListOptions request, long nAtoms,

@@ -130,10 +130,15 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   bool periodic[3] = {torch_pbc[0].item<bool>(), torch_pbc[1].item<bool>(),
                       torch_pbc[2].item<bool>()};
 
-  std::vector<int32_t> types_vec(in.atmnrs, in.atmnrs + nAtoms);
-  auto atomic_types =
-      torch::tensor(types_vec, torch::TensorOptions().dtype(torch::kInt32))
-          .to(m_device);
+  // Cache atomic types tensor (doesn't change between geometry steps)
+  if (m_cached_natoms != in.nAtoms) {
+    std::vector<int32_t> types_vec(in.atmnrs, in.atmnrs + nAtoms);
+    m_cached_types =
+        torch::tensor(types_vec, torch::TensorOptions().dtype(torch::kInt32))
+            .to(m_device);
+    m_cached_natoms = in.nAtoms;
+  }
+  auto atomic_types = m_cached_types;
 
   // 2. Create system
   auto system = torch::make_intrusive<metatomic_torch::SystemHolder>(
