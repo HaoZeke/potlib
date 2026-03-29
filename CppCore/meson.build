@@ -9,6 +9,7 @@ if get_option('with_cache') and not get_option('with_rpc_client_only')
 endif
 
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
+_rgpot_srcs += files('rgpot/units.cc')
 
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
@@ -115,7 +116,9 @@ if get_option('with_tests')
     )
     test_args = _args
     test_args += ['-DRGPOTTEST']
-    test_array = []
+    test_array = [
+        ['UnitsTest', 'units_test', 'UnitsTest.cc', ''],
+    ]
     if has_fortran
         test_array += [
             ['CuH2test', 'cuh2_test', 'CuH2PotTest.cc', ''],

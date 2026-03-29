@@ -32,6 +32,7 @@
 #include "rgpot/Potential.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 #include "rgpot/types/adapters/capnp/capnp_adapter.hpp"
+#include "rgpot/units.hpp"
 
 /**
  * @class GenericPotImpl
@@ -72,24 +73,51 @@ public:
 
     KJ_REQUIRE(fip.getAtmnrs().size() == numAtoms, "AtomNumbers size mismatch");
 
+    // Unit conversion factors (caller units -> internal angstrom/eV)
+    std::string lengthUnit = fip.getLengthUnit();
+    std::string energyUnit = fip.getEnergyUnit();
+    double len_to_angstrom = rgpot::units::unit_conversion_factor(lengthUnit, "angstrom");
+    double ev_to_caller = rgpot::units::unit_conversion_factor("eV", energyUnit);
+    // Force unit: energy/length in caller's system
+    double force_to_caller = ev_to_caller / len_to_angstrom;
+
     rgpot::types::AtomMatrix nativePositions =
         rgpot::types::adapt::capnp::convertPositionsFromCapnp(fip.getPos(),
                                                               numAtoms);
+    // Convert positions from caller's length unit to angstrom
+    if (len_to_angstrom != 1.0) {
+      for (size_t i = 0; i < numAtoms * 3; ++i) {
+        nativePositions.data()[i] *= len_to_angstrom;
+      }
+    }
+
     std::vector<int> nativeAtomTypes =
         rgpot::types::adapt::capnp::convertAtomNumbersFromCapnp(
             fip.getAtmnrs());
     std::array<std::array<double, 3>, 3> nativeBoxMatrix =
         rgpot::types::adapt::capnp::convertBoxMatrixFromCapnp(fip.getBox());
+    // Convert box from caller's length unit to angstrom
+    if (len_to_angstrom != 1.0) {
+      for (auto &row : nativeBoxMatrix)
+        for (auto &val : row)
+          val *= len_to_angstrom;
+    }
 
-    // Call via the virtual operator() on PotentialBase
+    // Potential always computes in eV/angstrom
     auto [energy, forces] =
         (*m_potential)(nativePositions, nativeAtomTypes, nativeBoxMatrix);
 
+    // Convert results to caller's units
     auto result = context.getResults();
     auto pres = result.initResult();
-    pres.setEnergy(energy);
+    pres.setEnergy(energy * ev_to_caller);
 
     auto forcesList = pres.initForces(numAtoms * 3);
+    if (force_to_caller != 1.0) {
+      for (size_t i = 0; i < numAtoms * 3; ++i) {
+        forces.data()[i] *= force_to_caller;
+      }
+    }
     rgpot::types::adapt::capnp::populateForcesToCapnp(forcesList, forces);
 
     return kj::READY_NOW;
