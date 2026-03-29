@@ -119,9 +119,19 @@ endif
 
 has_metatomic = false
 if get_option('with_metatomic')
-    # PyTorch C++ API (libtorch) -- found via cmake
+    # PyTorch C++ API (libtorch) -- found via cmake.
+    # Meson's cmake trace often fails to resolve the full linker flags for
+    # libtorch_cpu.so. We supplement with an explicit rpath + link_args.
     torch_dep = dependency('Torch', method: 'cmake', modules: ['torch'], required: true)
     _deps += torch_dep
+    _torch_libdir = run_command(
+        find_program('python3'), '-c',
+        'import torch, os; print(os.path.join(os.path.dirname(torch.__file__), "lib"))',
+        check: true,
+    ).stdout().strip()
+    _deps += declare_dependency(
+        link_args: ['-L' + _torch_libdir, '-Wl,-rpath,' + _torch_libdir],
+    )
 
     # metatensor-torch: try pkg-config, then cmake, then find_library
     mts_dep = dependency('metatensor_torch', required: false)
