@@ -137,6 +137,35 @@ if get_option('with_metatomic')
         ],
     )
 
+    # metatensor-torch / metatomic-torch headers live in the
+    # python interpreter's site-packages under
+    # <purelib>/metatensor/torch/torch-X.Y/include and
+    # <purelib>/metatomic/torch/torch-X.Y/include. The cmake /
+    # pkg-config dependency lookups don't see those, and
+    # find_library() doesn't add include paths. Ask sysconfig for
+    # the right purelib and propagate -isystem includes manually.
+    _py_purelib = run_command(
+        find_program('python3'), '-c',
+        'import sysconfig; print(sysconfig.get_paths()["purelib"])',
+        check: true,
+    ).stdout().strip()
+    _torch_major = run_command(
+        find_program('python3'), '-c',
+        'import torch; v = torch.__version__.split("+")[0].split(".")[:2]; print(".".join(v))',
+        check: true,
+    ).stdout().strip()
+
+    _mts_inc_dirs = [
+        _py_purelib / 'metatensor' / 'include',
+        _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major) / 'include',
+        _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'include',
+        _py_purelib / 'vesin' / 'include',
+    ]
+    _mts_inc_args = []
+    foreach d : _mts_inc_dirs
+        _mts_inc_args += ['-isystem', d]
+    endforeach
+
     # metatensor-torch: try pkg-config, then cmake, then find_library
     mts_dep = dependency('metatensor_torch', required: false)
     if not mts_dep.found()
@@ -146,10 +175,22 @@ if get_option('with_metatomic')
         mts_dep = dependency('metatensor_torch', method: 'cmake', required: false)
     endif
     if not mts_dep.found()
-        mts_dep = [
-            cppc.find_library('metatensor'),
-            cppc.find_library('metatensor_torch'),
-        ]
+        mts_dep = declare_dependency(
+            dependencies: [
+                cppc.find_library(
+                    'metatensor',
+                    dirs: [_py_purelib / 'metatensor' / 'lib'],
+                ),
+                cppc.find_library(
+                    'metatensor_torch',
+                    dirs: [
+                        _py_purelib / 'metatensor' / 'torch'
+                            / ('torch-' + _torch_major) / 'lib',
+                    ],
+                ),
+            ],
+            compile_args: _mts_inc_args,
+        )
     endif
     _deps += mts_dep
 
@@ -159,16 +200,29 @@ if get_option('with_metatomic')
         mta_dep = dependency('metatomic-torch', required: false)
     endif
     if not mta_dep.found()
-        mta_dep = cppc.find_library('metatomic_torch')
+        mta_dep = cppc.find_library(
+            'metatomic_torch',
+            dirs: [
+                _py_purelib / 'metatomic' / 'torch'
+                    / ('torch-' + _torch_major) / 'lib',
+            ],
+        )
     endif
     _deps += mta_dep
 
     # vesin neighbor list library
+    _vesin_libdir = _py_purelib / 'vesin' / 'lib'
     vesin_dep = dependency('vesin', required: false)
     if not vesin_dep.found()
-        vesin_dep = cppc.find_library('vesin')
+        vesin_dep = cppc.find_library(
+            'vesin',
+            dirs: [_vesin_libdir],
+        )
     endif
     _deps += vesin_dep
+    _deps += declare_dependency(
+        link_args: ['-Wl,-rpath,' + _vesin_libdir],
+    )
 
     _args += ['-DRGPOT_HAS_METATOMIC=TRUE']
     has_metatomic = true
