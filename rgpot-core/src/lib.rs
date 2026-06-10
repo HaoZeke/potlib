@@ -66,3 +66,5 @@ pub mod Potentials_capnp {
 
 #[cfg(feature = "rpc")]
 pub mod rpc;
+
+pub mod eindir;
