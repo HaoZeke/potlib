@@ -145,14 +145,10 @@ unsafe extern "C" fn rgpot_eval_cb(
     x: *const DLManagedTensorVersioned,
     value_out: *mut f64,
 ) -> eindir_status_t {
-    eprintln!("[rgpot_eval_cb] user_data={:?} x={:?}", user_data, x);
     let pot = unsafe { &*(user_data as *const rgpot_potential_t) };
-    eprintln!("[rgpot_eval_cb] n_atoms={}", pot.n_atoms);
     let xt = unsafe { &(*x).dl_tensor };
-    eprintln!("[rgpot_eval_cb] xt.data={:?} ndim={}", xt.data, xt.ndim);
     let n = pot.n_atoms * 3;
     let x_data = unsafe { std::slice::from_raw_parts(xt.data as *const f64, n) };
-    eprintln!("[rgpot_eval_cb] x_data ok, sum={}", x_data.iter().sum::<f64>());
     let mut pos = x_data.to_vec();
     let mut atmnrs =
         unsafe { std::slice::from_raw_parts(pot.atomic_numbers, pot.n_atoms) }.to_vec();
@@ -459,11 +455,8 @@ mod tests {
         let mut x_data = [1.0f64, 2.0, 3.0, 4.0, 5.0, 6.0];
         let x_t = make_1d(x_data.as_mut_ptr(), dim);
 
-        eprintln!("[test] obj={obj:?} x_t={x_t:?}");
         let mut value = 0.0f64;
-        eprintln!("[test] calling eindir_objective_eval");
         let s = unsafe { eindir_objective_eval(obj, x_t, &mut value) };
-        eprintln!("[test] eindir_objective_eval returned");
         assert_eq!(s, eindir_status_t::EINDIR_SUCCESS);
         assert_eq!(value, 21.0); // 1+2+3+4+5+6
 
@@ -505,9 +498,7 @@ mod tests {
         assert!(!pot.is_null());
         let obj = pot as *const eindir_objective_t;
         let dim = unsafe { (*obj).dim };
-        let eval_fn_ptr = unsafe { (*obj).eval_fn };
         let user_data = unsafe { (*obj).user_data };
-        eprintln!("dim={dim} eval_fn_ptr={eval_fn_ptr:?} user_data={user_data:?} pot={pot:?}");
         assert_eq!(dim, 6); // n_atoms * 3
         assert_eq!(user_data, pot as *mut c_void);
         unsafe { rgpot_potential_free_eindir(pot) };
