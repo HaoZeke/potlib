@@ -31,3 +31,6 @@ pub mod potential;
 
 #[cfg(feature = "rpc")]
 pub mod rpc;
+
+// Re-export eindir lifecycle functions at the c_api level so cbindgen picks them up.
+pub use crate::eindir::{rgpot_potential_new_eindir, rgpot_potential_free_eindir};

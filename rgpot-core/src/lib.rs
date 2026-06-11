@@ -51,6 +51,7 @@ pub mod types;
 pub mod tensor;
 pub mod status;
 pub mod potential;
+pub mod eindir;
 pub mod c_api;
 
 #[cfg(feature = "rpc")]
