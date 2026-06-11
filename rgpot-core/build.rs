@@ -7,8 +7,7 @@ fn link_eindir_core() {
     let lib_dir = env::var("EINDIR_LIB_DIR")
         .unwrap_or_else(|_| "/tmp/eindir-prefix/lib".to_string());
     println!("cargo:rustc-link-search=native={lib_dir}");
-    println!("cargo:rustc-link-lib=eindir_core");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{lib_dir}");
+    println!("cargo:rustc-link-lib=static=eindir_core");
     println!("cargo:rerun-if-env-changed=EINDIR_LIB_DIR");
 }
 
