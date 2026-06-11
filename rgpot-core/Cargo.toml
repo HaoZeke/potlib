@@ -22,7 +22,7 @@ cache = []
 gen-header = ["dep:cbindgen"]
 
 [dependencies]
-dlpk = "0.1"
+dlpk = { git = "https://github.com/metatensor/dlpk.git", tag = "v0.1.5" }
 capnp = { version = "0.20", optional = true }
 capnp-rpc = { version = "0.20", optional = true }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros"], optional = true }
