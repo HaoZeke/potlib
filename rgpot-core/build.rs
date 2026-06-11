@@ -4,8 +4,17 @@ use std::env;
 use std::path::PathBuf;
 
 fn link_eindir_core() {
-    let lib_dir = env::var("EINDIR_LIB_DIR")
-        .unwrap_or_else(|_| "/tmp/eindir-prefix/lib".to_string());
+    let lib_dir = env::var("EINDIR_LIB_DIR").unwrap_or_else(|_| {
+        // cargo cinstall on Debian/Ubuntu places the lib in a multiarch subdir.
+        // Prefer the multiarch path when both exist.
+        let multiarch = "/tmp/eindir-prefix/lib/x86_64-linux-gnu";
+        let base = "/tmp/eindir-prefix/lib";
+        if std::path::Path::new(multiarch).join("libeindir_core.a").exists() {
+            multiarch.to_string()
+        } else {
+            base.to_string()
+        }
+    });
     println!("cargo:rustc-link-search=native={lib_dir}");
     println!("cargo:rustc-link-lib=static=eindir_core");
     println!("cargo:rerun-if-env-changed=EINDIR_LIB_DIR");
