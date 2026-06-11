@@ -1,5 +1,16 @@
+use std::env;
+
 #[cfg(any(feature = "gen-header", feature = "rpc"))]
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
+
+fn link_eindir_core() {
+    let lib_dir = env::var("EINDIR_LIB_DIR")
+        .unwrap_or_else(|_| "/tmp/eindir-prefix/lib".to_string());
+    println!("cargo:rustc-link-search=native={lib_dir}");
+    println!("cargo:rustc-link-lib=eindir_core");
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{lib_dir}");
+    println!("cargo:rerun-if-env-changed=EINDIR_LIB_DIR");
+}
 
 /// Generate C header via cbindgen (only when `gen-header` feature is active).
 /// Run `cargo build --features gen-header` or `pixi r gen-header` to regenerate.
@@ -42,8 +53,10 @@ fn generate_c_header(crate_dir: &str) {
 }
 
 fn main() {
-    #[cfg(any(feature = "gen-header", feature = "rpc"))]
+    #[allow(unused_variables)]
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    link_eindir_core();
 
     #[cfg(feature = "gen-header")]
     generate_c_header(&crate_dir);
