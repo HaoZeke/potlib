@@ -124,11 +124,35 @@ if get_option('with_metatomic')
     # libtorch_cpu.so. We supplement with an explicit rpath + link_args.
     torch_dep = dependency('Torch', method: 'cmake', modules: ['torch'], required: true)
     _deps += torch_dep
-    _torch_libdir = run_command(
+
+    # PyTorch package paths are discovered without importing torch. Importing
+    # torch loads compiled NumPy extensions during configure, so the probe must
+    # only use Python's standard library and the installed package metadata.
+    _py_probe = run_command(
         find_program('python3'), '-c',
-        'import torch, os; print(os.path.join(os.path.dirname(torch.__file__), "lib"))',
+        '''
+import re
+import sysconfig
+from pathlib import Path
+
+purelib = Path(sysconfig.get_paths()["purelib"])
+version_file = purelib / "torch" / "version.py"
+match = re.search(
+    r"^__version__\\s*=\\s*['\\\"]([^'\\\"]+)",
+    version_file.read_text(),
+    re.MULTILINE,
+)
+if match is None:
+    raise SystemExit(f"torch version not found in {version_file}")
+version = ".".join(match.group(1).split("+")[0].split(".")[:2])
+print(purelib)
+print(version)
+''',
         check: true,
-    ).stdout().strip()
+    ).stdout().strip().split('\n')
+    _py_purelib = _py_probe[0]
+    _torch_major = _py_probe[1]
+    _torch_libdir = _py_purelib / 'torch' / 'lib'
     _deps += declare_dependency(
         link_args: [
             '-L' + _torch_libdir,
@@ -144,17 +168,6 @@ if get_option('with_metatomic')
     # pkg-config dependency lookups don't see those, and
     # find_library() doesn't add include paths. Ask sysconfig for
     # the right purelib and propagate -isystem includes manually.
-    _py_purelib = run_command(
-        find_program('python3'), '-c',
-        'import sysconfig; print(sysconfig.get_paths()["purelib"])',
-        check: true,
-    ).stdout().strip()
-    _torch_major = run_command(
-        find_program('python3'), '-c',
-        'import torch; v = torch.__version__.split("+")[0].split(".")[:2]; print(".".join(v))',
-        check: true,
-    ).stdout().strip()
-
     _mts_inc_dirs = [
         _py_purelib / 'metatensor' / 'include',
         _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major) / 'include',
