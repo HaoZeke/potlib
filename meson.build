@@ -138,7 +138,7 @@ from pathlib import Path
 purelib = Path(sysconfig.get_paths()["purelib"])
 version_file = purelib / "torch" / "version.py"
 match = re.search(
-    r"^__version__\\s*=\\s*['\\\"]([^'\\\"]+)",
+    r"^__version__\s*=\s*['\"]([^'\"]+)",
     version_file.read_text(),
     re.MULTILINE,
 )
