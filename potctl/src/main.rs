@@ -1,6 +1,8 @@
-//! potctl — rgpot project control plane (release lockstep, CI helpers).
+//! potctl — rgpot project control plane (release lockstep, CI helpers, cosmo APE).
 
 mod ci;
+#[cfg(feature = "cosmo-host")]
+mod cosmo;
 mod lockstep;
 
 use clap::{Parser, Subcommand};
@@ -12,7 +14,7 @@ use std::process::ExitCode;
     name = "potctl",
     version,
     about = "rgpot project control plane",
-    long_about = "Repo-local CLI for release lockstep and CI helpers. \
+    long_about = "Repo-local CLI for release lockstep, CI helpers, and Cosmopolitan APE build. \
 Run from the rgpot checkout (walks up for meson.build + pixi.toml + rgpot-core/)."
 )]
 struct Cli {
@@ -32,6 +34,24 @@ enum Commands {
         #[command(subcommand)]
         action: CiCmd,
     },
+    /// Cosmopolitan APE (`potctl.com`) build orchestration (Rust only; no project bash).
+    /// Host-only (`cosmo-host` feature); not compiled into the APE binary itself.
+    #[cfg(feature = "cosmo-host")]
+    Cosmo {
+        #[command(subcommand)]
+        action: CosmoCmd,
+    },
+}
+
+#[cfg(feature = "cosmo-host")]
+#[derive(Subcommand, Debug)]
+enum CosmoCmd {
+    /// Build potctl as Cosmopolitan APE via nightly rustc + cosmocc linker shim.
+    ///
+    /// Requires COSMO (cosmo monorepo after `make toolchain`), rustup nightly, and
+    /// host `potctl-cosmo-ld` (built automatically if missing). Env: POTCTL_COSMO_OUT,
+    /// POTCTL_COSMO_ARCHS, COSMO_CC, COSMOCC_ARCHES (see potctl/cosmo/README.md).
+    Build,
 }
 
 #[derive(Subcommand, Debug)]
@@ -103,6 +123,10 @@ fn run() -> Result<(), String> {
                 conda_prefix,
                 sdkroot,
             } => ci::print_darwin_env(force, conda_prefix.as_deref(), sdkroot.as_deref()),
+        },
+        #[cfg(feature = "cosmo-host")]
+        Commands::Cosmo { action } => match action {
+            CosmoCmd::Build => cosmo::build_ape(&root),
         },
     }
 }

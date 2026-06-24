@@ -11,5 +11,16 @@ publish = false
 name = "potctl"
 path = "src/main.rs"
 
+# rustc cosmo target `linker` must be a single executable (no subcommand argv).
+[[bin]]
+name = "potctl-cosmo-ld"
+path = "src/cosmo_ld.rs"
+
+[features]
+# Host-only Cosmopolitan APE builder (`potctl cosmo build` + potctl-cosmo-ld logic in cosmo.rs).
+# Disabled on the cosmo target itself so the APE only ships ci/lockstep (smaller, no builder).
+default = ["cosmo-host"]
+cosmo-host = []
+
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
