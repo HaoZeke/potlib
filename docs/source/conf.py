@@ -10,7 +10,9 @@ sys.path.insert(0, os.path.abspath("../../subprojects/doxyrest/sphinx"))
 project = "rgpot"
 copyright = "2025--present, rgpot developers"
 author = "Rohit Goswami"
-html_logo = "../../branding/logo/rgpot_notext.svg"
+# Navbar falls back to html_logo when light_logo/dark_logo are unset; prefer
+# theme-specific assets below (transparent glyphs readable on each header).
+html_logo = "_static/rgpot_notext_light.webp"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -61,6 +63,9 @@ html_theme_options = {
     "accent_color": "teal",
     "dark_code": True,
     "globaltoc_expand_depth": 1,
+    # Shibuya toggles .light-logo / .dark-logo with color mode (paths via pathto).
+    "light_logo": "_static/rgpot_notext_light.webp",
+    "dark_logo": "_static/rgpot_notext_dark.webp",
     "nav_links": [
         {
             "title": "Ecosystem",
@@ -97,3 +102,7 @@ html_sidebars = {
 }
 
 html_baseurl = "https://rgpot.rgoswami.me/"
+
+html_css_files = [
+    "custom.css",
+]
