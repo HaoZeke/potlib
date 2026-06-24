@@ -1,8 +1,27 @@
+name: Build Matrix
 concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
+  # potctl once per OS: Linux musl (portable) + macOS fat (arm64+x86_64 lipo).
+  # Consumer jobs restore ci-tools-<sha>-${{ runner.os }} (not a Linux ELF on Darwin).
+  ci-tools:
+    name: ci-tools (potctl / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Stage portable/fat potctl
+        uses: ./.github/actions/setup-ci-tools
+        with:
+          upload-artifact: "true"
+          artifact-name: ci-tools-${{ github.sha }}-${{ runner.os }}
+
   build_and_test:
+    needs: [ci-tools]
     env:
       CCACHE_COMPILERCHECK: content
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -14,6 +33,10 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+    - name: Ensure potctl (OS-matched portable/fat artifact)
+      uses: ./.github/actions/ensure-potctl
+      with:
+        artifact-prefix: ci-tools-${{ github.sha }}
     - uses: prefix-dev/setup-pixi@v0.9.4
       with:
         activate-environment: devbld
@@ -29,7 +52,13 @@ jobs:
     - if: ${{ matrix.sys == 'meson' }}
       name: Build & Test (Meson)
       run: |-
+        # macOS/pixi host clang/SDK via potctl (unit-tested); Linux is a no-op eval.
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          export SDKROOT="$(xcrun --show-sdk-path)"
+        fi
+        eval "$(potctl ci darwin-env)"
         meson setup bbdir \
+          ${POTCTL_MESON_EXTRA:-} \
           -Dwith_tests=True \
           -Dwith_examples=False \
           -Dwith_xtensor=False \
@@ -44,6 +73,20 @@ jobs:
     - if: ${{ matrix.sys == 'cmake' }}
       name: Build & Test (CMake)
       run: |-
+        CMAKE_EXTRA=""
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          export SDKROOT="$(xcrun --show-sdk-path)"
+        fi
+        eval "$(potctl ci darwin-env)"
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          CMAKE_EXTRA="-DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_OSX_SYSROOT=${SDKROOT}"
+          if [ -n "${CONDA_PREFIX:-}" ]; then
+            CMAKE_EXTRA="${CMAKE_EXTRA} -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} -DCMAKE_BUILD_RPATH=${CONDA_PREFIX}/lib -DCMAKE_INSTALL_RPATH=${CONDA_PREFIX}/lib"
+          fi
+          if [ -n "${FC:-}" ]; then
+            CMAKE_EXTRA="${CMAKE_EXTRA} -DCMAKE_Fortran_COMPILER=${FC}"
+          fi
+        fi
         cmake -S . -B build \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -54,7 +97,8 @@ jobs:
           -DRGPOT_WITH_EIGEN=OFF \
           -DRGPOT_WITH_RPC=${{ matrix.rpc }} \
           -DRGPOT_WITH_CACHE=${{ matrix.cache }} \
-          -DRGPOT_PURE_LIB=OFF
+          -DRGPOT_PURE_LIB=OFF \
+          $CMAKE_EXTRA
         cmake --build build -j
         ctest --test-dir build --output-on-failure
         ccache -s
@@ -81,6 +125,7 @@ jobs:
         - meson
         - cmake
   client_bridge_stress:
+    needs: [ci-tools]
     env:
       CCACHE_COMPILERCHECK: content
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -91,6 +136,10 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+    - name: Ensure potctl (OS-matched portable/fat artifact)
+      uses: ./.github/actions/ensure-potctl
+      with:
+        artifact-prefix: ci-tools-${{ github.sha }}
     - uses: prefix-dev/setup-pixi@v0.9.4
       with:
         activate-environment: devbld
@@ -138,6 +187,7 @@ jobs:
         kill $SERVER_PID
       shell: pixi run bash -e {0}
   rust_tests:
+    needs: [ci-tools]
     name: Rust Core Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     steps:
@@ -145,6 +195,10 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+    - name: Ensure potctl (OS-matched portable/fat artifact)
+      uses: ./.github/actions/ensure-potctl
+      with:
+        artifact-prefix: ci-tools-${{ github.sha }}
     - uses: prefix-dev/setup-pixi@v0.9.4
       with:
         activate-environment: devbld
@@ -155,16 +209,16 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-nextest
+    - name: potctl unit tests
+      run: cargo test -p potctl
     - name: Run Rust tests (nextest)
       run: |-
-        cd rgpot-core
-        cargo nextest run
-        cargo nextest run --all-features
+        cargo nextest run -p rgpot-core
+        cargo nextest run -p rgpot-core --all-features
       shell: pixi run bash -e {0}
     - name: Run Rust doc-tests
       run: |-
-        cd rgpot-core
-        cargo test --doc
+        cargo test --doc -p rgpot-core
       shell: pixi run bash -e {0}
     strategy:
       fail-fast: false
@@ -172,7 +226,7 @@ jobs:
         os:
         - ubuntu-latest
         - macos-latest
-name: Build Matrix
+
 on:
   pull_request:
     branches:

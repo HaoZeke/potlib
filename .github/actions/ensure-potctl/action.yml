@@ -1,0 +1,30 @@
+# Restore prebuilt portable/fat potctl for this runner OS (from ci-tools matrix job).
+# Artifact name must include runner.os (ci-tools builds Linux musl vs macOS lipo fat separately;
+# one binary cannot span Linux and Darwin, but within each OS it is as portable as Rust allows).
+name: Ensure potctl
+description: >
+  Download OS-matched ci-tools artifact (musl Linux or fat macOS potctl) and run preflight.
+
+inputs:
+  artifact-prefix:
+    # runner.os is appended in the restore step (not valid in input description expressions).
+    description: Prefix before runner OS suffix (e.g. ci-tools-sha becomes ci-tools-sha-Linux or ci-tools-sha-macOS)
+    required: false
+    default: ci-tools
+  preflight:
+    description: Run potctl ci preflight after install
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Restore potctl (${{ runner.os }} portable/fat artifact)
+      uses: ./.github/actions/restore-ci-tools
+      with:
+        artifact-name: ${{ inputs.artifact-prefix }}-${{ runner.os }}
+
+    - name: potctl ci preflight
+      if: inputs.preflight == 'true'
+      shell: bash
+      run: potctl ci preflight

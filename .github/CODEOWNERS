@@ -1,0 +1,13 @@
+# Release / publish surfaces — require maintainer eyes on PRs that touch the cut path.
+# (GitHub only enforces CODEOWNERS when branch protection enables it.)
+
+/cog.toml                          @HaoZeke
+/towncrier.toml                    @HaoZeke
+/potctl/                          @HaoZeke
+/Cargo.toml                      @HaoZeke
+/.github/actions/                  @HaoZeke
+/.github/workflows/release.yml     @HaoZeke
+/.github/workflows/release-prepare.yml @HaoZeke
+/.github/workflows/towncrier.yml   @HaoZeke
+/docs/newsfragments/               @HaoZeke
+/SECURITY.md                       @HaoZeke
