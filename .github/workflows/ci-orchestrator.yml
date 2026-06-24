@@ -1,0 +1,489 @@
+# Single PR/main CI workflow: prepare (Nickel plan) → ordered stages.
+# Remaining separate workflows (different triggers/secrets/permissions):
+#   release.yml, release-prepare.yml, ci_docs.yml, ci_doc_commenter.yml, cosmo-potctl.yml
+# Nickel modules under ci/gha/ still document job bodies; only the files above are
+# exported by gen-gha (plus this file is hand-maintained). See ci/gha/README.md.
+name: CI (orchestrator)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # was docs_quality.yml weekly; keep link/prose hygiene on a schedule
+  schedule:
+    - cron: "15 7 * * 1"
+
+concurrency:
+  group: ci-orchestrator-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PIXi_VERSION: v0.62.1
+
+jobs:
+  # --- Stage 0: generate plan (and audit yml bundle) from Nickel ---
+  prepare:
+    name: prepare (nickel plan)
+    runs-on: ubuntu-latest
+    outputs:
+      plan_sha: ${{ steps.plan.outputs.plan_sha }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.62.1
+          cache: true
+          environments: cigen
+          activate-environment: true
+
+      - name: Export ci-plan.json (+ workflow audit bundle)
+        id: plan
+        run: |
+          set -euo pipefail
+          pixi r -e cigen export-plan
+          test -f ci/gha/out/ci-plan.json
+          echo "plan_sha=$(sha256sum ci/gha/out/ci-plan.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "--- ci-plan.json (head) ---"
+          head -c 2000 ci/gha/out/ci-plan.json
+          echo
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path("ci/gha/out/ci-plan.json").read_text())
+          print("stages:")
+          for s in plan.get("stages", []):
+              needs = ",".join(s.get("needs") or []) or "-"
+              print(f"  {s['id']:24} needs=[{needs}] role={s.get('role','')}")
+          PY
+
+      - name: Upload plan + audit workflows
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-plan-${{ github.sha }}
+          path: |
+            ci/gha/out/ci-plan.json
+            ci/gha/out/workflows-audit/
+          retention-days: 7
+
+  # --- Lint / hygiene (parallel after prepare; no potctl needed) ---
+  prek:
+    name: prek
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    # schedule runs are docs-only hygiene; skip full prek (slow, needs apt hooks)
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install environment
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          pixi-version: v0.62.1
+      - name: Install prek
+        run: |
+          if ! command -v prek >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -LsSf \
+              https://github.com/j178/prek/releases/latest/download/prek-installer.sh | sh
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          prek --version
+      - name: Install system hook deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck clang-format-16 || \
+            sudo apt-get install -y -qq cppcheck clang-format
+          if ! command -v snapper >/dev/null 2>&1 && ! command -v snapper-fmt >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -LsSf \
+              https://github.com/TurtleTech-ehf/snapper/releases/latest/download/snapper-fmt-installer.sh | sh || true
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          if command -v snapper-fmt >/dev/null 2>&1 && ! command -v snapper >/dev/null 2>&1; then
+            ln -sf "$(command -v snapper-fmt)" "$HOME/.cargo/bin/snapper"
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Run prek on all files
+        shell: pixi run bash -e {0}
+        run: |
+          if command -v snapper-fmt >/dev/null 2>&1 && ! command -v snapper >/dev/null 2>&1; then
+            mkdir -p "$HOME/.local/bin"
+            ln -sf "$(command -v snapper-fmt)" "$HOME/.local/bin/snapper"
+            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          fi
+          prek validate-config prek.toml
+          prek run -a --config prek.toml
+      - name: Audit for large files
+        uses: HaoZeke/large-file-auditor@v0.1.0
+        with:
+          file-size-threshold: 1M
+
+  docs_snapper:
+    name: snapper semantic line breaks
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install snapper-fmt
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/TurtleTech-ehf/snapper/releases/latest/download/snapper-fmt-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          if command -v snapper-fmt >/dev/null 2>&1 && ! command -v snapper >/dev/null 2>&1; then
+            ln -sf "$(command -v snapper-fmt)" "$HOME/.cargo/bin/snapper"
+          fi
+          snapper --version || snapper-fmt --version
+      - name: Check prose formatting
+        run: |
+          set -euo pipefail
+          SNAPPER_BIN="$(command -v snapper || command -v snapper-fmt)"
+          mapfile -t files < <(find docs/orgmode -type f -name '*.org' ! -path '*/.pixi/*' | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No org prose files found"
+            exit 0
+          fi
+          printf 'Checking %s org file(s)\n' "${#files[@]}"
+          if ! out=$("$SNAPPER_BIN" --check --config .snapper.toml --format org "${files[@]}" 2>&1); then
+            printf '%s\n' "$out"
+            exit 1
+          fi
+          printf '%s\n' "$out"
+          if printf '%s\n' "$out" | grep -q 'would reformat:'; then
+            echo "::error::snapper would reformat prose; run \`pixi r snapper-fix\` and commit"
+            exit 1
+          fi
+
+  docs_lychee:
+    name: lychee link check
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Restore lychee cache
+        uses: actions/cache@v5
+        with:
+          key: lychee-${{ runner.os }}-${{ hashFiles('.lychee.toml', 'README.md', 'docs/**/*.org', 'docs/**/*.md') }}
+          path: .lycheecache
+          restore-keys: lychee-${{ runner.os }}-
+      - name: Link check
+        uses: lycheeverse/lychee-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            --config .lychee.toml
+            --cache
+            --max-cache-age 2d
+            --cache-exclude-status 429,500,502,503,504
+            --no-progress
+            README.md
+            CHANGELOG.md
+            CODE_OF_CONDUCT.md
+            readme_src.org
+            docs/orgmode/**/*.org
+            rgpot-core/README.md
+            rgpot-core/README.org
+          fail: true
+
+  towncrier:
+    name: towncrier fragments
+    # needs ci-tools for potctl (thin body); was prepare-only when using pipx towncrier
+    needs: [prepare, ci-tools]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - name: Towncrier check vs base branch
+        run: potctl ci towncrier-check --compare-with ${{ github.event.pull_request.base.sha }}
+
+  # --- Stage 1: potctl tools ---
+  ci-tools:
+    name: ci-tools (potctl / ${{ matrix.os }})
+    needs: [prepare]
+    if: github.event_name != 'schedule'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Stage portable/fat potctl
+        uses: ./.github/actions/setup-ci-tools
+        with:
+          upload-artifact: "true"
+          artifact-name: ci-tools-${{ github.sha }}-${{ runner.os }}
+
+  # --- Stage 2a: C++ build matrix ---
+  build_and_test:
+    name: ${{ matrix.sys }} / ${{ matrix.os }} [RPC:${{ matrix.rpc }} CACHE:${{ matrix.cache }}]
+    needs: [prepare, ci-tools]
+    if: github.event_name != 'schedule'
+    runs-on: ${{ matrix.os }}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPILERCHECK: content
+      CCACHE_MAXSIZE: 500M
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        sys: [meson, cmake]
+        rpc: ["true", "false"]
+        cache: ["true", "false"]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.62.1
+          cache: true
+          environments: devbld rpctest
+          activate-environment: devbld
+      - name: Restore ccache
+        uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: ccache-orch-${{ runner.os }}-${{ matrix.sys }}-${{ github.sha }}
+          restore-keys: ccache-orch-${{ runner.os }}-${{ matrix.sys }}-
+      # potctl owns step logic (darwin-env + configure/build/test); nickel/GHA owns matrix only
+      - if: matrix.sys == 'meson'
+        name: Build & Test (Meson)
+        shell: pixi run bash -e {0}
+        run: potctl ci meson-test --rpc ${{ matrix.rpc }} --cache ${{ matrix.cache }}
+      - if: matrix.sys == 'cmake'
+        name: Build & Test (CMake)
+        shell: pixi run bash -e {0}
+        run: potctl ci cmake-test --rpc ${{ matrix.rpc }} --cache ${{ matrix.cache }}
+      - if: matrix.rpc == 'true' && matrix.sys == 'meson' && matrix.os == 'ubuntu-latest'
+        name: RPC Integration Test
+        shell: pixi run -e rpctest bash -e {0}
+        run: potctl ci rpc-integ --server-bin bbdir/CppCore/rgpot/rpc/potserv
+
+  # --- Stage 2b: rust ---
+  rust_tests:
+    name: Rust Core Tests (${{ matrix.os }})
+    needs: [prepare, ci-tools]
+    if: github.event_name != 'schedule'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.62.1
+          cache: true
+          environments: devbld
+          activate-environment: devbld
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: potctl unit tests
+        run: cargo test -p potctl
+      - name: Run Rust tests (nextest)
+        shell: pixi run bash -e {0}
+        run: |
+          cargo nextest run -p rgpot-core
+          cargo nextest run -p rgpot-core --all-features
+      - name: Run Rust doc-tests
+        shell: pixi run bash -e {0}
+        run: cargo test --doc -p rgpot-core
+
+  # --- Stage 2c: client bridge ---
+  client_bridge_stress:
+    name: Client Bridge Stress Test (Linux)
+    needs: [prepare, ci-tools]
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPILERCHECK: content
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.62.1
+          cache: true
+          environments: devbld rpctest
+          activate-environment: devbld
+      - name: Restore ccache
+        uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: ccache-orch-bridge-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-orch-bridge-${{ runner.os }}-
+      # potctl owns server/client/potserv+ctest; pixi only provides toolchain env
+      - name: Client bridge stress (server + client + ctest)
+        shell: pixi run bash -e {0}
+        run: potctl ci bridge-stress-full
+
+  # --- Stage 2d: potentials (was potentials.yml; shares ci-tools) ---
+  potentials_metatomic:
+    name: metatomic+vesin (meson / ubuntu)
+    needs: [prepare, ci-tools]
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: content
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 800M
+      TORCH_DEVICE: cpu
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: metatomicbld
+          cache: true
+          environments: metatomicbld
+          pixi-version: v0.62.1
+      - name: Restore Compiler Cache
+        uses: actions/cache@v5
+        with:
+          key: ccache-pot-mta-${{ runner.os }}-${{ github.sha }}
+          path: .ccache
+          restore-keys: ccache-pot-mta-${{ runner.os }}-
+      # potctl owns torch/metatomic install + meson leg; pixi only provides metatomicbld env
+      - name: Ensure torch + metatomic C++ layout
+        shell: pixi run -e metatomicbld bash -e {0}
+        run: potctl ci ensure-torch-metatomic
+      - name: Meson build & test (metatomic)
+        shell: pixi run -e metatomicbld bash -e {0}
+        run: potctl ci metatomic-test
+
+  potentials_tight_binding:
+    name: xtb+tblite (meson / ${{ matrix.os }})
+    needs: [prepare, ci-tools]
+    if: github.event_name != 'schedule'
+    runs-on: ${{ matrix.os }}
+    env:
+      CCACHE_COMPILERCHECK: content
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Ensure potctl
+        uses: ./.github/actions/ensure-potctl
+        with:
+          artifact-prefix: ci-tools-${{ github.sha }}
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: tbbld
+          cache: true
+          environments: tbbld
+          pixi-version: v0.62.1
+      - name: Restore Compiler Cache
+        uses: actions/cache@v5
+        with:
+          key: ccache-pot-tb-${{ runner.os }}-${{ github.sha }}
+          path: .ccache
+          restore-keys: ccache-pot-tb-${{ runner.os }}-
+      - name: Meson build & test (xtb + tblite)
+        shell: pixi run -e tbbld bash -e {0}
+        run: potctl ci xtb-tblite-test
+
+  # --- Single branch-protection target (require this job name in settings) ---
+  ci_gate:
+    name: CI gate
+    if: always() && github.event_name != 'schedule'
+    needs:
+      - prepare
+      - prek
+      - docs_snapper
+      - docs_lychee
+      - towncrier
+      - ci-tools
+      - build_and_test
+      - rust_tests
+      - client_bridge_stress
+      - potentials_metatomic
+      - potentials_tight_binding
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate job results
+        run: |
+          set -euo pipefail
+          # towncrier is skipped on non-PR; treat skipped/success as ok, failure/cancelled as fail
+          ok() {
+            case "$1" in
+              success|skipped) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          fail=0
+          for pair in \
+            "prepare:${{ needs.prepare.result }}" \
+            "prek:${{ needs.prek.result }}" \
+            "docs_snapper:${{ needs.docs_snapper.result }}" \
+            "docs_lychee:${{ needs.docs_lychee.result }}" \
+            "towncrier:${{ needs.towncrier.result }}" \
+            "ci-tools:${{ needs.ci-tools.result }}" \
+            "build_and_test:${{ needs.build_and_test.result }}" \
+            "rust_tests:${{ needs.rust_tests.result }}" \
+            "client_bridge_stress:${{ needs.client_bridge_stress.result }}" \
+            "potentials_metatomic:${{ needs.potentials_metatomic.result }}" \
+            "potentials_tight_binding:${{ needs.potentials_tight_binding.result }}"
+          do
+            name="${pair%%:*}"
+            res="${pair##*:}"
+            echo "$name=$res"
+            if ! ok "$res"; then
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::CI gate failed (see individual job results above)"
+            exit 1
+          fi
+          echo "CI gate passed"

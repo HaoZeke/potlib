@@ -9,7 +9,7 @@ CI builds once on Linux, then smokes the **same** artifact on Linux and macOS wi
 `ci preflight` and `release assert` (release-command completeness for the APE path).
 
 Normal `potctl` (musl Linux + fat macOS via `setup-ci-tools` / `ensure-potctl`)
-remains the default install for `build.yml`, `potentials.yml`, and `release*.yml`
+remains the default install for `ci-orchestrator.yml` (build/potentials stages) and `release*.yml`
 jobs. Cosmo is an additional **gating** check that the APE binary works for
 release-relevant commands on both OSes—not a full replacement of every potctl
 consumer in one step.
@@ -56,6 +56,11 @@ Env knobs:
 | `POTCTL_COSMO_OUT` | `potctl/cosmo/out` | Output directory |
 | `POTCTL_COSMO_SKIP_APELINK` | unset | If `1`, keep `.com.dbg` only |
 | `POTCTL_COSMO_LINKER_TRACE` | `0` | If `1`, print cosmo linker shim trace |
+
+**Libc gaps:** `potctl-cosmo-ld` compiles and links a small `cosmo-libc-compat.o` (currently a
+`waitid` stub returning `ENOSYS`) because rustc nightly `std` process/unix/pidfd references
+`waitid`, which Cosmopolitan does not provide. Extend that C snippet if future nightlies add
+more missing symbols.
 | `COSMOCC_ARCHES` | `x86_64` | Passed through to cosmocc (spike default: single-arch APE) |
 | `COSMO_CC` | auto | Prefer `cosmocc` (APE CRT/specs); fallback `x86_64-linux-cosmo-gcc` |
 
@@ -87,7 +92,7 @@ Workflow: `.github/workflows/cosmo-potctl.yml` (`potctl Cosmopolitan APE`)
 - Warm-cache steady state is on the order of minutes (not a full uncached `make toolchain`
   every run). Cold cache/first run is intentionally expensive once per cache key.
 
-Legacy file `.github/workflows/cosmo-potctl-spike.yml` is a no-op alias (workflow_dispatch
+The old `cosmo-potctl-spike.yml` alias was removed; use `cosmo-potctl.yml` only.
 only) so old links/path filters do not 404; do not add jobs there.
 
 ## Known limits

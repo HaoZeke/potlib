@@ -1,0 +1,123 @@
+# Runtime CI plan: exported as JSON for the single PR/main orchestrator.
+# This is NOT a full GHA workflow document — GHA cannot load new .yml mid-run.
+# Live executor: .github/workflows/ci-orchestrator.yml (hand-maintained).
+# See ci/gha/README.md.
+let S = import "lib/steps.ncl" in
+let P = S.pins in
+{
+  version = 2,
+  pins = {
+    checkout = P.checkout,
+    setup_pixi = P.setup_pixi,
+    pixi_version = P.pixi_version,
+    cache = P.cache,
+    install_action = P.install_action,
+    setup_ci_tools = P.setup_ci_tools,
+    ensure_potctl = P.ensure_potctl,
+    ubuntu = P.ubuntu,
+    macos = P.macos,
+  },
+  # Job graph: orchestrator encodes stages; these ids document intended order/deps.
+  stages = [
+    {
+      id = "prepare",
+      runs_on = P.ubuntu,
+      needs = [],
+      role = "export plan + audit yml artifact",
+    },
+    {
+      id = "prek",
+      runs_on = P.ubuntu,
+      needs = ["prepare"],
+      role = "prek + large-file auditor (skipped on schedule)",
+    },
+    {
+      id = "docs_snapper",
+      runs_on = P.ubuntu,
+      needs = ["prepare"],
+      role = "org prose semantic line breaks",
+    },
+    {
+      id = "docs_lychee",
+      runs_on = P.ubuntu,
+      needs = ["prepare"],
+      role = "link check",
+    },
+    {
+      id = "towncrier",
+      runs_on = P.ubuntu,
+      needs = ["prepare"],
+      role = "fragment check (pull_request only)",
+    },
+    {
+      id = "ci-tools",
+      runs_on_matrix = [P.ubuntu, P.macos],
+      needs = ["prepare"],
+      role = "build portable/fat potctl artifact per OS",
+    },
+    {
+      id = "build_and_test",
+      needs = ["ci-tools"],
+      role = "meson/cmake × os × rpc × cache",
+      matrix = {
+        os = [P.ubuntu, P.macos],
+        sys = ["meson", "cmake"],
+        rpc = ["true", "false"],
+        cache = ["true", "false"],
+      },
+    },
+    {
+      id = "rust_tests",
+      needs = ["ci-tools"],
+      role = "rgpot-core + potctl tests",
+      matrix = { os = [P.ubuntu, P.macos] },
+    },
+    {
+      id = "client_bridge_stress",
+      needs = ["ci-tools"],
+      runs_on = P.ubuntu,
+      role = "RPC client/server stress (linux)",
+    },
+    {
+      id = "potentials_metatomic",
+      needs = ["ci-tools"],
+      runs_on = P.ubuntu,
+      role = "metatomic+vesin meson (ubuntu)",
+    },
+    {
+      id = "potentials_tight_binding",
+      needs = ["ci-tools"],
+      runs_on = P.ubuntu,
+      role = "xtb+tblite meson (ubuntu)",
+    },
+    {
+      id = "ci_gate",
+      needs = [
+        "prepare",
+        "prek",
+        "docs_snapper",
+        "docs_lychee",
+        "towncrier",
+        "ci-tools",
+        "build_and_test",
+        "rust_tests",
+        "client_bridge_stress",
+        "potentials_metatomic",
+        "potentials_tight_binding",
+      ],
+      role = "single required check aggregator (branch protection target)",
+    },
+  ],
+  # Separate committed workflows (not orchestrator): release, release-prepare, ci_docs,
+  # ci_doc_commenter, cosmo-potctl — nickel-exported via gen-gha.
+  external_workflows = [
+    "release.yml",
+    "release-prepare.yml",
+    "ci_docs.yml",
+    "ci_doc_commenter.yml",
+    "cosmo-potctl.yml",
+  ],
+  scripts = {
+    darwin_env_prelude = S.darwin_env_prelude,
+  },
+}
