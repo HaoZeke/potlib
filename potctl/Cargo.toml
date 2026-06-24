@@ -6,6 +6,7 @@ description = "rgpot project control plane: release lockstep and related repo ta
 license = "MIT"
 repository = "https://github.com/OmniPotentRPC/rgpot"
 publish = false
+default-run = "potctl"
 
 [[bin]]
 name = "potctl"
