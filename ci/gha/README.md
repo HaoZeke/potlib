@@ -87,11 +87,11 @@ Nix flake *and* ad-hoc Janet — strictly worse.
 # not: 40 lines of meson setup / torch wheel / snapper installer in run: |
 ```
 
-**Shipped orchestrator thin bodies:** `meson-test` / `cmake-test` (build matrix), `ensure-torch-metatomic` +
-`metatomic-test` (potentials_metatomic), `xtb-tblite-test`, `rpc-integ`, `towncrier-check`. Release-prepare
-uses `release-assert` / `towncrier-draft` / `cog-bump-dry-run` / `cog-check`. Still inline: prepare
-export-plan, prek/snapper installers, client_bridge_stress multi-step server/client, CI gate aggregator
-(needs GHA `needs.*.result` interpolation).
+**Shipped orchestrator thin bodies:** `meson-test` / `cmake-test`, `ensure-torch-metatomic` +
+`metatomic-test`, `xtb-tblite-test`, `rpc-integ`, `towncrier-check` (auto-installs towncrier via
+pipx/pip --user if missing), `bridge-stress-full`. Release-prepare: `release-assert` /
+`towncrier-draft` / `cog-bump-dry-run` / `cog-check`. Still multi-line (honest): prepare export-plan,
+prek/snapper installer curls+apt, rust nextest one-liner block, CI gate `needs.*.result` aggregator.
 
 **Nickel does not own:** shell installers, torch wheel repair, cosmo build scripts (those move into potctl subcommands or existing cosmo paths).
 

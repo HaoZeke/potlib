@@ -190,6 +190,39 @@ enum CiCmd {
         #[arg(long, default_value = "bbdir/CppCore/rgpot/rpc/potserv")]
         server_bin: String,
     },
+    /// Client bridge stress: meson RPC server build only.
+    BridgeServerBuild {
+        #[arg(long, default_value = "bbdir_server")]
+        build_dir: String,
+    },
+    /// Client bridge stress: cmake RPC client-only build.
+    BridgeClientBuild {
+        #[arg(long, default_value = "build_client")]
+        build_dir: String,
+    },
+    /// Client bridge stress: potserv + ctest (after server/client builds).
+    BridgeStress {
+        #[arg(long, default_value = "bbdir_server")]
+        server_build_dir: String,
+        #[arg(long, default_value = "build_client")]
+        client_build_dir: String,
+        #[arg(long, default_value = "12345")]
+        port: u16,
+        #[arg(long, default_value = "LJ")]
+        potential: String,
+    },
+    /// Full client_bridge_stress leg (server + client + potserv/ctest) — one GHA line.
+    /// Thin GHA: `potctl ci bridge-stress-full`
+    BridgeStressFull {
+        #[arg(long, default_value = "bbdir_server")]
+        server_build_dir: String,
+        #[arg(long, default_value = "build_client")]
+        client_build_dir: String,
+        #[arg(long, default_value = "12345")]
+        port: u16,
+        #[arg(long, default_value = "LJ")]
+        potential: String,
+    },
 }
 
 fn run() -> Result<(), String> {
@@ -271,6 +304,37 @@ fn run() -> Result<(), String> {
                 ci::run_xtb_tblite_test(&root, &build_dir)
             }
             CiCmd::RpcInteg { server_bin } => ci::run_rpc_integ(&root, &server_bin),
+            CiCmd::BridgeServerBuild { build_dir } => {
+                ci::run_bridge_server_build(&root, &build_dir)
+            }
+            CiCmd::BridgeClientBuild { build_dir } => {
+                ci::run_bridge_client_build(&root, &build_dir)
+            }
+            CiCmd::BridgeStress {
+                server_build_dir,
+                client_build_dir,
+                port,
+                potential,
+            } => ci::run_bridge_stress(
+                &root,
+                &server_build_dir,
+                &client_build_dir,
+                port,
+                &potential,
+                2,
+            ),
+            CiCmd::BridgeStressFull {
+                server_build_dir,
+                client_build_dir,
+                port,
+                potential,
+            } => ci::run_bridge_stress_full(
+                &root,
+                &server_build_dir,
+                &client_build_dir,
+                port,
+                &potential,
+            ),
         },
         #[cfg(feature = "cosmo-host")]
         Commands::Cosmo { action } => match action {

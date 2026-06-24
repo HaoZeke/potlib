@@ -327,6 +327,138 @@ pub fn run_release_assert(root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// How we invoke towncrier once installed (direct binary vs `python -m towncrier`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TowncrierInvoke {
+    Bin,
+    PythonModule,
+}
+
+/// Pure: prefer direct `towncrier` on PATH, else python -m if pip installed it.
+pub fn select_towncrier_invoke(has_towncrier_bin: bool, has_python: bool) -> Option<TowncrierInvoke> {
+    if has_towncrier_bin {
+        Some(TowncrierInvoke::Bin)
+    } else if has_python {
+        Some(TowncrierInvoke::PythonModule)
+    } else {
+        None
+    }
+}
+
+/// Install/locate towncrier for CI runners that only have potctl (no uvx/pipx preinstalled).
+/// Order: existing `towncrier` → `pipx install` → `python3 -m pip install --user` → `uvx` last.
+fn ensure_towncrier_available() -> Result<TowncrierInvoke> {
+    if which_bin("towncrier").is_some() {
+        return Ok(TowncrierInvoke::Bin);
+    }
+    if which_bin("pipx").is_some() {
+        println!("potctl: installing towncrier via pipx");
+        let st = Command::new("pipx")
+            .args(["install", "towncrier"])
+            .status()
+            .map_err(|e| format!("pipx install towncrier: {e}"))?;
+        if st.success() && which_bin("towncrier").is_some() {
+            return Ok(TowncrierInvoke::Bin);
+        }
+        // pipx may install but PATH not refreshed in same process; try common pipx bin dir.
+        if let Ok(home) = env::var("HOME") {
+            let cand = PathBuf::from(home).join(".local/bin/towncrier");
+            if cand.is_file() {
+                return Ok(TowncrierInvoke::Bin);
+            }
+        }
+    }
+    let py = which_bin("python3").or_else(|| which_bin("python"));
+    if let Some(ref py) = py {
+        println!("potctl: installing towncrier via {} -m pip --user", py.display());
+        let _ = Command::new(py)
+            .args(["-m", "ensurepip", "--upgrade"])
+            .status();
+        let st = Command::new(py)
+            .args(["-m", "pip", "install", "--user", "--quiet", "towncrier"])
+            .status()
+            .map_err(|e| format!("pip install towncrier: {e}"))?;
+        if st.success() {
+            if which_bin("towncrier").is_some() {
+                return Ok(TowncrierInvoke::Bin);
+            }
+            // scripts may land in ~/.local/bin not on PATH
+            if let Ok(home) = env::var("HOME") {
+                let cand = PathBuf::from(&home).join(".local/bin/towncrier");
+                if cand.is_file() {
+                    // Prepend to PATH for subsequent Command::new("towncrier")
+                    let local = PathBuf::from(&home).join(".local/bin");
+                    let mut paths = vec![local];
+                    if let Ok(cur) = env::var("PATH") {
+                        for p in env::split_paths(&cur) {
+                            paths.push(p);
+                        }
+                    }
+                    if let Ok(joined) = env::join_paths(paths) {
+                        env::set_var("PATH", joined);
+                    }
+                    if which_bin("towncrier").is_some() {
+                        return Ok(TowncrierInvoke::Bin);
+                    }
+                }
+            }
+            return Ok(TowncrierInvoke::PythonModule);
+        }
+    }
+    if which_bin("uvx").is_some() {
+        // uvx runs without install; treated as module-like at call site
+        return Ok(TowncrierInvoke::PythonModule);
+    }
+    Err(
+        "towncrier not available: install with `pipx install towncrier` or `pip install --user towncrier` (or provide uvx)"
+            .into(),
+    )
+}
+
+fn run_towncrier_argv(root: &Path, invoke: TowncrierInvoke, args: &[&str]) -> Result<()> {
+    let status = match invoke {
+        TowncrierInvoke::Bin => {
+            let mut cmd = Command::new("towncrier");
+            cmd.args(args).current_dir(root);
+            cmd.status()
+                .map_err(|e| format!("spawn towncrier: {e}"))?
+        }
+        TowncrierInvoke::PythonModule => {
+            // Prefer python -m towncrier; if only uvx works, use that as last resort.
+            if let Some(py) = which_bin("python3").or_else(|| which_bin("python")) {
+                let mut cmd = Command::new(py);
+                cmd.arg("-m").arg("towncrier").args(args).current_dir(root);
+                let st = cmd
+                    .status()
+                    .map_err(|e| format!("spawn python -m towncrier: {e}"))?;
+                if st.success() || which_bin("uvx").is_none() {
+                    if st.success() {
+                        return Ok(());
+                    }
+                    return Err(format!("python -m towncrier {} failed with {st}", args.join(" ")));
+                }
+            }
+            if which_bin("uvx").is_some() {
+                let mut cmd = Command::new("uvx");
+                cmd.arg("towncrier").args(args).current_dir(root);
+                let st = cmd
+                    .status()
+                    .map_err(|e| format!("spawn uvx towncrier: {e}"))?;
+                if st.success() {
+                    return Ok(());
+                }
+                return Err(format!("uvx towncrier {} failed with {st}", args.join(" ")));
+            }
+            return Err("no python/uvx for towncrier module invoke".into());
+        }
+    };
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("towncrier {} failed with {status}", args.join(" ")))
+    }
+}
+
 /// `potctl ci towncrier-draft` — towncrier build --draft if any newsfragments exist.
 pub fn run_towncrier_draft(root: &Path) -> Result<()> {
     let frag_dir = root.join("docs/newsfragments");
@@ -344,15 +476,8 @@ pub fn run_towncrier_draft(root: &Path) -> Result<()> {
         println!("No newsfragments; skip draft (ok if this PR only touches tooling)");
         return Ok(());
     }
-    let status = Command::new("uvx")
-        .args(["towncrier", "build", "--draft"])
-        .current_dir(root)
-        .status()
-        .map_err(|e| format!("spawn uvx towncrier: {e}"))?;
-    if !status.success() {
-        return Err(format!("towncrier build --draft failed with {status}"));
-    }
-    Ok(())
+    let invoke = ensure_towncrier_available()?;
+    run_towncrier_argv(root, invoke, &["build", "--draft"])
 }
 
 /// `potctl ci cog-bump-dry-run` — PR tip (meson version) or workflow_dispatch bump kind.
@@ -791,29 +916,109 @@ pub fn run_towncrier_check(root: &Path, compare_with: &str) -> Result<()> {
     if compare_with.is_empty() {
         return Err("towncrier-check requires --compare-with <sha>".into());
     }
-    // Prefer system/pipx towncrier; fall back to uvx.
-    let direct = Command::new("towncrier")
-        .args(["check", "--compare-with", compare_with])
+    let invoke = ensure_towncrier_available()?;
+    run_towncrier_argv(root, invoke, &["check", "--compare-with", compare_with])
+}
+
+/// Pure: meson argv for RPC server build (client_bridge_stress).
+pub fn bridge_server_meson_setup_args(build_dir: &str) -> Vec<String> {
+    vec![
+        "setup".into(),
+        build_dir.into(),
+        "-Dwith_rpc=true".into(),
+        "-Dwith_tests=false".into(),
+        "-Dwith_examples=false".into(),
+    ]
+}
+
+/// Pure: cmake argv for RPC client-only configure.
+pub fn bridge_client_cmake_configure_args(build_dir: &str) -> Vec<String> {
+    vec![
+        "-S".into(),
+        ".".into(),
+        "-B".into(),
+        build_dir.into(),
+        "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache".into(),
+        "-DCMAKE_C_COMPILER_LAUNCHER=ccache".into(),
+        "-DCMAKE_BUILD_TYPE=Release".into(),
+        "-DRGPOT_RPC_CLIENT_ONLY=ON".into(),
+        "-DRGPOT_BUILD_TESTS=ON".into(),
+    ]
+}
+
+/// Pure: default potserv path under meson server build dir.
+pub fn bridge_potserv_path(server_build_dir: &str) -> PathBuf {
+    PathBuf::from(server_build_dir)
+        .join("CppCore/rgpot/rpc/potserv")
+}
+
+/// `potctl ci bridge-server-build` — meson RPC server (no tests).
+pub fn run_bridge_server_build(root: &Path, build_dir: &str) -> Result<()> {
+    let setup = bridge_server_meson_setup_args(build_dir);
+    let refs: Vec<&str> = setup.iter().map(String::as_str).collect();
+    run_cmd("meson", &refs, root)?;
+    run_cmd("meson", &["compile", "-C", build_dir], root)?;
+    Ok(())
+}
+
+/// `potctl ci bridge-client-build` — cmake RPC client-only + tests target.
+pub fn run_bridge_client_build(root: &Path, build_dir: &str) -> Result<()> {
+    let cfg = bridge_client_cmake_configure_args(build_dir);
+    let refs: Vec<&str> = cfg.iter().map(String::as_str).collect();
+    run_cmd("cmake", &refs, root)?;
+    run_cmd("cmake", &["--build", build_dir, "-j"], root)?;
+    Ok(())
+}
+
+/// `potctl ci bridge-stress` — start potserv, ctest client, kill potserv.
+pub fn run_bridge_stress(
+    root: &Path,
+    server_build_dir: &str,
+    client_build_dir: &str,
+    port: u16,
+    potential: &str,
+    sleep_secs: u64,
+) -> Result<()> {
+    let potserv = root.join(bridge_potserv_path(server_build_dir));
+    if !potserv.is_file() {
+        return Err(format!(
+            "missing potserv at {} (run bridge-server-build first)",
+            potserv.display()
+        ));
+    }
+    let mut child = Command::new(&potserv)
+        .args([port.to_string(), potential.to_string()])
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|e| format!("spawn potserv: {e}"))?;
+    std::thread::sleep(std::time::Duration::from_secs(sleep_secs));
+    let ctest = Command::new("ctest")
+        .args(["--test-dir", client_build_dir, "--output-on-failure"])
         .current_dir(root)
         .status();
-    if let Ok(s) = direct {
-        if s.success() {
-            return Ok(());
-        }
-        if which_bin("uvx").is_none() {
-            return Err(format!("towncrier check failed with {s}"));
-        }
+    let _ = child.kill();
+    let _ = child.wait();
+    match ctest {
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => Err(format!("ctest failed with {s}")),
+        Err(e) => Err(format!("spawn ctest: {e}")),
     }
-    let st = Command::new("uvx")
-        .args(["towncrier", "check", "--compare-with", compare_with])
-        .current_dir(root)
-        .status()
-        .map_err(|e| format!("uvx towncrier: {e}"))?;
-    if st.success() {
-        Ok(())
-    } else {
-        Err(format!("towncrier check failed with {st}"))
-    }
+}
+
+/// Full client_bridge_stress leg (server + client + stress) in one verb for maximum thinning.
+pub fn run_bridge_stress_full(
+    root: &Path,
+    server_build_dir: &str,
+    client_build_dir: &str,
+    port: u16,
+    potential: &str,
+) -> Result<()> {
+    run_bridge_server_build(root, server_build_dir)?;
+    run_bridge_client_build(root, client_build_dir)?;
+    run_bridge_stress(root, server_build_dir, client_build_dir, port, potential, 2)
 }
 
 /// `potctl ci rpc-integ` — run tests/rpc_integ.py against potserv in bbdir.
@@ -1267,6 +1472,36 @@ mod tests {
         assert!(paths
             .iter()
             .any(|p| p.ends_with("metatomic/torch/torch-2.10/include")));
+    }
+
+    #[test]
+    fn towncrier_invoke_selection() {
+        assert_eq!(
+            select_towncrier_invoke(true, false),
+            Some(TowncrierInvoke::Bin)
+        );
+        assert_eq!(
+            select_towncrier_invoke(false, true),
+            Some(TowncrierInvoke::PythonModule)
+        );
+        assert_eq!(select_towncrier_invoke(false, false), None);
+        assert_eq!(
+            select_towncrier_invoke(true, true),
+            Some(TowncrierInvoke::Bin)
+        );
+    }
+
+    #[test]
+    fn bridge_argv_builders() {
+        let s = bridge_server_meson_setup_args("bbdir_server");
+        assert!(s.iter().any(|x| x == "-Dwith_rpc=true"));
+        assert_eq!(s[1], "bbdir_server");
+        let c = bridge_client_cmake_configure_args("build_client");
+        assert!(c.iter().any(|x| x == "-DRGPOT_RPC_CLIENT_ONLY=ON"));
+        assert!(c.iter().any(|x| x == "build_client"));
+        let p = bridge_potserv_path("bbdir_server");
+        assert!(p.ends_with("potserv"));
+        assert!(p.to_string_lossy().contains("bbdir_server"));
     }
 
     #[test]

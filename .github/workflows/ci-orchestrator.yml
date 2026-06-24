@@ -350,26 +350,10 @@ jobs:
           path: .ccache
           key: ccache-orch-bridge-${{ runner.os }}-${{ github.sha }}
           restore-keys: ccache-orch-bridge-${{ runner.os }}-
-      - shell: pixi run bash -e {0}
-        run: |
-          meson setup bbdir_server -Dwith_rpc=true -Dwith_tests=false -Dwith_examples=false
-          meson compile -C bbdir_server
-      - shell: pixi run bash -e {0}
-        run: |
-          cmake -S . -B build_client \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DRGPOT_RPC_CLIENT_ONLY=ON \
-            -DRGPOT_BUILD_TESTS=ON
-          cmake --build build_client -j
-      - shell: pixi run bash -e {0}
-        run: |
-          ./bbdir_server/CppCore/rgpot/rpc/potserv 12345 LJ &
-          SERVER_PID=$!
-          sleep 2
-          ctest --test-dir build_client --output-on-failure
-          kill $SERVER_PID
+      # potctl owns server/client/potserv+ctest; pixi only provides toolchain env
+      - name: Client bridge stress (server + client + ctest)
+        shell: pixi run bash -e {0}
+        run: potctl ci bridge-stress-full
 
   # --- Stage 2d: potentials (was potentials.yml; shares ci-tools) ---
   potentials_metatomic:
