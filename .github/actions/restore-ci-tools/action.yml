@@ -1,0 +1,38 @@
+# Download a ci-tools artifact produced by setup-ci-tools (upload-artifact=true)
+# and put its bin/ on PATH. No cargo/rust required on this runner.
+name: Restore CI tools
+description: Download staged ci-tools artifact and add bin/ to PATH
+
+inputs:
+  artifact-name:
+    description: Artifact name uploaded by setup-ci-tools
+    required: false
+    default: ci-tools
+
+runs:
+  using: composite
+  steps:
+    - name: Download ci-tools artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/ci-tools
+
+    - name: Put ci-tools on PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        PREFIX="${RUNNER_TEMP}/ci-tools"
+        if [ ! -d "${PREFIX}/bin" ]; then
+          echo "error: ${PREFIX}/bin missing after artifact download" >&2
+          ls -laR "${PREFIX}" 2>/dev/null || true
+          exit 1
+        fi
+        chmod -R a+rX "${PREFIX}"
+        # binaries must be executable after artifact round-trip
+        find "${PREFIX}/bin" -type f -exec chmod a+x {} +
+        echo "CI_TOOLS_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+        echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+        ls -la "${PREFIX}/bin"
+        command -v potctl || test -x "${PREFIX}/bin/potctl"
+        "${PREFIX}/bin/potctl" --help | head -2 || true

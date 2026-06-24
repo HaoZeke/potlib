@@ -54,16 +54,30 @@ TEST_CASE("unit_conversion_factor compound expressions", "[units]") {
   }
 
   SECTION("pressure: eV/A^3 to hartree/bohr^3") {
-    double factor = rgpot::units::unit_conversion_factor("eV/angstrom^3",
-                                                         "hartree/bohr^3");
+    double factor =
+        rgpot::units::unit_conversion_factor("eV/angstrom^3", "hartree/bohr^3");
     REQUIRE_THAT(factor, WithinRel(0.00544, 1e-2));
+  }
+
+  SECTION("whitespace and case are ignored") {
+    double a = rgpot::units::unit_conversion_factor("Angstrom", "BOHR");
+    double b = rgpot::units::unit_conversion_factor(" angstrom ", " bohr ");
+    REQUIRE_THAT(a, WithinRel(b, 1e-12));
+  }
+
+  SECTION("power and grouping") {
+    // (eV/A) has force dimensions; reciprocal should invert the factor
+    double forward =
+        rgpot::units::unit_conversion_factor("eV/angstrom", "hartree/bohr");
+    double inverse =
+        rgpot::units::unit_conversion_factor("hartree/bohr", "eV/angstrom");
+    REQUIRE_THAT(forward * inverse, WithinRel(1.0, 1e-10));
   }
 }
 
 TEST_CASE("unit_conversion_factor dimension mismatch", "[units]") {
-  REQUIRE_THROWS_AS(
-      rgpot::units::unit_conversion_factor("angstrom", "eV"),
-      std::invalid_argument);
+  REQUIRE_THROWS_AS(rgpot::units::unit_conversion_factor("angstrom", "eV"),
+                    std::invalid_argument);
 }
 
 TEST_CASE("unit_conversion_factor unknown unit", "[units]") {
@@ -76,17 +90,37 @@ TEST_CASE("validate_unit", "[units]") {
   REQUIRE_NOTHROW(rgpot::units::validate_unit("energy", "eV"));
   REQUIRE_NOTHROW(rgpot::units::validate_unit("force", "eV/angstrom"));
   REQUIRE_NOTHROW(rgpot::units::validate_unit("length", "bohr"));
+  REQUIRE_NOTHROW(rgpot::units::validate_unit("pressure", "eV/angstrom^3"));
 
   REQUIRE_THROWS_AS(rgpot::units::validate_unit("energy", "angstrom"),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(rgpot::units::validate_unit("force", "eV"),
                     std::invalid_argument);
 }
 
 TEST_CASE("constexpr constants match parser", "[units]") {
-  double parsed_bohr =
-      rgpot::units::unit_conversion_factor("bohr", "angstrom");
+  double parsed_bohr = rgpot::units::unit_conversion_factor("bohr", "angstrom");
   REQUIRE_THAT(parsed_bohr, WithinRel(rgpot::units::BOHR_TO_ANGSTROM, 1e-8));
 
-  double parsed_hartree =
-      rgpot::units::unit_conversion_factor("hartree", "eV");
+  double parsed_hartree = rgpot::units::unit_conversion_factor("hartree", "eV");
   REQUIRE_THAT(parsed_hartree, WithinRel(rgpot::units::HARTREE_TO_EV, 1e-8));
+
+  double parsed_force =
+      rgpot::units::unit_conversion_factor("hartree/bohr", "eV/angstrom");
+  REQUIRE_THAT(parsed_force,
+               WithinRel(rgpot::units::HARTREE_BOHR_TO_EV_ANGSTROM, 1e-8));
+}
+
+TEST_CASE("round-trip conversions are inverses", "[units]") {
+  const char *pairs[][2] = {
+      {"angstrom", "bohr"},
+      {"eV", "hartree"},
+      {"eV/angstrom", "hartree/bohr"},
+      {"kcal/mol", "eV"},
+  };
+  for (const auto &pair : pairs) {
+    double f = rgpot::units::unit_conversion_factor(pair[0], pair[1]);
+    double g = rgpot::units::unit_conversion_factor(pair[1], pair[0]);
+    REQUIRE_THAT(f * g, WithinRel(1.0, 1e-10));
+  }
 }

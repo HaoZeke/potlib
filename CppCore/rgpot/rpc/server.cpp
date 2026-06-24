@@ -165,10 +165,13 @@ int main(int argc, char *argv[]) {
   std::string pot_type = argv[2];
   std::unique_ptr<rgpot::PotentialBase> potential_to_use;
 
+#ifdef RGPOT_HAS_FORTRAN
   if (pot_type == "CuH2") {
     std::cout << "Loading CuH2 potential..." << std::endl;
     potential_to_use = std::make_unique<rgpot::CuH2Pot>();
-  } else if (pot_type == "LJ") {
+  } else
+#endif // RGPOT_HAS_FORTRAN
+      if (pot_type == "LJ") {
     std::cout << "Loading LJ potential..." << std::endl;
     potential_to_use = std::make_unique<rgpot::LJPot>();
 #ifdef RGPOT_HAS_XTB

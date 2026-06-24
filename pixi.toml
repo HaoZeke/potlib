@@ -4,7 +4,7 @@ channels = ["conda-forge"]
 description = "RPC based core for potential energy surface functionality."
 name = "rgpot"
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
-version = "0.1.0"
+version = "1.2.0"
 
 [feature.cigen.tasks]
 gen-gha = { cmd = "nickel export --format yaml ci/gha/workflow.ncl -o .github/workflows/build.yml" }
@@ -33,6 +33,8 @@ tblite = ">=0.3.0,<1"
 platforms = ["linux-64"]
 
 [feature.metatomic.dependencies]
+# uv is already in the default workspace deps; potentials.yml uses it for
+# fallback wheel installs when pypi packages are incomplete in the env.
 
 [feature.metatomic.pypi-dependencies]
 torch = ">=2.10, <2.11"
@@ -104,6 +106,28 @@ rust-test-all = { cmd = "cargo nextest run --manifest-path rgpot-core/Cargo.toml
 gen-header = { cmd = "cargo build --manifest-path rgpot-core/Cargo.toml --features gen-header", description = "Regenerate C header (include/rgpot.h) from Rust source" }
 towncrier-draft = { cmd = "uvx towncrier build --draft", description = "Preview release notes" }
 towncrier-build = { cmd = "uvx towncrier build", description = "Build release notes into CHANGELOG.md" }
+
+# Prose / link hygiene (mirrors .github/workflows/docs_quality.yml).
+# snapper/snapper-fmt: org sources under docs/orgmode only (avoids splitting long markdown URLs).
+snapper-check = { cmd = "bash -lc 'set -euo pipefail; S=$(command -v snapper || command -v snapper-fmt); mapfile -t f < <(find docs/orgmode -type f -name \"*.org\" | sort); \"$S\" --check --config .snapper.toml --format org \"${f[@]}\"'", description = "Semantic line-break check on docs/orgmode (CI parity)" }
+snapper-fix = { cmd = "bash -lc 'set -euo pipefail; S=$(command -v snapper || command -v snapper-fmt); mapfile -t f < <(find docs/orgmode -type f -name \"*.org\" | sort); \"$S\" --in-place --config .snapper.toml --format org \"${f[@]}\"'", description = "Apply semantic line breaks to docs/orgmode" }
+lychee-check = { cmd = "lychee --config .lychee.toml --cache --max-cache-age 2d --no-progress README.md CHANGELOG.md CODE_OF_CONDUCT.md readme_src.org 'docs/orgmode/**/*.org' rgpot-core/README.md rgpot-core/README.org", description = "Link check with lychee (CI parity)" }
+
+# Hook runner (prek replaces pre-commit; config is prek.toml)
+prek = { cmd = "prek run -a --config prek.toml", description = "Run all prek hooks on the repo" }
+prek-install = { cmd = "prek install", description = "Install prek git shims into .git/hooks" }
+prek-validate = { cmd = "prek validate-config prek.toml", description = "Validate prek.toml" }
+
+# potctl: cargo workspace member at potctl/; project CLI (release + CI helpers).
+release-potctl = { cmd = "cargo run -q -p potctl --", description = "rgpot project CLI. Usage: pixi r release-potctl -- release assert | ci preflight" }
+release-sync-versions = { cmd = "cargo run -q -p potctl -- release sync", description = "Lockstep version write. Usage: pixi r release-sync-versions -- 1.2.3" }
+release-assert-lockstep = { cmd = "cargo run -q -p potctl -- release assert", description = "Assert meson/cmake/cargo/towncrier/pixi agree. Optional version; --require-changelog" }
+release-extract-changelog = { cmd = "cargo run -q -p potctl -- release notes", description = "Print CHANGELOG section. Usage: pixi r release-extract-changelog -- 1.2.0 -o /tmp/notes.md" }
+ci-preflight = { cmd = "cargo run -q -p potctl -- ci preflight", description = "Repo sanity + lockstep (CI first step parity)" }
+ci-darwin-env = { cmd = "cargo run -q -p potctl -- ci darwin-env", description = "Print macOS/pixi host clang/SDK exports (eval in shell)" }
+potctl-test = { cmd = "cargo test -p potctl", description = "Unit tests for potctl (lockstep + CI helpers)" }
+release-cog-dry = { cmd = "cog bump --auto --dry-run", description = "Preview next cog bump without writing" }
+release-towncrier-check = { cmd = "uvx towncrier check", description = "Fail if PR lacks newsfragments vs base (run in CI with --compare-with)" }
 
 [feature.docs.tasks.gen-readme]
 description = "Export rgpot-core/README.org to README.md"

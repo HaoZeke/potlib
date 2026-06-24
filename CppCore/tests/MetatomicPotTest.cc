@@ -10,8 +10,8 @@
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
-using rgpot::types::AtomMatrix;
 using Catch::Matchers::WithinAbs;
+using rgpot::types::AtomMatrix;
 
 // 13 hydrogen atoms from eOn lj38 test (pos.con), positions in Angstrom
 // Cell: 101.9424 x 103.1426 x 102.6055 (orthogonal, 90 deg)
@@ -111,4 +111,40 @@ TEST_CASE("MetatomicPot forces sum to zero", "[metatomic]") {
   REQUIRE_THAT(fx_sum, WithinAbs(0.0, 1.0));
   REQUIRE_THAT(fy_sum, WithinAbs(0.0, 1.0));
   REQUIRE_THAT(fz_sum, WithinAbs(0.0, 1.0));
+}
+
+TEST_CASE("MetatomicPot is deterministic across repeated calls",
+          "[metatomic]") {
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "data/lj38/lennard-jones.pt";
+  cfg.device = "cpu";
+  cfg.length_unit = "angstrom";
+  rgpot::MetatomicPot pot(cfg);
+
+  AtomMatrix positions(N_ATOMS, 3);
+  for (int i = 0; i < N_ATOMS; ++i)
+    for (int j = 0; j < 3; ++j)
+      positions(i, j) = lj13_pos[i * 3 + j];
+
+  std::vector<int> atmtypes(lj13_atmnrs, lj13_atmnrs + N_ATOMS);
+  std::array<std::array<double, 3>, 3> box = {
+      {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
+
+  // Second call exercises the cached atomic_types tensor path
+  auto [e1, f1] = pot(positions, atmtypes, box);
+  auto [e2, f2] = pot(positions, atmtypes, box);
+
+  REQUIRE_THAT(e1, WithinAbs(e2, 1e-8));
+  for (int i = 0; i < N_ATOMS; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      REQUIRE_THAT(f1(i, j), WithinAbs(f2(i, j), 1e-6));
+    }
+  }
+}
+
+TEST_CASE("MetatomicPot missing model path throws", "[metatomic]") {
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "data/lj38/does-not-exist.pt";
+  cfg.device = "cpu";
+  REQUIRE_THROWS(rgpot::MetatomicPot(cfg));
 }

@@ -1,0 +1,134 @@
+# Build/install repo CI tools (potctl) into ci-tools/bin.
+# Portable/fat builds:
+#   Linux  — x86_64-unknown-linux-musl when available (static-ish, runs across distros);
+#            falls back to host triple with -C target-feature=+crt-static when feasible.
+#   macOS  — universal fat binary (aarch64-apple-darwin + x86_64-apple-darwin via lipo).
+# Upload uses artifact-name (caller should include runner.os so restore picks the right file).
+name: Setup CI tools
+description: >
+  Build portable/fat potctl into ci-tools/bin; optional cog; optional artifact upload.
+
+inputs:
+  install-cog:
+    description: Install cocogitto 7 into ci-tools/bin (cargo install --root)
+    required: false
+    default: "false"
+  upload-artifact:
+    description: Upload ci-tools/ as a GHA artifact for other jobs
+    required: false
+    default: "false"
+  artifact-name:
+    description: Artifact name when upload-artifact is true (include OS, e.g. ci-tools-sha-Linux)
+    required: false
+    default: ci-tools
+  potctl-features:
+    description: Extra cargo features for potctl (usually empty)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Rust toolchain (stable + cross targets)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || 'x86_64-unknown-linux-musl' }}
+
+    - name: musl linker (Linux portable build)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # musl target needs a musl-capable linker on the runner
+        if ! command -v musl-gcc >/dev/null 2>&1 && ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq musl-tools
+        fi
+        musl-gcc --version | head -1 || true
+
+    - name: Rust cache (workspace / potctl)
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: ". -> target"
+        # Include OS so macOS/linux caches do not collide
+        shared-key: potctl-ci-tools-${{ runner.os }}
+        cache-targets: true
+        cache-all-crates: false
+
+    - name: Prepare ci-tools prefix
+      shell: bash
+      run: |
+        set -euo pipefail
+        PREFIX="${RUNNER_TEMP}/ci-tools"
+        mkdir -p "${PREFIX}/bin"
+        echo "CI_TOOLS_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+        echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+
+    - name: Build portable potctl
+      shell: bash
+      run: |
+        set -euo pipefail
+        PREFIX="${CI_TOOLS_PREFIX:-${RUNNER_TEMP}/ci-tools}"
+        FEATURES_ARGS=()
+        if [ -n "${{ inputs.potctl-features }}" ]; then
+          FEATURES_ARGS=(--features "${{ inputs.potctl-features }}")
+        fi
+        OUT=""
+        case "${RUNNER_OS:-}" in
+          macOS)
+            # Fat/universal: arm64 + x86_64 in one Mach-O (runs on Apple Silicon and Intel runners).
+            echo "Building macOS fat potctl (aarch64 + x86_64)..."
+            cargo build -q -p potctl --release --target aarch64-apple-darwin "${FEATURES_ARGS[@]+"${FEATURES_ARGS[@]}"}"
+            cargo build -q -p potctl --release --target x86_64-apple-darwin "${FEATURES_ARGS[@]+"${FEATURES_ARGS[@]}"}"
+            lipo -create -output "${PREFIX}/bin/potctl" \
+              target/aarch64-apple-darwin/release/potctl \
+              target/x86_64-apple-darwin/release/potctl
+            lipo -info "${PREFIX}/bin/potctl"
+            OUT="${PREFIX}/bin/potctl"
+            ;;
+          Linux)
+            # musl: single static-linked binary, portable across glibc/musl hosts (same arch).
+            if rustup target list --installed | grep -qx 'x86_64-unknown-linux-musl' \
+              || rustup target add x86_64-unknown-linux-musl 2>/dev/null; then
+              echo "Building Linux musl potctl (portable)..."
+              export RUSTFLAGS="${RUSTFLAGS:-} -C target-feature=+crt-static"
+              cargo build -q -p potctl --release --target x86_64-unknown-linux-musl "${FEATURES_ARGS[@]+"${FEATURES_ARGS[@]}"}"
+              install -m 0755 target/x86_64-unknown-linux-musl/release/potctl "${PREFIX}/bin/potctl"
+            else
+              echo "musl target unavailable; host triple release build"
+              cargo build -q -p potctl --release "${FEATURES_ARGS[@]+"${FEATURES_ARGS[@]}"}"
+              install -m 0755 target/release/potctl "${PREFIX}/bin/potctl"
+            fi
+            OUT="${PREFIX}/bin/potctl"
+            file "$OUT" || true
+            ldd "$OUT" 2>/dev/null || echo "(static or non-ELF check skipped)"
+            ;;
+          *)
+            cargo build -q -p potctl --release "${FEATURES_ARGS[@]+"${FEATURES_ARGS[@]}"}"
+            install -m 0755 target/release/potctl "${PREFIX}/bin/potctl"
+            OUT="${PREFIX}/bin/potctl"
+            ;;
+        esac
+        "$OUT" --version 2>/dev/null || "$OUT" --help | head -2
+        echo "potctl installed -> $OUT (portable/fat build for ${RUNNER_OS:-unknown})"
+
+    - name: Install cocogitto (cog) into ci-tools
+      if: inputs.install-cog == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        PREFIX="${CI_TOOLS_PREFIX:-${RUNNER_TEMP}/ci-tools}"
+        if [ ! -x "${PREFIX}/bin/cog" ]; then
+          cargo install --locked --root "$PREFIX" cocogitto --version 7.0.0 \
+            || cargo install --locked --root "$PREFIX" cocogitto
+        fi
+        cog --version
+
+    - name: Upload ci-tools artifact
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/ci-tools
+        if-no-files-found: error
+        retention-days: 3

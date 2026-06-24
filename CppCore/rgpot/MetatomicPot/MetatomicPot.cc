@@ -27,7 +27,7 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
   }
 
   m_model = metatomic_torch::load_atomistic_model(m_config.model_path,
-                                                   extensions_directory);
+                                                  extensions_directory);
 
   // 2. Extract capabilities and neighbor list requests
   m_capabilities =
@@ -83,7 +83,8 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
 
   // 5. Resolve energy output key
   auto outputs = m_capabilities->outputs();
-  m_energy_key = metatomic_torch::pick_output("energy", outputs, torch::nullopt);
+  m_energy_key =
+      metatomic_torch::pick_output("energy", outputs, torch::nullopt);
   if (!outputs.contains(m_energy_key)) {
     throw std::runtime_error("Missing energy output in metatomic model");
   }
@@ -182,27 +183,33 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
 metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
     metatomic_torch::NeighborListOptions request, long nAtoms,
-    const double *positions, const double *box,
-    const bool periodic[3]) const {
+    const double *positions, const double *box, const bool periodic[3]) const {
 
   auto cutoff = request->engine_cutoff(m_config.length_unit);
 
+  // vesin 0.5+: VesinOptions gained `sorted` and `algorithm` (default zero =
+  // VesinAutoAlgorithm). Zero-init then set only the fields we care about so
+  // newer fields stay at safe defaults.
   VesinOptions options{};
   options.cutoff = cutoff;
   options.full = request->full_list();
+  options.sorted = false;
+  options.algorithm = VesinAutoAlgorithm;
   options.return_shifts = true;
   options.return_distances = false;
   options.return_vectors = true;
 
   VesinNeighborList *vesin_nl = new VesinNeighborList();
 
-  VesinDevice cpu = VesinCPU;
+  // vesin 0.5+: VesinDevice is struct { VesinDeviceKind type; int device_id; }.
+  // (0.3–0.4 briefly used an enum typedef; we require >=0.5 for the struct
+  // API.)
+  VesinDevice cpu{VesinCPU, /*device_id=*/0};
   const char *error_message = nullptr;
-  int status = vesin_neighbors(reinterpret_cast<const double(*)[3]>(positions),
-                               static_cast<size_t>(nAtoms),
-                               reinterpret_cast<const double(*)[3]>(box),
-                               const_cast<bool *>(periodic), cpu, options,
-                               vesin_nl, &error_message);
+  int status = vesin_neighbors(
+      reinterpret_cast<const double (*)[3]>(positions),
+      static_cast<size_t>(nAtoms), reinterpret_cast<const double (*)[3]>(box),
+      const_cast<bool *>(periodic), cpu, options, vesin_nl, &error_message);
 
   if (status != EXIT_SUCCESS) {
     std::string err_str = "vesin_neighbors failed";
@@ -220,10 +227,8 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
   auto pair_samples_values = torch::empty({n_pairs, 5}, labels_options_cpu);
   auto pair_samples_values_ptr = pair_samples_values.accessor<int32_t, 2>();
   for (int64_t i = 0; i < n_pairs; i++) {
-    pair_samples_values_ptr[i][0] =
-        static_cast<int32_t>(vesin_nl->pairs[i][0]);
-    pair_samples_values_ptr[i][1] =
-        static_cast<int32_t>(vesin_nl->pairs[i][1]);
+    pair_samples_values_ptr[i][0] = static_cast<int32_t>(vesin_nl->pairs[i][0]);
+    pair_samples_values_ptr[i][1] = static_cast<int32_t>(vesin_nl->pairs[i][1]);
     pair_samples_values_ptr[i][2] = vesin_nl->shifts[i][0];
     pair_samples_values_ptr[i][3] = vesin_nl->shifts[i][1];
     pair_samples_values_ptr[i][4] = vesin_nl->shifts[i][2];

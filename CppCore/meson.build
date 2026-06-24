@@ -1,6 +1,5 @@
 if get_option('with_cache') and not get_option('with_rpc_client_only')
     _deps += dependency('rocksdb')
-    # Wrap installed
     _deps += subproject('xxhash', default_options: ['cli=false']).get_variable(
         'xxhash_dep',
     )
@@ -147,7 +146,12 @@ if get_option('with_tests')
     endif
     if has_metatomic
         test_array += [
-            ['MetatomicTest', 'metatomic_test', 'MetatomicPotTest.cc', '/CppCore/tests'],
+            [
+                'MetatomicTest',
+                'metatomic_test',
+                'MetatomicPotTest.cc',
+                '/CppCore/tests',
+            ],
         ]
     endif
     if rpc_enabled
@@ -171,6 +175,7 @@ if get_option('with_tests')
                 include_directories: _incdirs + ['.'],
                 cpp_args: test_args,
                 link_with: _linkto,
+                link_language: 'cpp',
             ),
             workdir: meson.source_root() + test.get(3),
         )

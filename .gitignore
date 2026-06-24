@@ -5,6 +5,8 @@ build_client
 *.tmp
 subprojects/*
 !subprojects/*.wrap
+!subprojects/packagefiles/
+!subprojects/packagefiles/**
 *.capnp.*
 # Byte-compiled / optimized / DLL files
 __pycache__/

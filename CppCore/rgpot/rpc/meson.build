@@ -42,11 +42,13 @@ ptlrpc_dep = declare_dependency(
 
 pot_bridge = library(
     'pot_client_bridge',
-    'pot_bridge.cc',
+    ['pot_bridge.cc', gen_rpc],
     link_with: ptlrpc,
     dependencies: [capnp_rpc_dep],
     cpp_args: _args,
-    include_directories: _incdirs,
+    # gen_rpc outputs live in the build dir; include it explicitly so
+    # Potentials.capnp.h is found even when only pot_bridge.cc is compiled first.
+    include_directories: _incdirs + [include_directories('.')],
     install: not meson.is_subproject(),
 )
 
@@ -62,6 +64,7 @@ if not get_option('with_rpc_client_only')
         dependencies: _deps + capnp_rpc_dep,
         cpp_args: _args,
         include_directories: _incdirs,
+        link_language: 'cpp',
         install: not meson.is_subproject(),
     )
 endif

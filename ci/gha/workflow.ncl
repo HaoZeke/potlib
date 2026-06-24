@@ -31,8 +31,35 @@ in
 # --- Flag Generation Logic ---
 
 # Meson usually auto-detects ccache if it's in the PATH.
+# macOS/pixi: system clang + SDKROOT; CONDA_PREFIX via LIBRARY_PATH/CPATH only
+# (no -isysroot in LDFLAGS — breaks meson -Wl,--version probe on Apple ld).
+# Full RPC/cache/CuH2 matrix.
 let meson_conf = m%"
+  MESON_EXTRA=""
+  if [ "${{ runner.os }}" = "macOS" ]; then
+    export SDKROOT="$(xcrun --show-sdk-path)"
+    export CC=/usr/bin/clang
+    export CXX=/usr/bin/clang++
+    export OBJC=/usr/bin/clang
+    export OBJCXX=/usr/bin/clang++
+    export LD=/usr/bin/clang++
+    unset CONDA_BUILD_SYSROOT CC_FOR_BUILD CXX_FOR_BUILD CPP_FOR_BUILD \
+      CMAKE_ARGS host_alias build_alias CFLAGS CXXFLAGS CPPFLAGS LDFLAGS || true
+    if [ -n "${CONDA_PREFIX:-}" ]; then
+      export CMAKE_PREFIX_PATH="${CONDA_PREFIX}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}"
+      export PKG_CONFIG_PATH="${CONDA_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+      export LIBRARY_PATH="${CONDA_PREFIX}/lib${LIBRARY_PATH:+:${LIBRARY_PATH}}"
+      export CPATH="${CONDA_PREFIX}/include${CPATH:+:${CPATH}}"
+      export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib${DYLD_FALLBACK_LIBRARY_PATH:+:${DYLD_FALLBACK_LIBRARY_PATH}}"
+      if [ -x "${CONDA_PREFIX}/bin/gfortran" ]; then
+        export FC="${CONDA_PREFIX}/bin/gfortran"
+        export F77="$FC" F90="$FC" F95="$FC" GFORTRAN="$FC"
+      fi
+    fi
+    MESON_EXTRA="-Ddefault_library=static"
+  fi
   meson setup bbdir \
+    $MESON_EXTRA \
     -Dwith_tests=True \
     -Dwith_examples=False \
     -Dwith_xtensor=False \
@@ -44,6 +71,35 @@ let meson_conf = m%"
 in
 
 let cmake_conf = m%"
+  CMAKE_EXTRA=""
+  if [ "${{ runner.os }}" = "macOS" ]; then
+    export SDKROOT="$(xcrun --show-sdk-path)"
+    export CC=/usr/bin/clang
+    export CXX=/usr/bin/clang++
+    export OBJC=/usr/bin/clang
+    export OBJCXX=/usr/bin/clang++
+    export LD=/usr/bin/clang++
+    unset CONDA_BUILD_SYSROOT CC_FOR_BUILD CXX_FOR_BUILD CPP_FOR_BUILD \
+      CMAKE_ARGS host_alias build_alias CFLAGS CXXFLAGS CPPFLAGS LDFLAGS || true
+    if [ -n "${CONDA_PREFIX:-}" ]; then
+      export CMAKE_PREFIX_PATH="${CONDA_PREFIX}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}"
+      export PKG_CONFIG_PATH="${CONDA_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+      export LIBRARY_PATH="${CONDA_PREFIX}/lib${LIBRARY_PATH:+:${LIBRARY_PATH}}"
+      export CPATH="${CONDA_PREFIX}/include${CPATH:+:${CPATH}}"
+      export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib${DYLD_FALLBACK_LIBRARY_PATH:+:${DYLD_FALLBACK_LIBRARY_PATH}}"
+      if [ -x "${CONDA_PREFIX}/bin/gfortran" ]; then
+        export FC="${CONDA_PREFIX}/bin/gfortran"
+        export F77="$FC" F90="$FC" F95="$FC" GFORTRAN="$FC"
+      fi
+    fi
+    CMAKE_EXTRA="-DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_OSX_SYSROOT=${SDKROOT}"
+    if [ -n "${CONDA_PREFIX:-}" ]; then
+      CMAKE_EXTRA="${CMAKE_EXTRA} -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} -DCMAKE_BUILD_RPATH=${CONDA_PREFIX}/lib -DCMAKE_INSTALL_RPATH=${CONDA_PREFIX}/lib"
+    fi
+    if [ -n "${FC:-}" ]; then
+      CMAKE_EXTRA="${CMAKE_EXTRA} -DCMAKE_Fortran_COMPILER=${FC}"
+    fi
+  fi
   cmake -S . -B build \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -54,7 +110,8 @@ let cmake_conf = m%"
     -DRGPOT_WITH_EIGEN=OFF \
     -DRGPOT_WITH_RPC=${{ matrix.rpc }} \
     -DRGPOT_WITH_CACHE=${{ matrix.cache }} \
-    -DRGPOT_PURE_LIB=OFF
+    -DRGPOT_PURE_LIB=OFF \
+    $CMAKE_EXTRA
 "%
 in
 

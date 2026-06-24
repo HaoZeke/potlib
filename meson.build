@@ -1,7 +1,7 @@
 project(
     'rgpot',
     'cpp',
-    version: '1.1.0',
+    version: '1.2.0',
     default_options: ['warning_level=2', 'cpp_std=c++20'],
 )
 # IMPORTANT!! warning_level=3 passes -fimplicit-none
@@ -30,8 +30,11 @@ endif
 
 # Languages
 add_languages('c', required: true)
+# Fortran/CuH2 on all hosts when available. On Darwin/CI, pair with system
+# clang++ (not conda arm64-apple-darwin20 clang) so C++ targets link the host
+# SDK; fortcuh2 is static on Darwin (packagefiles) and scoped to the cuh2
+# target only so LJ/ptlrpc are not polluted with gfortran link flags.
 if not get_option('with_rpc_client_only')
-    # Check for Fortran compiler instead of requiring it globally
     has_fortran = add_languages('fortran', required: false)
 else
     has_fortran = false
@@ -50,8 +53,8 @@ cppc = meson.get_compiler('cpp')
 # libm for Unix systems
 m_dep = cppc.find_library('m', required: false)
 _deps += m_dep
-# For clang on Unix (MSVC links the C++ runtime automatically)
-if host_system != 'windows'
+# libstdc++ only on Linux/GCC; Darwin/clang uses libc++ via the driver.
+if host_system == 'linux'
     _deps += [declare_dependency(link_args: '-lstdc++')]
 endif
 
@@ -122,14 +125,20 @@ if get_option('with_metatomic')
     # PyTorch C++ API (libtorch) -- found via cmake.
     # Meson's cmake trace often fails to resolve the full linker flags for
     # libtorch_cpu.so. We supplement with an explicit rpath + link_args.
-    torch_dep = dependency('Torch', method: 'cmake', modules: ['torch'], required: true)
+    torch_dep = dependency(
+        'Torch',
+        method: 'cmake',
+        modules: ['torch'],
+        required: true,
+    )
     _deps += torch_dep
 
     # PyTorch package paths are discovered without importing torch. Importing
     # torch loads compiled NumPy extensions during configure, so the probe must
     # only use Python's standard library and the installed package metadata.
     _py_probe = run_command(
-        find_program('python3'), '-c',
+        find_program('python3'),
+        '-c',
         '''
 import re
 import sysconfig
@@ -185,7 +194,11 @@ print(version)
         mts_dep = dependency('metatensor-torch', required: false)
     endif
     if not mts_dep.found()
-        mts_dep = dependency('metatensor_torch', method: 'cmake', required: false)
+        mts_dep = dependency(
+            'metatensor_torch',
+            method: 'cmake',
+            required: false,
+        )
     endif
     if not mts_dep.found()
         mts_dep = declare_dependency(
@@ -197,8 +210,9 @@ print(version)
                 cppc.find_library(
                     'metatensor_torch',
                     dirs: [
-                        _py_purelib / 'metatensor' / 'torch'
-                            / ('torch-' + _torch_major) / 'lib',
+                        _py_purelib / 'metatensor' / 'torch' / (
+                            'torch-' + _torch_major
+                        ) / 'lib',
                     ],
                 ),
             ],
@@ -216,8 +230,7 @@ print(version)
         mta_dep = cppc.find_library(
             'metatomic_torch',
             dirs: [
-                _py_purelib / 'metatomic' / 'torch'
-                    / ('torch-' + _torch_major) / 'lib',
+                _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
             ],
         )
     endif
@@ -242,10 +255,16 @@ print(version)
 endif
 
 # --------------------- Subprojects
+# fortcuh2 is only needed by the CuH2 potential — do NOT add it to global
+# `_deps`. Doing so pulls -lgfortran / gcc lib paths into every intermediate
+# dylib (LJ, ptlrpc, …) and breaks conda macOS clang++ links (missing
+# __Unwind_Resume / libSystem symbols).
+fortcuh2_dep = disabler()
 if has_fortran
+    # Darwin: packagefiles/fortcuh2 builds a static lib (see fortcuh2.wrap
+    # patch_directory) so the final C++ target resolves system symbols.
     fortcuh2_proj = subproject('fortcuh2')
     fortcuh2_dep = fortcuh2_proj.get_variable('fortcuh2_dep')
-    _deps += [fortcuh2_dep]
     _args += ['-DRGPOT_HAS_FORTRAN=TRUE']
 endif
 

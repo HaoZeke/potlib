@@ -34,9 +34,9 @@ namespace eigen {
 inline AtomMatrix convertToAtomMatrix(const Eigen::MatrixXd &matrix) {
   AtomMatrix result(matrix.rows(), matrix.cols());
   // Eigen default is column-major; use Map to reorder into row-major layout
-  Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                           Eigen::RowMajor>>(result.data(), matrix.rows(),
-                                             matrix.cols()) = matrix;
+  Eigen::Map<
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(
+      result.data(), matrix.rows(), matrix.cols()) = matrix;
   return result;
 }
 
