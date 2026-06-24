@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
   rgpot
-  VERSION 1.0.1
+  VERSION 1.2.0
   DESCRIPTION "Cpp core for potential energy surface functionality"
   HOMEPAGE_URL "https://github.com/OmniPotentRPC/rgpot"
   LANGUAGES C CXX)
@@ -51,19 +51,16 @@ endif()
 
 # 1. Server/Physics Dependencies
 if(NOT RGPOT_RPC_CLIENT_ONLY)
-  # Check for Fortran before assuming it exists
+  # CuH2 / fortcuh2. On Apple/CI pair system clang++ (host SDK) with conda
+  # gfortran; enable_language(Fortran) alone does not break C++ links when the
+  # C/C++ compilers are /usr/bin/clang{,++} rather than conda's darwin20 driver.
+  set(RGPOT_HAS_FORTRAN FALSE)
   include(CheckLanguage)
   check_language(Fortran)
   if(CMAKE_Fortran_COMPILER)
     enable_language(Fortran)
     set(RGPOT_HAS_FORTRAN TRUE)
     message(STATUS "Fortran found. CuH2 potential enabled.")
-  else()
-    set(RGPOT_HAS_FORTRAN FALSE)
-    message(STATUS "Fortran NOT found. CuH2 potential disabled.")
-  endif()
-
-  if(RGPOT_HAS_FORTRAN)
     find_package(fortcuh2 QUIET)
     if(NOT fortcuh2_FOUND)
       message(STATUS "fortcuh2 not found, attempting to fetch...")
@@ -73,9 +70,18 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
         GIT_TAG main)
       FetchContent_MakeAvailable(fortcuh2)
     endif()
+  else()
+    message(STATUS "Fortran NOT found. CuH2 potential disabled.")
   endif()
 
   if(RGPOT_WITH_CACHE)
+    # Conda macOS runners sometimes fail FindThreads before RocksDB; set the
+    # pthread hint explicitly so RocksDBConfig's find_dependency(Threads) works.
+    set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+    set(CMAKE_HAVE_THREADS_LIBRARY 1)
+    set(CMAKE_USE_PTHREADS_INIT 1)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
     find_package(RocksDB REQUIRED)
     find_package(xxHash CONFIG QUIET)
     if(NOT xxHash_FOUND)
@@ -115,8 +121,17 @@ if(RGPOT_WITH_RPC)
   capnp_generate_cpp(CAPNP_SOURCES CAPNP_HEADERS
                      CppCore/rgpot/rpc/Potentials.capnp)
 
-  add_library(ptlrpc SHARED ${CAPNP_SOURCES})
+  # On Apple, static intermediate RPC libs avoid install_name / mixed
+  # toolchain dylib issues when system clang links conda Cap'n Proto; the
+  # full RPC/cache/CuH2 feature set is still exercised in executables/tests.
+  if(APPLE)
+    add_library(ptlrpc STATIC ${CAPNP_SOURCES})
+  else()
+    add_library(ptlrpc SHARED ${CAPNP_SOURCES})
+  endif()
   target_link_libraries(ptlrpc PUBLIC CapnProto::capnp-rpc)
+  # Always drive C++ links with the C++ linker, even if Fortran is enabled.
+  set_target_properties(ptlrpc PROPERTIES LINKER_LANGUAGE CXX)
 
   # Ensure the generated headers are in the include path
   target_include_directories(
@@ -126,8 +141,13 @@ if(RGPOT_WITH_RPC)
            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 
   # Client Bridge
-  add_library(rgpot_client_bridge SHARED CppCore/rgpot/rpc/pot_bridge.cc)
+  if(APPLE)
+    add_library(rgpot_client_bridge STATIC CppCore/rgpot/rpc/pot_bridge.cc)
+  else()
+    add_library(rgpot_client_bridge SHARED CppCore/rgpot/rpc/pot_bridge.cc)
+  endif()
   target_link_libraries(rgpot_client_bridge PUBLIC ptlrpc CapnProto::capnp-rpc)
+  set_target_properties(rgpot_client_bridge PROPERTIES LINKER_LANGUAGE CXX)
 
   target_include_directories(
     rgpot_client_bridge
@@ -138,6 +158,7 @@ endif()
 if(NOT RGPOT_RPC_CLIENT_ONLY)
   # Basic sources
   set(RGPOT_SOURCES CppCore/rgpot/PotHelpers.cc
+                    CppCore/rgpot/units.cc
                     CppCore/rgpot/LennardJones/LJPot.cc)
 
   if(RGPOT_HAS_FORTRAN)
@@ -146,6 +167,7 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   endif()
 
   add_library(rgpot ${RGPOT_SOURCES})
+  set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX)
 
   if(RGPOT_WITH_CACHE)
     target_sources(rgpot PRIVATE CppCore/rgpot/PotentialCache.cc)
@@ -165,6 +187,13 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
 
   if(RGPOT_HAS_FORTRAN)
     target_link_libraries(rgpot PUBLIC fortcuh2)
+    # Static fortcuh2 needs the gfortran runtime; do not make gfortran the driver.
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+      target_link_libraries(rgpot PUBLIC gfortran)
+    endif()
+    if(UNIX AND NOT APPLE)
+      target_link_libraries(rgpot PUBLIC m)
+    endif()
     target_compile_definitions(rgpot PUBLIC RGPOT_HAS_FORTRAN)
   endif()
 
@@ -252,6 +281,7 @@ if(RGPOT_BUILD_TESTS)
       add_executable(${TEST_NAME} ${SOURCE_FILE})
       target_link_libraries(${TEST_NAME} PRIVATE rgpot::rgpot
                                                  Catch2::Catch2WithMain)
+      set_target_properties(${TEST_NAME} PROPERTIES LINKER_LANGUAGE CXX)
       add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endfunction()
 
@@ -269,6 +299,7 @@ if(RGPOT_BUILD_TESTS)
       add_executable(potserv CppCore/rgpot/rpc/server.cpp)
       target_link_libraries(potserv PRIVATE rgpot::rgpot ptlrpc
                                             CapnProto::capnp-rpc)
+      set_target_properties(potserv PROPERTIES LINKER_LANGUAGE CXX)
     endif()
   endif()
 endif()

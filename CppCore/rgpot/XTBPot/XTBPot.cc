@@ -94,8 +94,8 @@ void XTBPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (!m_initialized) {
     double charge = m_config.charge;
     int uhf = m_config.uhf;
-    m_mol = xtb_newMolecule(m_env, &intN, in.atmnrs, m_pos_bohr.data(),
-                            &charge, &uhf, box_bohr, periodicity);
+    m_mol = xtb_newMolecule(m_env, &intN, in.atmnrs, m_pos_bohr.data(), &charge,
+                            &uhf, box_bohr, periodicity);
     loadParametrisation();
     m_initialized = true;
   } else {

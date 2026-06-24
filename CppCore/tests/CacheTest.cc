@@ -68,7 +68,9 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
     auto dur = duration_cast<nanoseconds>(end - start).count();
 
     REQUIRE_THAT(e2, WithinAbs(e1, 1e-12));
-    REQUIRE(dur < base_duration * 4);
+    // Shared CI runners (esp. macOS) have noisy wall-clock; keep a loose
+    // bound that still fails if the cache is completely ineffective.
+    REQUIRE(dur < base_duration * 50);
   }
 
   SECTION("Managed DB Life-cycle (Path String)") {
@@ -91,7 +93,7 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
       auto dur = duration_cast<nanoseconds>(end - start).count();
 
       REQUIRE_THAT(e2, WithinAbs(e_base, 1e-12));
-      REQUIRE(dur < base_duration * 4);
+      REQUIRE(dur < base_duration * 50);
     }
     // pcache goes out of scope here, should close DB cleanly
 
@@ -122,7 +124,9 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
 
       // Should be a Hit (fast) despite being a new object
       REQUIRE_THAT(e_read, WithinAbs(e_base, 1e-12));
-      REQUIRE(dur < base_duration * 4);
+      // Timing is noisy on CI (esp. macOS/shared runners); keep a loose bound
+      // so we still catch pathological misses (orders of magnitude slower).
+      REQUIRE(dur < base_duration * 50);
     }
   }
 

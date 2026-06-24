@@ -115,8 +115,7 @@ static const Dimension DIM_NONE = {{0, 0, 0, 0, 0}};
 
 static std::string to_lower(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
-    return c < 128 ? static_cast<char>(std::tolower(c))
-                   : static_cast<char>(c);
+    return c < 128 ? static_cast<char>(std::tolower(c)) : static_cast<char>(c);
   });
   return s;
 }
@@ -311,8 +310,7 @@ static std::vector<Token> shunting_yard(const std::vector<Token> &tokens) {
       operators.push_back(token);
       break;
     case TokenType::RParen: {
-      while (!operators.empty() &&
-             operators.back().type != TokenType::LParen) {
+      while (!operators.empty() && operators.back().type != TokenType::LParen) {
         output.push_back(operators.back());
         operators.pop_back();
       }
@@ -328,8 +326,7 @@ static std::vector<Token> shunting_yard(const std::vector<Token> &tokens) {
   while (!operators.empty()) {
     if (operators.back().type == TokenType::LParen ||
         operators.back().type == TokenType::RParen) {
-      throw std::invalid_argument(
-          "unit expression has unbalanced parentheses");
+      throw std::invalid_argument("unit expression has unbalanced parentheses");
     }
     output.push_back(operators.back());
     operators.pop_back();
@@ -373,8 +370,8 @@ struct UnitExpr {
           } else if constexpr (std::is_same_v<T, Div>) {
             return "(" + v.lhs->to_string() + " / " + v.rhs->to_string() + ")";
           } else if constexpr (std::is_same_v<T, Pow>) {
-            return "(" + v.base->to_string() + " ^ " +
-                   v.exponent->to_string() + ")";
+            return "(" + v.base->to_string() + " ^ " + v.exponent->to_string() +
+                   ")";
           }
         },
         data);
@@ -429,8 +426,7 @@ struct UnitExpr {
 
 static UnitExprPtr read_expr(std::vector<Token> &stream) {
   if (stream.empty()) {
-    throw std::invalid_argument(
-        "malformed unit expression: missing a value");
+    throw std::invalid_argument("malformed unit expression: missing a value");
   }
   auto token = stream.back();
   stream.pop_back();
@@ -503,14 +499,10 @@ static UnitValue parse_unit_expression(const std::string &unit) {
 // ---- Quantity dimension map ----
 
 static const auto QUANTITY_DIMS = std::unordered_map<std::string, Dimension>{
-    {"length", DIM_LENGTH},
-    {"energy", DIM_ENERGY},
-    {"force", {{1, -2, 1, 0, 0}}},
-    {"pressure", {{-1, -2, 1, 0, 0}}},
-    {"momentum", {{1, -1, 1, 0, 0}}},
-    {"mass", DIM_MASS},
-    {"velocity", {{1, -1, 0, 0, 0}}},
-    {"charge", DIM_CHARGE},
+    {"length", DIM_LENGTH},           {"energy", DIM_ENERGY},
+    {"force", {{1, -2, 1, 0, 0}}},    {"pressure", {{-1, -2, 1, 0, 0}}},
+    {"momentum", {{1, -1, 1, 0, 0}}}, {"mass", DIM_MASS},
+    {"velocity", {{1, -1, 0, 0, 0}}}, {"charge", DIM_CHARGE},
 };
 
 // ---- Public API ----
@@ -537,11 +529,10 @@ void validate_unit(const std::string &quantity, const std::string &unit) {
   auto it = QUANTITY_DIMS.find(quantity);
   if (it != QUANTITY_DIMS.end()) {
     if (parsed.dim != it->second) {
-      throw std::invalid_argument("unit '" + unit + "' has dimension " +
-                                  parsed.dim.to_string() +
-                                  " which is incompatible with quantity '" +
-                                  quantity + "' (expected " +
-                                  it->second.to_string() + ")");
+      throw std::invalid_argument(
+          "unit '" + unit + "' has dimension " + parsed.dim.to_string() +
+          " which is incompatible with quantity '" + quantity + "' (expected " +
+          it->second.to_string() + ")");
     }
   }
 }

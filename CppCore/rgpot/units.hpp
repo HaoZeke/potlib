@@ -6,7 +6,8 @@
  * @brief Physical constants, unit conversion factors, and runtime unit parser.
  *
  * Compile-time constants use CODATA 2018 recommended values.
- * rgpot's native unit system: energy = eV, length = Angstrom, force = eV/Angstrom.
+ * rgpot's native unit system: energy = eV, length = Angstrom, force =
+ * eV/Angstrom.
  *
  * The runtime expression parser (unit_conversion_factor) is derived from
  * metatomic-torch (https://github.com/metatensor/metatomic), specifically
@@ -69,9 +70,9 @@ inline constexpr double KB_EV = 8.617333262e-5;          // k_B in eV/K
 double unit_conversion_factor(const std::string &from_unit,
                               const std::string &to_unit);
 
-/// Check that @p unit is a valid expression with dimensions matching @p quantity.
-/// Known quantities: "length", "energy", "force", "pressure", "momentum",
-/// "mass", "velocity", "charge".
+/// Check that @p unit is a valid expression with dimensions matching @p
+/// quantity. Known quantities: "length", "energy", "force", "pressure",
+/// "momentum", "mass", "velocity", "charge".
 ///
 /// Throws std::invalid_argument on mismatch or parse error.
 void validate_unit(const std::string &quantity, const std::string &unit);

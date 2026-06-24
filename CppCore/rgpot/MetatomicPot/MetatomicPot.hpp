@@ -1,6 +1,10 @@
 #pragma once
 // MIT License
 // Copyright 2023--present rgpot developers
+//
+// Requires vesin >= 0.5 (VesinDevice is a struct {type, device_id};
+// VesinOptions includes algorithm/sorted). Pin via pixi feature.metatomic
+// (vesin>=0.5.2,<0.6).
 
 #include <mutex>
 #include <string>
@@ -60,8 +64,8 @@ private:
   std::string m_energy_key;
 
   mutable std::mutex m_mutex;
-  mutable torch::Tensor m_cached_types;  //!< Cached atomic types tensor.
-  mutable size_t m_cached_natoms = 0;    //!< Atom count for cached types.
+  mutable torch::Tensor m_cached_types; //!< Cached atomic types tensor.
+  mutable size_t m_cached_natoms = 0;   //!< Atom count for cached types.
 
   metatensor_torch::TensorBlock
   computeNeighbors(metatomic_torch::NeighborListOptions request, long nAtoms,

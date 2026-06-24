@@ -16,12 +16,12 @@ using rgpot::types::AtomMatrix;
 // Water molecule geometry (Angstrom)
 // O at origin, two H atoms
 static const double water_pos[] = {
-    0.00000000, 0.00000000, 0.11779000, // O
-    0.00000000, 0.75545000, -0.47116000, // H
+    0.00000000, 0.00000000,  0.11779000,  // O
+    0.00000000, 0.75545000,  -0.47116000, // H
     0.00000000, -0.75545000, -0.47116000  // H
 };
 static const int water_atmnrs[] = {8, 1, 1};
-static const double zero_box[9] = {100.0, 0.0, 0.0, 0.0, 100.0,
+static const double zero_box[9] = {100.0, 0.0, 0.0, 0.0,  100.0,
                                    0.0,   0.0, 0.0, 100.0};
 
 TEST_CASE("XTBPot GFN2 water energy", "[xtb]") {
