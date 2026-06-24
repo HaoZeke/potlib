@@ -123,7 +123,7 @@ conversion at the boundary (defaults remain Angstrom / eV).
 ### Developing locally
 
 Hooks use [prek](https://prek.j178.dev) (`prek.toml`), not the legacy Python `pre-commit` CLI.
-CI runs `prek run -a` on every PR (`.github/workflows/prek.yml`). Locally:
+CI runs `prek run -a` on every PR (`CI (orchestrator)` / `prek` job). Locally:
 
     prek install                 # one-time git shim install
     prek run -a --config prek.toml

@@ -7,7 +7,13 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 version = "1.2.0"
 
 [feature.cigen.tasks]
-gen-gha = { cmd = "nickel export --format yaml ci/gha/workflow.ncl -o .github/workflows/build.yml" }
+# Export every ci/gha/*.ncl workflow (shared pins/steps in ci/gha/lib/).
+gen-gha = { cmd = "bash ci/gha/gen.sh" }
+# Format all Nickel sources (prek nickel-format hook runs this on changed .ncl files).
+nickel-fmt = { cmd = "bash ci/gha/format.sh" }
+# Fail if .github/workflows drifted from ci/gha (regen + git diff --exit-code).
+gha-drift = { cmd = "bash ci/gha/check-drift.sh" }
+export-plan = { cmd = "bash ci/gha/export-plan.sh" }
 
 [environments]
 rpctest = {features = ["rpc", "itests"]}
@@ -33,7 +39,7 @@ tblite = ">=0.3.0,<1"
 platforms = ["linux-64"]
 
 [feature.metatomic.dependencies]
-# uv is already in the default workspace deps; potentials.yml uses it for
+# uv is already in the default workspace deps; orchestrator potentials jobs use it for
 # fallback wheel installs when pypi packages are incomplete in the env.
 
 [feature.metatomic.pypi-dependencies]
@@ -107,7 +113,7 @@ gen-header = { cmd = "cargo build --manifest-path rgpot-core/Cargo.toml --featur
 towncrier-draft = { cmd = "uvx towncrier build --draft", description = "Preview release notes" }
 towncrier-build = { cmd = "uvx towncrier build", description = "Build release notes into CHANGELOG.md" }
 
-# Prose / link hygiene (mirrors .github/workflows/docs_quality.yml).
+# Prose / link hygiene (mirrors orchestrator docs_snapper / docs_lychee jobs).
 # snapper/snapper-fmt: org sources under docs/orgmode only (avoids splitting long markdown URLs).
 snapper-check = { cmd = "bash -lc 'set -euo pipefail; S=$(command -v snapper || command -v snapper-fmt); mapfile -t f < <(find docs/orgmode -type f -name \"*.org\" | sort); \"$S\" --check --config .snapper.toml --format org \"${f[@]}\"'", description = "Semantic line-break check on docs/orgmode (CI parity)" }
 snapper-fix = { cmd = "bash -lc 'set -euo pipefail; S=$(command -v snapper || command -v snapper-fmt); mapfile -t f < <(find docs/orgmode -type f -name \"*.org\" | sort); \"$S\" --in-place --config .snapper.toml --format org \"${f[@]}\"'", description = "Apply semantic line breaks to docs/orgmode" }
