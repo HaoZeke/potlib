@@ -745,6 +745,45 @@ fn cosmocc_wants_aarch64_companions() -> bool {
         || arches == "all"
 }
 
+/// rustc nightly `std` process/unix/pidfd calls `waitid`, which Cosmopolitan libc does not
+/// export. Provide a weak-style C stub (strong symbol here) that returns `ENOSYS` so the APE
+/// links; potctl does not rely on pidfd wait in the cosmo CLI path.
+const WAITID_STUB_C: &str = r#"
+/* potctl-cosmo-ld: waitid shim for rustc std PidFd (Cosmopolitan has no waitid). */
+#include <errno.h>
+typedef int idtype_t;
+typedef int id_t;
+typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;
+int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
+    (void)idtype;
+    (void)id;
+    (void)infop;
+    (void)options;
+    errno = ENOSYS;
+    return -1;
+}
+"#;
+
+/// Compile libc compat stubs (waitid, …) with the same cosmo driver rustc uses.
+fn compile_libc_compat_stub(cc: &Path, work: &Path) -> Result<PathBuf, String> {
+    let src = work.join("cosmo-libc-compat.c");
+    let obj = work.join("cosmo-libc-compat.o");
+    fs::write(&src, WAITID_STUB_C).map_err(|e| err(e.to_string()))?;
+    let status = Command::new(cc)
+        .args(["-c", "-o"])
+        .arg(&obj)
+        .arg(&src)
+        .status()
+        .map_err(|e| err(format!("compile cosmo-libc-compat: {e}")))?;
+    if !status.success() {
+        return Err(err(format!(
+            "compile cosmo-libc-compat failed (exit {:?})",
+            status.code()
+        )));
+    }
+    Ok(obj)
+}
+
 /// Entry for `potctl-cosmo-ld` (rustc linker).
 pub fn link_main(args: &[String]) -> Result<(), String> {
     let cosmo = cosmo_env();
@@ -767,10 +806,18 @@ pub fn link_main(args: &[String]) -> Result<(), String> {
         build_aarch64_stubs_once(&cosmo, &cc, a64_cc.as_deref(), &work)?;
     }
 
+    // Always inject waitid (and future libc gaps) before other objects so rustc std links.
+    let compat_obj = compile_libc_compat_stub(&cc, &work)?;
+    if need_a64 {
+        ensure_aarch64_companion(&compat_obj)?;
+    }
+
     let mut prefix_args: Vec<String> = Vec::new();
     if !use_cosmocc {
         inject_cosmo_lib_paths(&cosmo, &cc, &mut prefix_args);
     }
+    // Compat objects first (before user/rlib objs and -lc) so missing Cosmo symbols resolve.
+    prefix_args.push(compat_obj.to_string_lossy().into_owned());
 
     let ar_bin = resolve_ar(&cosmo, &cc);
     let mut out_args: Vec<String> = Vec::new();
@@ -809,7 +856,7 @@ pub fn link_main(args: &[String]) -> Result<(), String> {
     }
 
     trace(&format!(
-        "CC={} cosmocc={} need_a64={} AARCH64_CC={} COSMOCC_ARCHES={} rlibs_extracted={} prefix={} nargs={}",
+        "CC={} cosmocc={} need_a64={} AARCH64_CC={} COSMOCC_ARCHES={} rlibs_extracted={} prefix={} nargs={} compat={}",
         cc.display(),
         use_cosmocc as u8,
         need_a64 as u8,
@@ -820,7 +867,8 @@ pub fn link_main(args: &[String]) -> Result<(), String> {
         env::var("COSMOCC_ARCHES").unwrap_or_default(),
         rlib_i,
         prefix_args.len(),
-        out_args.len()
+        out_args.len(),
+        compat_obj.display(),
     ));
 
     let mut cmd = Command::new(&cc);

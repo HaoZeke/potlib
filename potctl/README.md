@@ -44,15 +44,26 @@ pixi r ci-preflight
 |----------|-----|
 | `cog.toml` `pre_bump_hooks` | `cargo run -q -p potctl -- release sync/assert …` |
 | `pixi.toml` | `release-*`, `ci-preflight`, `ci-darwin-env`, `potctl-test` |
-| `build.yml` / `potentials.yml` / `release*.yml` | Job `ci-tools`/`tools` → `setup-ci-tools` artifact → jobs `restore-ci-tools` + `potctl ci preflight`; meson/cmake use `eval "$(potctl ci darwin-env)"` on macOS |
+| `ci-orchestrator.yml` / `release*.yml` | Job `ci-tools`/`tools` → `setup-ci-tools` artifact → jobs `ensure-potctl`/`restore-ci-tools` + `potctl ci preflight`; build matrix legs are one-liners `potctl ci meson-test` / `cmake-test` (darwin-env applied inside potctl) |
 | GHA rust-cache | `Swatinem/rust-cache` `shared-key: potctl-ci-tools` |
 
 CI builds **portable/fat** potctl per OS family (`setup-ci-tools`): **Linux** → `x86_64-unknown-linux-musl` (+ crt-static when possible); **macOS** → `lipo` fat binary (aarch64 + x86_64). Artifacts are `ci-tools-<sha>-Linux` / `…-macOS`; `ensure-potctl` restores `…-${{ runner.os }}` (no single binary spans Darwin and Linux — different ABIs). Cross-run: rust-cache.
 
 ## Design rule
 
-Anything that is “assert / emit env / rewrite semver” belongs in `potctl` with `cargo test -p potctl`.
-Meson/cmake/pixi still own the real builds.
+Anything that is “assert / emit env / rewrite semver / CI step body” belongs in `potctl` with
+`cargo test -p potctl`. Nickel (or hand orchestrator until `orchestrator.ncl`) owns the job
+graph and matrices only; GHA steps should be thin `potctl ci …` lines.
+
+| `potctl ci` verb | Role |
+|------------------|------|
+| `preflight` | Repo layout / lockstep sanity |
+| `darwin-env` | Print `eval`-able macOS+pixi host SDK exports (low-level; prefer verbs below) |
+| `meson-test --rpc … --cache …` | Meson setup + compile + test (orchestrator matrix leg) |
+| `cmake-test --rpc … --cache …` | CMake configure + build + ctest |
+| `build-test --sys meson\|cmake …` | Same as above via `matrix.sys` |
+
+Meson/cmake/pixi still execute the real builds; potctl only orchestrates argv + env.
 
 
 ## Cosmopolitan APE (`potctl.com`, gating on PR)
@@ -63,4 +74,4 @@ One `potctl.com` via Cosmopolitan + community `*-linux-cosmo` targets, built onc
 on Linux and smoke-tested on Linux and macOS with `ci preflight` / `release assert`.
 That workflow is a **gating** PR/release check (failure fails the check). Normal
 musl/fat `setup-ci-tools` / `ensure-potctl` remains the default potctl install for
-`build.yml`, `potentials.yml`, and `release*.yml` jobs.
+`ci-orchestrator.yml` (build/potentials stages) and `release*.yml` jobs.

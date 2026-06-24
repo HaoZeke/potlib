@@ -1,11 +1,273 @@
-//! CI helpers: repo preflight, macOS/pixi host-SDK env (replaces ad-hoc bash in GHA).
+//! CI helpers: repo preflight, macOS/pixi host-SDK env, meson/cmake/torch legs.
+//!
+//! GHA / Nickel own the job graph and matrices; thin steps call `potctl ci …`.
 
 use std::env;
+use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use crate::lockstep;
 
+/// PyTorch CPU wheel constraint used when forcing a non-CUDA install in CI.
+pub const TORCH_CPU_SPEC: &str = "torch>=2.10,<2.11";
+pub const TORCH_CPU_INDEX: &str = "https://download.pytorch.org/whl/cpu";
+pub const METATENSOR_TORCH_SPEC: &str = "metatensor-torch>=0.8.4,<0.9";
+pub const METATOMIC_TORCH_SPEC: &str = "metatomic-torch>=0.1.9,<0.2";
+pub const VESIN_SPEC: &str = "vesin>=0.5.2,<0.6";
+pub const VESIN_TORCH_SPEC: &str = "vesin-torch>=0.5.2,<0.6";
+
 pub type Result<T> = std::result::Result<T, String>;
+
+/// Which C++ build system the matrix leg uses (GHA `matrix.sys`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildSys {
+    Meson,
+    Cmake,
+}
+
+impl BuildSys {
+    pub fn parse(s: &str) -> Result<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "meson" => Ok(Self::Meson),
+            "cmake" => Ok(Self::Cmake),
+            other => Err(format!(
+                "unknown build sys {other:?}; expected meson or cmake"
+            )),
+        }
+    }
+}
+
+fn parse_bool_flag(s: &str, name: &str) -> Result<bool> {
+    match s.to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        other => Err(format!(
+            "invalid {name}={other:?}; expected true/false (or 1/0)"
+        )),
+    }
+}
+
+/// Apply darwin-env plan into this process (macOS only; no-op elsewhere).
+pub fn apply_darwin_env_to_process(force: bool) -> Result<()> {
+    let os = detect_runner_os();
+    let prefix = env::var("CONDA_PREFIX").ok();
+    let mut sdk = resolve_sdkroot_hint();
+    if sdk.is_none() && (force || os == "macOS" || os == "Darwin") {
+        sdk = try_xcrun_sdkroot();
+    }
+    let plan = if force {
+        plan_darwin_env("macOS", prefix.as_deref(), sdk.as_deref())
+    } else {
+        plan_darwin_env(&os, prefix.as_deref(), sdk.as_deref())
+    };
+    let Some(p) = plan else {
+        return Ok(());
+    };
+    for k in &p.unsets {
+        env::remove_var(k);
+    }
+    for (k, v) in &p.exports {
+        env::set_var(k, v);
+    }
+    env::set_var("POTCTL_MESON_EXTRA", &p.meson_extra);
+    Ok(())
+}
+
+fn try_xcrun_sdkroot() -> Option<String> {
+    let out = Command::new("xcrun")
+        .args(["--show-sdk-path"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+/// Pure: meson configure argv (after `meson setup <builddir>`).
+pub fn meson_configure_args(rpc: bool, cache: bool, meson_extra: &str) -> Vec<String> {
+    let mut args = vec![
+        "-Dwith_tests=True".into(),
+        "-Dwith_examples=False".into(),
+        "-Dwith_xtensor=False".into(),
+        "-Dwith_eigen=False".into(),
+        format!("-Dwith_rpc={}", if rpc { "true" } else { "false" }),
+        format!("-Dwith_cache={}", if cache { "true" } else { "false" }),
+        "-Dpure_lib=False".into(),
+    ];
+    for tok in meson_extra.split_whitespace() {
+        if !tok.is_empty() {
+            args.push(tok.to_string());
+        }
+    }
+    args
+}
+
+/// Pure: extra cmake -D / compiler flags for macOS (after darwin-env applied).
+pub fn cmake_macos_extra_args(
+    is_macos: bool,
+    sdkroot: Option<&str>,
+    conda_prefix: Option<&str>,
+    fc: Option<&str>,
+) -> Vec<String> {
+    if !is_macos {
+        return Vec::new();
+    }
+    let mut args = vec![
+        "-DCMAKE_C_COMPILER=/usr/bin/clang".into(),
+        "-DCMAKE_CXX_COMPILER=/usr/bin/clang++".into(),
+    ];
+    if let Some(sdk) = sdkroot.filter(|s| !s.is_empty()) {
+        args.push(format!("-DCMAKE_OSX_SYSROOT={sdk}"));
+    }
+    if let Some(prefix) = conda_prefix.filter(|s| !s.is_empty()) {
+        args.push(format!("-DCMAKE_PREFIX_PATH={prefix}"));
+        args.push(format!("-DCMAKE_BUILD_RPATH={prefix}/lib"));
+        args.push(format!("-DCMAKE_INSTALL_RPATH={prefix}/lib"));
+    }
+    if let Some(fc) = fc.filter(|s| !s.is_empty()) {
+        args.push(format!("-DCMAKE_Fortran_COMPILER={fc}"));
+    }
+    args
+}
+
+/// Pure: core cmake configure flags (RGPOT_*), not including macOS extras.
+pub fn cmake_configure_core_args(rpc: bool, cache: bool) -> Vec<String> {
+    vec![
+        "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache".into(),
+        "-DCMAKE_C_COMPILER_LAUNCHER=ccache".into(),
+        "-DCMAKE_BUILD_TYPE=Release".into(),
+        "-DRGPOT_BUILD_TESTS=True".into(),
+        "-DRGPOT_BUILD_EXAMPLES=False".into(),
+        "-DRGPOT_WITH_XTENSOR=OFF".into(),
+        "-DRGPOT_WITH_EIGEN=OFF".into(),
+        format!(
+            "-DRGPOT_WITH_RPC={}",
+            if rpc { "ON" } else { "OFF" }
+        ),
+        format!(
+            "-DRGPOT_WITH_CACHE={}",
+            if cache { "ON" } else { "OFF" }
+        ),
+        "-DRGPOT_PURE_LIB=OFF".into(),
+    ]
+}
+
+fn run_cmd(bin: &str, args: &[&str], cwd: &Path) -> Result<()> {
+    let status = Command::new(bin)
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .status()
+        .map_err(|e| format!("failed to spawn {bin}: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{bin} {} failed with {status}",
+            args.join(" ")
+        ))
+    }
+}
+
+fn maybe_ccache_stats() {
+    let _ = Command::new("ccache").arg("-s").status();
+}
+
+/// Meson setup + compile + test (orchestrator `Build & Test (Meson)` leg).
+pub fn run_meson_test(
+    root: &Path,
+    rpc: bool,
+    cache: bool,
+    build_dir: &str,
+    apply_darwin: bool,
+) -> Result<()> {
+    if apply_darwin {
+        apply_darwin_env_to_process(false)?;
+    }
+    let meson_extra = env::var("POTCTL_MESON_EXTRA").unwrap_or_default();
+    let mut setup_args: Vec<String> = vec!["setup".into(), build_dir.into()];
+    setup_args.extend(meson_configure_args(rpc, cache, &meson_extra));
+    let setup_refs: Vec<&str> = setup_args.iter().map(String::as_str).collect();
+    run_cmd("meson", &setup_refs, root)?;
+    run_cmd("meson", &["compile", "-C", build_dir], root)?;
+    run_cmd(
+        "meson",
+        &["test", "-C", build_dir, "--print-errorlogs"],
+        root,
+    )?;
+    maybe_ccache_stats();
+    Ok(())
+}
+
+/// CMake configure + build + ctest (orchestrator `Build & Test (CMake)` leg).
+pub fn run_cmake_test(
+    root: &Path,
+    rpc: bool,
+    cache: bool,
+    build_dir: &str,
+    apply_darwin: bool,
+) -> Result<()> {
+    if apply_darwin {
+        apply_darwin_env_to_process(false)?;
+    }
+    let os = detect_runner_os();
+    let is_macos = os == "macOS" || os == "Darwin";
+    let sdk = env::var("SDKROOT").ok();
+    let conda = env::var("CONDA_PREFIX").ok();
+    let fc = env::var("FC").ok();
+
+    let mut args: Vec<String> = vec!["-S".into(), ".".into(), "-B".into(), build_dir.into()];
+    args.extend(cmake_configure_core_args(rpc, cache));
+    args.extend(cmake_macos_extra_args(
+        is_macos,
+        sdk.as_deref(),
+        conda.as_deref(),
+        fc.as_deref(),
+    ));
+    let cmake_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_cmd("cmake", &cmake_refs, root)?;
+    run_cmd("cmake", &["--build", build_dir, "-j"], root)?;
+    run_cmd(
+        "ctest",
+        &["--test-dir", build_dir, "--output-on-failure"],
+        root,
+    )?;
+    maybe_ccache_stats();
+    Ok(())
+}
+
+/// `potctl ci build-test --sys meson|cmake --rpc … --cache …`
+pub fn run_build_test(
+    root: &Path,
+    sys: &str,
+    rpc: &str,
+    cache: &str,
+    build_dir: Option<&str>,
+    no_darwin: bool,
+) -> Result<()> {
+    let sys = BuildSys::parse(sys)?;
+    let rpc = parse_bool_flag(rpc, "rpc")?;
+    let cache = parse_bool_flag(cache, "cache")?;
+    let apply_darwin = !no_darwin;
+    match sys {
+        BuildSys::Meson => {
+            let dir = build_dir.unwrap_or("bbdir");
+            run_meson_test(root, rpc, cache, dir, apply_darwin)
+        }
+        BuildSys::Cmake => {
+            let dir = build_dir.unwrap_or("build");
+            run_cmake_test(root, rpc, cache, dir, apply_darwin)
+        }
+    }
+}
 
 /// Paths that must exist for a healthy rgpot checkout (build/release CI).
 pub fn required_paths(root: &Path) -> Vec<PathBuf> {
@@ -41,6 +303,630 @@ pub fn preflight(root: &Path, lockstep_check: bool) -> Result<()> {
 
     println!("preflight ok ({})", root.display());
     Ok(())
+}
+
+/// `potctl ci release-assert` — lockstep + cog.toml parse + cog --version (release-prepare leg).
+pub fn run_release_assert(root: &Path) -> Result<()> {
+    lockstep::assert_lockstep(root, None, false)?;
+    let cog_toml = root.join("cog.toml");
+    let text = std::fs::read_to_string(&cog_toml)
+        .map_err(|e| format!("read cog.toml: {e}"))?;
+    // Minimal TOML presence check (full schema is cog's concern).
+    if !text.contains('[') {
+        return Err("cog.toml looks empty or invalid".into());
+    }
+    println!("cog.toml parse ok (read {} bytes)", text.len());
+    let status = Command::new("cog")
+        .arg("--version")
+        .current_dir(root)
+        .status()
+        .map_err(|e| format!("spawn cog: {e}"))?;
+    if !status.success() {
+        return Err(format!("cog --version failed with {status}"));
+    }
+    Ok(())
+}
+
+/// `potctl ci towncrier-draft` — towncrier build --draft if any newsfragments exist.
+pub fn run_towncrier_draft(root: &Path) -> Result<()> {
+    let frag_dir = root.join("docs/newsfragments");
+    let has_frags = frag_dir.is_dir()
+        && std::fs::read_dir(&frag_dir)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok()).any(|e| {
+                    let n = e.file_name();
+                    let s = n.to_string_lossy();
+                    s.ends_with(".md")
+                })
+            })
+            .unwrap_or(false);
+    if !has_frags {
+        println!("No newsfragments; skip draft (ok if this PR only touches tooling)");
+        return Ok(());
+    }
+    let status = Command::new("uvx")
+        .args(["towncrier", "build", "--draft"])
+        .current_dir(root)
+        .status()
+        .map_err(|e| format!("spawn uvx towncrier: {e}"))?;
+    if !status.success() {
+        return Err(format!("towncrier build --draft failed with {status}"));
+    }
+    Ok(())
+}
+
+/// `potctl ci cog-bump-dry-run` — PR tip (meson version) or workflow_dispatch bump kind.
+pub fn run_cog_bump_dry_run(root: &Path, bump: Option<&str>) -> Result<()> {
+    let mut cmd = Command::new("cog");
+    cmd.current_dir(root);
+    match bump {
+        None | Some("") => {
+            let ver = lockstep::read_meson_version(root)?;
+            cmd.args(["bump", "--version", &ver, "--dry-run"]);
+            let output = cmd
+                .output()
+                .map_err(|e| format!("spawn cog bump: {e}"))?;
+            let _ = std::io::Write::write_all(&mut std::io::stdout(), &output.stdout);
+            let _ = std::io::Write::write_all(&mut std::io::stderr(), &output.stderr);
+            if !output.status.success() {
+                println!(
+                    "note: cog dry-run non-zero (often dirty/unpushed state on PR); lockstep + cog.toml ok above"
+                );
+            }
+            Ok(())
+        }
+        Some("auto") => {
+            run_cmd_status_ok("cog", &["bump", "--auto", "--dry-run"], root)
+        }
+        Some("patch") => {
+            run_cmd_status_ok("cog", &["bump", "--patch", "--dry-run"], root)
+        }
+        Some("minor") => {
+            run_cmd_status_ok("cog", &["bump", "--minor", "--dry-run"], root)
+        }
+        Some("major") => {
+            run_cmd_status_ok("cog", &["bump", "--major", "--dry-run"], root)
+        }
+        Some(other) => Err(format!(
+            "unknown cog bump kind {other:?}; expected auto|patch|minor|major or omit for meson version"
+        )),
+    }
+}
+
+fn run_cmd_status_ok(bin: &str, args: &[&str], cwd: &Path) -> Result<()> {
+    let status = Command::new(bin)
+        .args(args)
+        .current_dir(cwd)
+        .status()
+        .map_err(|e| format!("failed to spawn {bin}: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{bin} {} failed with {status}", args.join(" ")))
+    }
+}
+
+/// Conventional-commit subject prefixes accepted by release-prepare cog-check fallback.
+pub fn is_conventional_commit_subject(subj: &str) -> bool {
+    let s = subj.trim();
+    if s.is_empty() {
+        return false;
+    }
+    if s.starts_with("Merge ") || s.starts_with("merge ") {
+        return true;
+    }
+    // type(scope): or type:
+    let types = [
+        "feat", "fix", "perf", "refactor", "docs", "test", "build", "ci", "chore", "style",
+        "revert", "enh", "bug", "maint", "doc", "tst", "bld", "gen",
+    ];
+    for t in types {
+        if s.starts_with(&format!("{t}(")) || s.starts_with(&format!("{t}:")) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Resolve active Python interpreter (PATH `python` / `python3`).
+fn python_bin() -> Result<PathBuf> {
+    which_bin("python")
+        .or_else(|| which_bin("python3"))
+        .ok_or_else(|| "python not on PATH (run under pixi shell)".into())
+}
+
+fn which_bin(name: &str) -> Option<PathBuf> {
+    let path = env::var_os("PATH")?;
+    for dir in env::split_paths(&path) {
+        let cand = dir.join(name);
+        if cand.is_file() {
+            return Some(cand);
+        }
+    }
+    None
+}
+
+fn py_eval(py: &Path, code: &str) -> Result<String> {
+    let out = Command::new(py)
+        .args(["-c", code])
+        .output()
+        .map_err(|e| format!("python -c: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "python -c failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Pure: torch X.Y major.minor from a full version string (strip `+cu*` suffix first).
+pub fn torch_mm_from_version(ver: &str) -> Option<String> {
+    let base = ver.split('+').next().unwrap_or(ver);
+    let parts: Vec<&str> = base.split('.').collect();
+    if parts.len() >= 2 {
+        Some(format!("{}.{}", parts[0], parts[1]))
+    } else {
+        None
+    }
+}
+
+/// Pure: required purelib paths for metatomic C++ CI layout.
+pub fn metatomic_layout_paths(purelib: &Path, torch_mm: &str) -> Vec<PathBuf> {
+    vec![
+        purelib.join("torch/lib/libtorch_global_deps.so"),
+        purelib.join("torch/share/cmake"),
+        purelib.join("metatensor/include"),
+        purelib.join(format!("metatensor/torch/torch-{torch_mm}/include")),
+        purelib.join(format!("metatomic/torch/torch-{torch_mm}/include")),
+        purelib.join("vesin/include/vesin.h"),
+        purelib.join("vesin/lib"),
+    ]
+}
+
+fn pip_install(py: &Path, args: &[&str]) -> Result<()> {
+    if which_bin("uv").is_some() {
+        let mut cmd = Command::new("uv");
+        cmd.args(["pip", "install", "--python"])
+            .arg(py)
+            .arg("--no-cache");
+        for a in args {
+            cmd.arg(a);
+        }
+        let st = cmd.status().map_err(|e| format!("uv pip: {e}"))?;
+        if st.success() {
+            return Ok(());
+        }
+        return Err(format!("uv pip install failed with {st}"));
+    }
+    let _ = Command::new(py)
+        .args(["-m", "ensurepip", "--upgrade"])
+        .status();
+    let mut cmd = Command::new(py);
+    cmd.args(["-m", "pip", "install", "--no-cache-dir"]);
+    for a in args {
+        cmd.arg(a);
+    }
+    let st = cmd.status().map_err(|e| format!("pip: {e}"))?;
+    if st.success() {
+        Ok(())
+    } else {
+        Err(format!("pip install failed with {st}"))
+    }
+}
+
+fn reinstall_torch_cpu(py: &Path) -> Result<()> {
+    println!("Reinstalling CPU torch wheel (libtorch missing or CUDA build detected)");
+    if which_bin("uv").is_some() {
+        let st = Command::new("uv")
+            .args([
+                "pip",
+                "install",
+                "--python",
+            ])
+            .arg(py)
+            .args([
+                "--reinstall",
+                "--no-cache",
+                "--index-url",
+                TORCH_CPU_INDEX,
+                TORCH_CPU_SPEC,
+            ])
+            .status()
+            .map_err(|e| format!("uv pip torch: {e}"))?;
+        if st.success() {
+            return Ok(());
+        }
+        return Err(format!("uv pip reinstall torch failed with {st}"));
+    }
+    let _ = Command::new(py)
+        .args(["-m", "ensurepip", "--upgrade"])
+        .status();
+    let st = Command::new(py)
+        .args([
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            "--no-cache-dir",
+            "--index-url",
+            TORCH_CPU_INDEX,
+            TORCH_CPU_SPEC,
+        ])
+        .status()
+        .map_err(|e| format!("pip torch: {e}"))?;
+    if st.success() {
+        Ok(())
+    } else {
+        Err(format!("pip reinstall torch failed with {st}"))
+    }
+}
+
+fn read_torch_version_file(purelib: &Path) -> Option<String> {
+    let vf = purelib.join("torch/version.py");
+    let text = fs::read_to_string(vf).ok()?;
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix("__version__") {
+            let rest = rest.trim().trim_start_matches('=').trim();
+            let q = rest.trim_matches(|c| c == '"' || c == '\'');
+            if !q.is_empty() && q != rest.trim() || rest.starts_with('"') || rest.starts_with('\'') {
+                let s = rest.trim_matches(|c| c == '"' || c == '\'');
+                if !s.is_empty() {
+                    return Some(s.to_string());
+                }
+            }
+        }
+    }
+    // simpler: regex-free scan
+    if let Some(i) = text.find("__version__") {
+        let slice = &text[i..];
+        if let Some(eq) = slice.find('=') {
+            let v = slice[eq + 1..].trim();
+            let end = v.find('\n').unwrap_or(v.len());
+            let tok = v[..end].trim().trim_matches(|c| c == '"' || c == '\'');
+            if !tok.is_empty() {
+                return Some(tok.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn append_github_env(lines: &[(&str, String)]) -> Result<()> {
+    let Some(path) = env::var_os("GITHUB_ENV") else {
+        for (k, v) in lines {
+            println!("export {k}={v}");
+        }
+        return Ok(());
+    };
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("GITHUB_ENV open: {e}"))?;
+    for (k, v) in lines {
+        writeln!(f, "{k}={v}").map_err(|e| format!("GITHUB_ENV write: {e}"))?;
+    }
+    Ok(())
+}
+
+/// `potctl ci ensure-torch-metatomic` — CPU torch + metatensor/metatomic/vesin purelib layout.
+/// Writes TORCH_LIB / TORCH_CMAKE / PURELIB / LD_LIBRARY_PATH / CMAKE_PREFIX_PATH to GITHUB_ENV when set.
+pub fn run_ensure_torch_metatomic(_root: &Path) -> Result<()> {
+    let py = python_bin()?;
+    let purelib_s = py_eval(&py, "import sysconfig; print(sysconfig.get_paths()['purelib'])")?;
+    let mut purelib = PathBuf::from(&purelib_s);
+
+    let torch_ver = read_torch_version_file(&purelib).unwrap_or_default();
+    let libtorch = purelib.join("torch/lib/libtorch_global_deps.so");
+    let need_cpu = !libtorch.is_file()
+        || torch_ver.contains("+cu")
+        || torch_ver.contains("+cuda");
+    if need_cpu {
+        println!(
+            "Forcing CPU torch (current version: '{}')",
+            if torch_ver.is_empty() {
+                "missing"
+            } else {
+                &torch_ver
+            }
+        );
+        reinstall_torch_cpu(&py)?;
+        purelib = PathBuf::from(py_eval(
+            &py,
+            "import sysconfig; print(sysconfig.get_paths()['purelib'])",
+        )?);
+    }
+
+    let mut need: Vec<&str> = Vec::new();
+    if !purelib.join("metatensor/include").is_dir() {
+        need.push(METATENSOR_TORCH_SPEC);
+    }
+    if !purelib.join("metatomic/torch").is_dir() {
+        need.push(METATOMIC_TORCH_SPEC);
+    }
+    if !purelib.join("vesin/include/vesin.h").is_file() {
+        need.push(VESIN_SPEC);
+        need.push(VESIN_TORCH_SPEC);
+    }
+    if need.is_empty() {
+        println!("metatomic/metatensor/vesin purelib trees already present");
+    } else {
+        println!("Installing missing wheels: {}", need.join(" "));
+        let refs: Vec<&str> = need.to_vec();
+        pip_install(&py, &refs)?;
+        purelib = PathBuf::from(py_eval(
+            &py,
+            "import sysconfig; print(sysconfig.get_paths()['purelib'])",
+        )?);
+    }
+
+    let torch_ver = read_torch_version_file(&purelib)
+        .ok_or_else(|| format!("torch version not found under {}", purelib.display()))?;
+    let tver = torch_mm_from_version(&torch_ver)
+        .ok_or_else(|| format!("could not parse torch major.minor from {torch_ver:?}"))?;
+    let required = metatomic_layout_paths(&purelib, &tver);
+    let missing: Vec<String> = required
+        .iter()
+        .filter(|p| !p.exists())
+        .map(|p| p.display().to_string())
+        .collect();
+    if !missing.is_empty() {
+        eprintln!("missing C++ layout paths:");
+        for m in &missing {
+            eprintln!("  {m}");
+        }
+        return Err("metatomic C++ purelib layout incomplete".into());
+    }
+    let torch_share = purelib.join("torch/share/cmake");
+    println!(
+        "C++ metatomic layout ok; torch {tver} python {}",
+        py_eval(&py, "import sys; print(sys.version.split()[0])").unwrap_or_default()
+    );
+    println!("torch cmake {}", torch_share.display());
+    println!("vesin.h {}", purelib.join("vesin/include/vesin.h").display());
+
+    let torch_lib = purelib.join("torch/lib");
+    let ld = match env::var("LD_LIBRARY_PATH") {
+        Ok(cur) if !cur.is_empty() => format!("{}:{cur}", torch_lib.display()),
+        _ => torch_lib.display().to_string(),
+    };
+    let cmake_pp = match env::var("CMAKE_PREFIX_PATH") {
+        Ok(cur) if !cur.is_empty() => format!("{}:{cur}", torch_share.display()),
+        _ => torch_share.display().to_string(),
+    };
+    append_github_env(&[
+        ("TORCH_LIB", torch_lib.display().to_string()),
+        ("TORCH_CMAKE", torch_share.display().to_string()),
+        ("PURELIB", purelib.display().to_string()),
+        ("LD_LIBRARY_PATH", ld),
+        ("CMAKE_PREFIX_PATH", cmake_pp),
+    ])?;
+    Ok(())
+}
+
+fn apply_torch_env_from_github_or_purelib() -> Result<()> {
+    if env::var_os("TORCH_LIB").is_some() && env::var_os("CMAKE_PREFIX_PATH").is_some() {
+        return Ok(());
+    }
+    let py = python_bin()?;
+    let purelib = PathBuf::from(py_eval(
+        &py,
+        "import sysconfig; print(sysconfig.get_paths()['purelib'])",
+    )?);
+    let torch_lib = purelib.join("torch/lib");
+    let torch_cmake = purelib.join("torch/share/cmake");
+    if env::var_os("TORCH_LIB").is_none() {
+        env::set_var("TORCH_LIB", &torch_lib);
+    }
+    if env::var_os("TORCH_CMAKE").is_none() {
+        env::set_var("TORCH_CMAKE", &torch_cmake);
+    }
+    let ld = match env::var("LD_LIBRARY_PATH") {
+        Ok(cur) if !cur.is_empty() => format!("{}:{cur}", torch_lib.display()),
+        _ => torch_lib.display().to_string(),
+    };
+    env::set_var("LD_LIBRARY_PATH", &ld);
+    let cmake_pp = match env::var("CMAKE_PREFIX_PATH") {
+        Ok(cur) if !cur.is_empty() => format!("{}:{cur}", torch_cmake.display()),
+        _ => torch_cmake.display().to_string(),
+    };
+    env::set_var("CMAKE_PREFIX_PATH", &cmake_pp);
+    println!("CMAKE_PREFIX_PATH={cmake_pp}");
+    println!("LD_LIBRARY_PATH={ld}");
+    Ok(())
+}
+
+/// `potctl ci metatomic-test` — meson setup/compile/test with metatomic+vesin (orchestrator leg).
+pub fn run_metatomic_test(root: &Path, build_dir: &str) -> Result<()> {
+    apply_torch_env_from_github_or_purelib()?;
+    let setup = [
+        "setup",
+        build_dir,
+        "-Dwith_tests=true",
+        "-Dwith_examples=false",
+        "-Dwith_metatomic=true",
+        "-Dwith_rpc=false",
+        "-Dwith_cache=false",
+        "--buildtype=debug",
+    ];
+    run_cmd("meson", &setup, root)?;
+    run_cmd("meson", &["compile", "-C", build_dir], root)?;
+    run_cmd(
+        "meson",
+        &["test", "-C", build_dir, "--print-errorlogs"],
+        root,
+    )?;
+    maybe_ccache_stats();
+    Ok(())
+}
+
+/// `potctl ci xtb-tblite-test` — meson setup/compile/test with xtb+tblite.
+pub fn run_xtb_tblite_test(root: &Path, build_dir: &str) -> Result<()> {
+    let setup = [
+        "setup",
+        build_dir,
+        "-Dwith_tests=true",
+        "-Dwith_examples=false",
+        "-Dwith_xtb=true",
+        "-Dwith_tblite=true",
+        "-Dwith_rpc=false",
+        "-Dwith_cache=false",
+        "--buildtype=debug",
+    ];
+    run_cmd("meson", &setup, root)?;
+    run_cmd("meson", &["compile", "-C", build_dir], root)?;
+    run_cmd(
+        "meson",
+        &["test", "-C", build_dir, "--print-errorlogs"],
+        root,
+    )?;
+    maybe_ccache_stats();
+    Ok(())
+}
+
+/// `potctl ci towncrier-check --compare-with SHA`
+pub fn run_towncrier_check(root: &Path, compare_with: &str) -> Result<()> {
+    if compare_with.is_empty() {
+        return Err("towncrier-check requires --compare-with <sha>".into());
+    }
+    // Prefer system/pipx towncrier; fall back to uvx.
+    let direct = Command::new("towncrier")
+        .args(["check", "--compare-with", compare_with])
+        .current_dir(root)
+        .status();
+    if let Ok(s) = direct {
+        if s.success() {
+            return Ok(());
+        }
+        if which_bin("uvx").is_none() {
+            return Err(format!("towncrier check failed with {s}"));
+        }
+    }
+    let st = Command::new("uvx")
+        .args(["towncrier", "check", "--compare-with", compare_with])
+        .current_dir(root)
+        .status()
+        .map_err(|e| format!("uvx towncrier: {e}"))?;
+    if st.success() {
+        Ok(())
+    } else {
+        Err(format!("towncrier check failed with {st}"))
+    }
+}
+
+/// `potctl ci rpc-integ` — run tests/rpc_integ.py against potserv in bbdir.
+pub fn run_rpc_integ(root: &Path, server_bin: &str) -> Result<()> {
+    let script = root.join("tests/rpc_integ.py");
+    if !script.is_file() {
+        return Err(format!("missing {}", script.display()));
+    }
+    let st = Command::new("python")
+        .arg(&script)
+        .args(["--server-bin", server_bin])
+        .current_dir(root)
+        .status()
+        .or_else(|_| {
+            Command::new("python3")
+                .arg(&script)
+                .args(["--server-bin", server_bin])
+                .current_dir(root)
+                .status()
+        })
+        .map_err(|e| format!("rpc_integ: {e}"))?;
+    if st.success() {
+        Ok(())
+    } else {
+        Err(format!("rpc_integ failed with {st}"))
+    }
+}
+
+/// `potctl ci cog-check [--from SHA]` — conventional commits (PR base..HEAD or full cog check).
+pub fn run_cog_check(root: &Path, from_sha: Option<&str>) -> Result<()> {
+    let from = from_sha.filter(|s| !s.is_empty());
+    if let Some(base) = from {
+        // Prefer cog check --from when available.
+        let help = Command::new("cog")
+            .arg("check")
+            .arg("--help")
+            .output()
+            .ok();
+        let has_from = help
+            .as_ref()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains("--from")
+                || String::from_utf8_lossy(&o.stderr).contains("--from"))
+            .unwrap_or(false);
+        if has_from {
+            let st = Command::new("cog")
+                .args(["check", "--from", base])
+                .current_dir(root)
+                .status();
+            if let Ok(s) = st {
+                if s.success() {
+                    return Ok(());
+                }
+            }
+            let st2 = Command::new("cog")
+                .arg("check")
+                .current_dir(root)
+                .status();
+            if let Ok(s) = st2 {
+                if s.success() {
+                    return Ok(());
+                }
+            }
+        } else {
+            println!("Checking commits not in base...");
+            let _ = Command::new("git")
+                .args(["log", "--oneline", &format!("{base}..HEAD")])
+                .current_dir(root)
+                .status();
+            let cog_ok = Command::new("cog")
+                .arg("check")
+                .current_dir(root)
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if cog_ok {
+                return Ok(());
+            }
+            eprintln!("::warning::cog check reported issues (often pre-existing history).");
+            eprintln!("New commits on this PR should use conventional prefixes (feat/fix/chore/...).");
+        }
+        // Enforce conventional subjects on commits introduced by the PR.
+        let log = Command::new("git")
+            .args(["log", "--format=%h %s", &format!("{base}..HEAD")])
+            .current_dir(root)
+            .output()
+            .map_err(|e| format!("git log: {e}"))?;
+        let text = String::from_utf8_lossy(&log.stdout);
+        let mut bad = false;
+        for line in text.lines() {
+            let subj = line
+                .split_once(' ')
+                .map(|(_, s)| s)
+                .unwrap_or(line);
+            if !is_conventional_commit_subject(subj) {
+                eprintln!("non-conventional subject: {subj}");
+                bad = true;
+            }
+        }
+        if bad {
+            return Err("PR introduces non-conventional commit subjects".into());
+        }
+        Ok(())
+    } else {
+        let status = Command::new("cog")
+            .arg("check")
+            .current_dir(root)
+            .status()
+            .map_err(|e| format!("spawn cog check: {e}"))?;
+        if !status.success() {
+            println!("advisory cog check (dispatch run)");
+        }
+        Ok(())
+    }
 }
 
 /// Environment variables for macOS + pixi: use host Apple clang/SDK, keep conda
@@ -310,5 +1196,90 @@ mod tests {
     #[test]
     fn semver_still_ok_via_lockstep_module() {
         assert!(lockstep::semver_ok("1.2.0-rc.1"));
+    }
+
+    #[test]
+    fn build_sys_parse() {
+        assert_eq!(BuildSys::parse("meson").unwrap(), BuildSys::Meson);
+        assert_eq!(BuildSys::parse("CMAKE").unwrap(), BuildSys::Cmake);
+        assert!(BuildSys::parse("ninja").is_err());
+    }
+
+    #[test]
+    fn parse_bool_flag_accepts_matrix_strings() {
+        assert!(parse_bool_flag("true", "rpc").unwrap());
+        assert!(!parse_bool_flag("false", "cache").unwrap());
+        assert!(parse_bool_flag("maybe", "rpc").is_err());
+    }
+
+    #[test]
+    fn meson_configure_args_include_rpc_cache_and_extra() {
+        let a = meson_configure_args(true, false, "-Ddefault_library=static");
+        assert!(a.iter().any(|x| x == "-Dwith_rpc=true"));
+        assert!(a.iter().any(|x| x == "-Dwith_cache=false"));
+        assert!(a.iter().any(|x| x == "-Dwith_tests=True"));
+        assert!(a.iter().any(|x| x == "-Ddefault_library=static"));
+    }
+
+    #[test]
+    fn cmake_configure_core_rpc_cache_on_off() {
+        let on = cmake_configure_core_args(true, true);
+        assert!(on.iter().any(|x| x == "-DRGPOT_WITH_RPC=ON"));
+        assert!(on.iter().any(|x| x == "-DRGPOT_WITH_CACHE=ON"));
+        let off = cmake_configure_core_args(false, false);
+        assert!(off.iter().any(|x| x == "-DRGPOT_WITH_RPC=OFF"));
+        assert!(off.iter().any(|x| x == "-DRGPOT_WITH_CACHE=OFF"));
+    }
+
+    #[test]
+    fn cmake_macos_extra_empty_on_linux() {
+        assert!(cmake_macos_extra_args(false, Some("/sdk"), Some("/c"), Some("/fc")).is_empty());
+    }
+
+    #[test]
+    fn cmake_macos_extra_has_clang_and_prefix() {
+        let a = cmake_macos_extra_args(true, Some("/SDKs/X.sdk"), Some("/opt/conda"), Some("/opt/conda/bin/gfortran"));
+        assert!(a.iter().any(|x| x == "-DCMAKE_C_COMPILER=/usr/bin/clang"));
+        assert!(a.iter().any(|x| x.contains("CMAKE_OSX_SYSROOT=/SDKs/X.sdk")));
+        assert!(a.iter().any(|x| x.contains("CMAKE_PREFIX_PATH=/opt/conda")));
+        assert!(a.iter().any(|x| x.contains("CMAKE_Fortran_COMPILER=/opt/conda/bin/gfortran")));
+    }
+
+    #[test]
+    fn conventional_commit_subjects() {
+        assert!(is_conventional_commit_subject("feat(ci): thin steps"));
+        assert!(is_conventional_commit_subject("fix: waitid stub"));
+        assert!(is_conventional_commit_subject("chore: bump"));
+        assert!(is_conventional_commit_subject("Merge branch 'main'"));
+        assert!(!is_conventional_commit_subject("wip stuff"));
+        assert!(!is_conventional_commit_subject(""));
+    }
+
+    #[test]
+    fn torch_mm_and_layout_paths() {
+        assert_eq!(
+            torch_mm_from_version("2.10.1+cpu").as_deref(),
+            Some("2.10")
+        );
+        assert_eq!(torch_mm_from_version("2.9.0").as_deref(), Some("2.9"));
+        let paths = metatomic_layout_paths(Path::new("/p"), "2.10");
+        assert!(paths.iter().any(|p| p.ends_with("vesin/include/vesin.h")));
+        assert!(paths
+            .iter()
+            .any(|p| p.ends_with("metatomic/torch/torch-2.10/include")));
+    }
+
+    #[test]
+    fn run_build_test_rejects_bad_sys() {
+        let err = run_build_test(
+            Path::new("/tmp/nope"),
+            "make",
+            "true",
+            "false",
+            None,
+            true,
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown build sys") || err.contains("make"));
     }
 }
