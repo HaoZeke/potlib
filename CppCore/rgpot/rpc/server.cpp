@@ -246,11 +246,11 @@ int main(int argc, char *argv[]) {
     potential_to_use = std::make_unique<rgpot::MetatomicPot>(cfg);
 #endif // RGPOT_HAS_METATOMIC
   } else if (pot_type == "NWChem") {
-    std::cout << "Loading NWChem potential (dlopen libnwchem_engine)..."
+    std::cout << "Loading NWChem potential (dlopen libnwchemc)..."
               << std::endl;
     auto nw = std::make_unique<rgpot::NWChemPot>();
     if (!nw->available()) {
-      std::cerr << "Warning: libnwchem_engine not loaded; calculate() will fail "
+      std::cerr << "Warning: libnwchemc not loaded; calculate() will fail "
                    "until engine is available (configure() still accepted)."
                 << std::endl;
     }

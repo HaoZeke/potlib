@@ -30,7 +30,7 @@ NWChemCResult nwchemc_energy_gradient(
   r.ok = 0;
   r.energy_h = 0.0;
   snprintf(r.message, sizeof(r.message),
-           "NWChem embed not available (stub). Build libnwchem_engine with "
+           "NWChem embed not available (stub). Build libnwchemc with "
            "-Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP>.");
   return r;
 }

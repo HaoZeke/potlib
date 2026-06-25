@@ -26,7 +26,7 @@ static const double water_pos[] = {
 static const int water_atmnrs[] = {8, 1, 1};
 
 TEST_CASE("NWChemPot probe_available without engine", "[nwchem]") {
-  // Without RGPOT_NWCHEM_ENGINE / libnwchem_engine on path, probe is false.
+  // Without an nwchemc-compatible library on path, probe is false.
   // This documents expected behavior; does not require NWChem installed.
   bool ok = rgpot::NWChemPot::probe_available();
   if (!ok) {
@@ -37,7 +37,7 @@ TEST_CASE("NWChemPot probe_available without engine", "[nwchem]") {
 }
 
 TEST_CASE("NWChemPot abi_available without real embed", "[nwchem]") {
-  // Real embed only when libnwchem_engine was built with RGPOT_HAS_NWCHEM.
+  // Real embed only when the loaded library was built with RGPOT_HAS_NWCHEM.
   bool abi = rgpot::NWChemPot::abi_available();
   if (!abi) {
     SUCCEED("stub or missing engine reports abi_available=false");
@@ -48,7 +48,7 @@ TEST_CASE("NWChemPot abi_available without real embed", "[nwchem]") {
 
 TEST_CASE("NWChemPot water energy when engine present", "[nwchem]") {
   if (!rgpot::NWChemPot::probe_available()) {
-    SKIP("libnwchem_engine not available (set RGPOT_NWCHEM_ENGINE, NWCHEM_TOP)");
+    SKIP("libnwchemc not available (set NWCHEMC_LIBRARY, RGPOT_NWCHEMC_ENGINE, or NWCHEM_TOP)");
   }
 
   ::capnp::MallocMessageBuilder msg;

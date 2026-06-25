@@ -1,9 +1,9 @@
-# NWChemPot — backend under rgpot `PotentialConfig` params
+# NWChemPot - backend under rgpot `PotentialConfig` params
 
 ## User options = rgpot `PotentialConfig` (Cap'n Proto)
 
 rgpot has **one** user-facing parameter carrier: `PotentialConfig` in
-`Potentials.capnp` — an extensible **union** of backend-specific option structs.
+`Potentials.capnp`, an extensible **union** of backend-specific option structs.
 `NWChemParams` is only the **nwchem arm**, not a separate config ecosystem.
 
 Same schema for RPC and in-process; add future arms without new TOML/JSON:
@@ -17,47 +17,48 @@ Same schema for RPC and in-process; add future arms without new TOML/JSON:
 
 ```
 user / client
-    PotentialConfig  { nwchem = NWChemParams{...} }   ← rgpot params (in/out)
+    PotentialConfig  { nwchem = NWChemParams{...} }   rgpot params (in/out)
             │
             ├── RPC:  configure(config)
             └── C++:  setPotentialConfig(config)  or  setParams(nwchem only)
             │
             ▼  (nwchem arm only on this pot)
-    RgpotNWChemParams (embed C buffers only — fixed at .so boundary)
-            │  rgpot_nwchem_set_params / energy_grad
+    serialized flat Cap'n Proto NWChemParams bytes
+            │  nwchemc_set_params / nwchemc_energy_gradient
             ▼
-    libnwchem_engine
-      nwchem_c_abi.c → nwchem_embed_c_api.f90 (bind(C), iso_c_binding)
-      → nwchem_embed_legacy.F (geom/basis via nw_inp_from_character embed API;
+    libnwchemc.so (or transitional in-tree libnwchem_engine.so)
+      C parser + nwchem_embed_c_api.f90 (bind(C), iso_c_binding)
+      -> nwchem_embed_legacy.F (geom/basis via nw_inp_from_character embed API;
         rtdb/task_energy/task_gradient; no user .nw / subprocess CLI)
 ```
 
 Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
 
 **Not** a subprocess `nwchem` CLI. Embed still needs `NWCHEM_TOP` + built
-`libnwchem_engine.so` (`-Dwith_nwchem=true -Dnwchem_root=...`).
+`libnwchemc.so` / transitional `libnwchem_engine.so`
+(`-Dwith_nwchem=true -Dnwchem_root=...`).
 
 ## Layers
 
 | Piece | Built when | Role |
 |-------|------------|------|
-| `NWChemPot.cc` frontend | always | `dlopen` engine, units to eV/Å |
-| `nwchem_c_abi.h` | header | stable symbols (`rgpot_nwchem_*`) |
-| `nwchem_c_abi_stub.c` | always | `abi_available()==0`, compute fails |
-| `nwchem_c_abi.c` + `nwchem_embed_c_api.f90` + `nwchem_embed_legacy.F` | `-Dwith_nwchem=true` `-Dnwchem_root=...` | real embed → runtime-loaded engine |
+| `NWChemPot.cc` frontend | always | Serialize `NWChemParams`, `dlopen` engine, units to eV/Angstrom |
+| `nwchem_c_abi.h` | header | stable C symbols (`nwchemc_*`) |
+| `nwchem_c_abi_stub.c` | always | `nwchemc_available()==0`, compute fails |
+| `nwchem_c_abi.c` + `nwchem_embed_c_api.f90` + `nwchem_embed_legacy.F` | `-Dwith_nwchem=true` `-Dnwchem_root=...` | real embed -> runtime-loaded engine |
 
 ```
 app / potserv
     │
     ▼
 NWChemPot (static, always in librgpot)
-    │  dlopen(RTLD_GLOBAL)  RGPOT_NWCHEM_ENGINE / libnwchem_engine.so
+    │  dlopen(RTLD_GLOBAL)  NWCHEMC_LIBRARY / RGPOT_NWCHEMC_ENGINE / enginePath
     ▼
-libnwchem_engine.so
-    rgpot_nwchem_energy_grad / set_config / abi_available
+libnwchemc.so
+    nwchemc_set_params / nwchemc_energy_gradient / nwchemc_available
     │
     ▼
-nwchem_embed_legacy.F  →  geom/basis via embed API + task_energy/gradient  (NWCHEM_TOP libs)
+nwchem_embed_legacy.F  ->  geom/basis via embed API + task_energy/gradient  (NWCHEM_TOP libs)
 ```
 
 ## Meson
@@ -83,7 +84,9 @@ do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
 
 | Variable | Purpose |
 |----------|---------|
-| `RGPOT_NWCHEM_ENGINE` | Path to `libnwchem_engine.so` |
+| `NWCHEMC_LIBRARY` | Path to `libnwchemc.so` |
+| `RGPOT_NWCHEMC_ENGINE` | Path to `libnwchemc.so` |
+| `RGPOT_NWCHEM_ENGINE` | Transitional path to `libnwchem_engine.so` |
 | `NWCHEM_TOP` | Hint for engine/data paths (optional; also `NWChemParams.nwchemRoot`) |
 | `LD_LIBRARY_PATH` | NWChem `lib/<target>` (and deps) when embed was linked with unresolved symbols |
 
@@ -96,15 +99,15 @@ do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
 | `scfType` | `rhf` | HF: `rhf`/`uhf`; with DFT: XC functional (`blyp`, …) |
 | `charge` | `0` | Molecular charge |
 | `multiplicity` | `1` | 2S+1 |
-| `enginePath` | `""` | Frontend: `libnwchem_engine.so` (dlopen); empty → env/probe |
-| `nwchemRoot` | `""` | Frontend: `NWCHEM_TOP`; empty → env |
+| `enginePath` | `""` | Frontend: explicit `libnwchemc.so` or transitional `libnwchem_engine.so`; empty -> env/probe |
+| `nwchemRoot` | `""` | Frontend: `NWCHEM_TOP`; empty -> env |
 
-Defaults match schema + embed helper `rgpot_nwchem_params_default` (internal only).
+Defaults are the Cap'n Proto schema defaults.
 
 ### DFT: two equivalent forms
 
-1. **Preferred:** `theory="dft"`, `scfType="blyp"` (or `b3lyp`, …) — explicit DFT + XC.
-2. **Shorthand:** `theory="blyp"` (embed maps theory alias → `dft` + XC); still fine if `scfType` left default.
+1. **Preferred:** `theory="dft"`, `scfType="blyp"` (or `b3lyp`, ...): explicit DFT + XC.
+2. **Shorthand:** `theory="blyp"`: embed maps theory alias to `dft` + XC; still fine if `scfType` left default.
 
 HF: `theory="scf"`, `scfType="rhf"` or `"uhf"`.
 
@@ -112,13 +115,13 @@ HF: `theory="scf"`, `scfType="rhf"` or `"uhf"`.
 
 | Step | What happens |
 |------|----------------|
-| `setPotentialConfig` / RPC `configure` / `setParams` | Sticky on the C++ pot: stores internal mirror until next configure |
-| Each `forceImpl` / `calculate` | Frontend copies full current options into embed buffers and calls `rgpot_nwchem_energy_grad(..., &params, ...)` (per-call at embed boundary) |
-| Embed only: `set_params` then `energy_grad(..., NULL, ...)` | Sticky inside engine `.so` via last `g_params` (advanced; normal path is through the pot) |
+| `setPotentialConfig` / RPC `configure` / `setParams` | Sticky on the C++ pot: stores serialized flat Cap'n Proto `NWChemParams` words |
+| Each `forceImpl` / `calculate` | Frontend passes the current message bytes to `nwchemc_energy_gradient(...)` at the dlopen boundary |
+| Direct C callers | Pass the same unpacked flat `NWChemParams` message bytes to `nwchemc_set_params(...)` or `nwchemc_energy_gradient(...)` |
 
 ### Units
 
-Embed / C ABI: energy **Hartree**, gradient **Hartree/Bohr**. Frontend converts to rgpot **eV** / **eV/Å**. Geometry units for `calculate` remain on `ForceInput`, not on `PotentialConfig`.
+Embed / C ABI: energy **Hartree**, gradient **Hartree/Bohr**. Frontend converts to rgpot **eV** / **eV/Angstrom**. Geometry units for `calculate` remain on `ForceInput`, not on `PotentialConfig`.
 
 ```cpp
 ::capnp::MallocMessageBuilder msg;
@@ -126,7 +129,7 @@ auto cfg = msg.initRoot<::PotentialConfig>();
 auto nw = cfg.initNwchem();
 nw.setTheory("dft");
 nw.setScfType("blyp");
-nw.setEnginePath("/path/to/libnwchem_engine.so");
+nw.setEnginePath("/path/to/libnwchemc.so");
 rgpot::NWChemPot pot;
 pot.setPotentialConfig(cfg.asReader());  // rgpot params, nwchem arm
 ```
@@ -149,4 +152,4 @@ top of the same frontend; it is not required for the C ABI or embed path.
 
 ## Units
 
-ABI: Hartree, Hartree/Bohr. Frontend: eV, eV/Å (`rgpot::units`).
+ABI: Hartree, Hartree/Bohr. Frontend: eV, eV/Angstrom (`rgpot::units`).

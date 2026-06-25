@@ -62,8 +62,8 @@ def main() -> int:
         "NWChem frontend dependency is missing",
     )
     require(
-        "dependencies: [nwchem_dl_dep]" in meson,
-        "NWChem frontend dependency should expose only dl",
+        "dependencies: [nwchem_dl_dep, ptlrpc_dep]" in meson,
+        "NWChem frontend dependency should expose dl plus the Cap'n Proto schema dependency",
     )
     return 0
 
