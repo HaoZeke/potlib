@@ -11,13 +11,9 @@ option('with_rust_core', type : 'boolean', value : false)
 option('with_xtb', type : 'boolean', value : false)
 option('with_tblite', type : 'boolean', value : false)
 option('with_metatomic', type : 'boolean', value : false)
-option('with_psi4', type : 'boolean', value : false,
-       description : 'Build Psi4Pot frontend + libpsi4_engine (runtime dlopen; no Psi4 link dep)')
-option('psi4_includedir', type : 'string', value : '',
-       description : 'Psi4 C++ headers (e.g. third_party/libpsi4-cpp/install/include or conda include)')
 option('with_nwchem', type : 'boolean', value : false,
-       description : 'Build optional libnwchem_engine (NWChem embed); NWChemPot frontend always builds')
+       description : 'Enable in-process NWChem Fortran embed (needs nwchem_root); CLI engine always builds')
 option('nwchem_root', type : 'string', value : '',
-       description : 'NWCHEM_TOP install/source root for engine build')
+       description : 'NWCHEM_TOP install/source root for optional Fortran embed engine')
 option('nwchem_target', type : 'string', value : 'LINUX64',
        description : 'NWChem target name (lib/<target>/ layout)')

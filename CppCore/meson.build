@@ -46,11 +46,6 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
-    if has_psi4
-        subdir('rgpot/Psi4Pot')  # 'psi4pot' (+ builds libpsi4_engine)
-        rgpotentials += [psi4pot]
-    endif
-
     # NWChemPot frontend always builds (stub ABI always; engine optional).
     subdir('rgpot/NWChemPot')  # 'nwchempot' (+ optional libnwchem_engine)
     rgpotentials += [nwchempot]
@@ -161,11 +156,6 @@ if get_option('with_tests')
                 'MetatomicPotTest.cc',
                 '/CppCore/tests',
             ],
-        ]
-    endif
-    if has_psi4
-        test_array += [
-            ['Psi4test', 'psi4_test', 'Psi4PotTest.cc', ''],
         ]
     endif
     # NWChem frontend tests (main lib build only; skip at runtime if engine missing)

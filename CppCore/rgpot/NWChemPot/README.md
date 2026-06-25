@@ -10,8 +10,9 @@ Fortran embed (`nwchem_embed.F`).
 | Frontend | `NWChemPot.cc` / `NWChemPot.hpp` | Always built. `dlopen`s `libnwchem_engine`. |
 | C ABI | `nwchem_c_abi.h` | Stable symbols: energy/grad, set_config, version, abi_available. |
 | Stub | `nwchem_c_abi_stub.c` → `libnwchem_abi_stub.a` | Always built. Returns not-available. |
-| Engine | `nwchem_c_abi.c` + `nwchem_embed.F` → `libnwchem_engine.so` | Optional (`-Dwith_nwchem=true`). |
-| DynLib | `DynLib.hpp` | Same portable dlopen pattern as Psi4Pot. |
+| Engine (default) | `nwchem_c_abi_cli.c` → `libnwchem_engine.so` | Always built. Runs `nwchem` subprocess. |
+| Engine (embed) | `nwchem_c_abi.c` + `nwchem_embed.F` | Optional when `with_nwchem` + `nwchem_root` + Fortran. |
+| DynLib | `DynLib.hpp` | Portable dlopen helper for the engine. |
 
 ```
 Caller / RPC server
@@ -20,22 +21,28 @@ Caller / RPC server
   NWChemPot (static, always in librgpot)
        │  dlopen(RTLD_GLOBAL)
        ▼
-  libnwchem_engine.so  ──►  nwchem_c_abi.c  ──►  nwchem_embed.F  ──►  NWChem libs
-       │
-       └── or missing / stub only → available()=false, force throws
+  libnwchem_engine.so  ──►  nwchem_c_abi_cli.c  ──►  nwchem (PATH / RGPOT_NWCHEM_EXE)
+       │                   or (optional) nwchem_c_abi.c + nwchem_embed.F
+       └── missing engine .so → available()=false; missing nwchem exe → abi_available=false
 ```
 
 ## Meson options
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `with_nwchem` | `false` | Build optional `libnwchem_engine` when root/target set. |
-| `nwchem_root` | `''` | `NWCHEM_TOP` install / source root. |
+| `with_nwchem` | `false` | Switch engine to in-process Fortran embed (needs `nwchem_root`). |
+| `nwchem_root` | `''` | `NWCHEM_TOP` for embed build. |
 | `nwchem_target` | `LINUX64` | NWChem target lib dir name under `lib/`. |
 
-Frontend is **always** compiled regardless of `with_nwchem` (unlike Psi4 which is gated by `with_psi4`). Engine path is optional.
+Frontend + CLI engine are **always** built. Put real `nwchem` on `PATH` (or set `RGPOT_NWCHEM_EXE`).
 
 ```bash
+# default: CLI engine
+meson setup bbdir -Dwith_rpc=true
+export RGPOT_NWCHEM_ENGINE=$PWD/bbdir/CppCore/rgpot/NWChemPot/libnwchem_engine.so
+export RGPOT_NWCHEM_EXE=$(command -v nwchem)   # or scripts/mock_nwchem.sh for smoke
+
+# optional Fortran embed (full NWChem tree)
 meson setup bbdir -Dwith_nwchem=true -Dnwchem_root=$NWCHEM_TOP -Dnwchem_target=LINUX64
 ```
 
@@ -44,8 +51,17 @@ meson setup bbdir -Dwith_nwchem=true -Dnwchem_root=$NWCHEM_TOP -Dnwchem_target=L
 | Variable | Purpose |
 |----------|---------|
 | `RGPOT_NWCHEM_ENGINE` | Explicit path to `libnwchem_engine.so`. |
-| `NWCHEM_TOP` | NWChem install/source tree (also settable via `NWChemConfig.nwchem_root`). |
-| `LD_LIBRARY_PATH` | Must include NWChem runtime libs when using a real engine. |
+| `RGPOT_NWCHEM_EXE` / `NWCHEM_EXECUTABLE` | Path to `nwchem` binary (CLI engine). |
+| `NWCHEM_TOP` | NWChem install/source tree (embed mode / `NWChemConfig.nwchem_root`). |
+| `LD_LIBRARY_PATH` | Include dir containing `libnwchem_engine.so` (and NWChem libs for embed). |
+
+Smoke without a full NWChem install:
+
+```bash
+RGPOT_NWCHEM_ENGINE=$PWD/bbdir/CppCore/rgpot/NWChemPot/libnwchem_engine.so \
+RGPOT_NWCHEM_EXE=$PWD/scripts/mock_nwchem.sh \
+  ./scripts/nwchem_calc_smoke   # or compile scripts/nwchem_calc_smoke.cc against built libs
+```
 
 ## Config (`NWChemConfig`)
 
@@ -77,4 +93,4 @@ meson test -C bbdir --suite nwchem
 
 ## Units
 
-Engine returns Hartree and Hartree/Bohr gradient; frontend converts to eV and eV/Å using `rgpot::units` (same as Psi4Pot / XTB).
+Engine returns Hartree and Hartree/Bohr gradient; frontend converts to eV and eV/Å using `rgpot::units` (same as XTB).

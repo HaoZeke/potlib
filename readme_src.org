@@ -44,7 +44,6 @@ matching pixi environments:
 | =XTBPot= | =-Dwith_xtb=true= | =xtbbld= / =tbbld= | GFNFF, GFN0/1/2-xTB via xtb |
 | =TBLitePot= | =-Dwith_tblite=true= | =tblitebld= / =tbbld= | GFN1, GFN2, IPEA1 via tblite |
 | =MetatomicPot= | =-Dwith_metatomic=true= | =metatomicbld= (linux-64) | TorchScript models via metatomic/PyTorch + vesin |
-| =Psi4Pot= | =-Dwith_psi4=true= | custom / =third_party/libpsi4-cpp= | BLYP via =libpsi4_engine= (=dlopen=; no Python) |
 | =NWChemPot= | frontend always; engine =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | NWChem install | QM via =libnwchem_engine= (=dlopen=); stub ABI without NWChem |
 
 #+begin_src bash

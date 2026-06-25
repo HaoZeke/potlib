@@ -47,7 +47,6 @@ Enable only what the host project needs:
 | =-Dwith_xtb=true= | =xtbbld= / =tbbld= | =XTBPot= (GFNFF, GFN0/1/2-xTB) |
 | =-Dwith_tblite=true= | =tblitebld= / =tbbld= | =TBLitePot= (GFN1, GFN2, IPEA1) |
 | =-Dwith_metatomic=true= | =metatomicbld= (linux-64) | =MetatomicPot= (TorchScript models) |
-| =-Dwith_psi4=true= | (custom / third_party) | =Psi4Pot= frontend + =libpsi4_engine= (runtime =dlopen=) |
 | =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | (NWChem install) | optional =libnwchem_engine=; =NWChemPot= frontend always built |
 
 =NWChemPot= is always compiled into the main library (frontend only). Enable

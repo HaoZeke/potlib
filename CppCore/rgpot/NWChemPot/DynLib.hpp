@@ -6,7 +6,7 @@
  * @brief Portable dynamic library loader (dlopen / LoadLibrary family).
  *
  * Used by NWChemPot to resolve libnwchem_engine at runtime without a
- * build-time link dependency on NWChem (same pattern as Psi4Pot/DynLib.hpp).
+ * build-time link dependency on NWChem.
  */
 
 #include <stdexcept>

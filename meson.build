@@ -112,25 +112,16 @@ if get_option('with_xtb')
     has_xtb = true
 endif
 
-# Psi4Pot: frontend only (dlopen libpsi4 + libpsi4_engine). No link dep on Psi4.
-has_psi4 = false
-if get_option('with_psi4')
-    _args += ['-DRGPOT_HAS_PSI4=TRUE']
-    has_psi4 = true
-endif
-
-# NWChemPot: frontend always builds (dlopen libnwchem_engine). Engine optional.
-# Minimal probe: with_nwchem + nwchem_root set => has_nwchem for engine target.
+# NWChemPot: frontend always builds (dlopen libnwchem_engine).
+# Engine shared lib always built with CLI backend (nwchem on PATH).
+# has_nwchem=true only when with_nwchem + nwchem_root for optional Fortran embed.
 nwchem_root = get_option('nwchem_root')
 nwchem_target = get_option('nwchem_target')
 has_nwchem = false
 if get_option('with_nwchem') and nwchem_root != ''
-    # Full MA/global/rtdb probe is host-specific; enable engine build path when
-    # the user explicitly requests it with a non-empty install/source root.
     _args += ['-DRGPOT_HAS_NWCHEM=TRUE']
     has_nwchem = true
 endif
-# Frontend always available in the C++ tree (subdir always entered).
 _args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
 
 has_tblite = false
