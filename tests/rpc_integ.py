@@ -12,6 +12,12 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SCHEMA_PATH = os.path.join(SCRIPT_DIR, "../CppCore/rgpot/rpc/Potentials.capnp")
 pot_capnp = capnp.load(SCHEMA_PATH)
 
+try:
+    from nwchem_params import configure_nwchem, make_potential_config_none
+except ImportError:
+    sys.path.insert(0, SCRIPT_DIR)
+    from nwchem_params import configure_nwchem, make_potential_config_none
+
 
 async def run_client(port):
     # Retry connection a few times to allow server startup
@@ -71,12 +77,48 @@ async def run_client(port):
     return True
 
 
+async def run_nwchem_smoke(port):
+    """Optional smoke: start NWChem server, configure(), skip calculate if no engine."""
+    for _ in range(10):
+        try:
+            connection = await capnp.AsyncIoStream.create_connection(
+                host="localhost", port=port
+            )
+            break
+        except OSError:
+            await asyncio.sleep(0.5)
+    else:
+        print("NWChem smoke: failed to connect to server.")
+        return False
+
+    client = capnp.TwoPartyClient(connection)
+    pot = client.bootstrap().cast_as(pot_capnp.Potential)
+
+    # configure(none) should succeed
+    cfg_none = make_potential_config_none(pot_capnp)
+    r0 = await pot.configure(cfg_none)
+    print(f"NWChem configure(none): ok={r0.ok} msg={r0.message}")
+
+    ok, msg = await configure_nwchem(
+        pot, pot_capnp, basis="sto-3g", theory="scf", scf_type="rhf"
+    )
+    print(f"NWChem configure(nwchem): ok={ok} msg={msg}")
+    # ok may be False without engine; still a valid RPC round-trip
+    print("NWChem smoke: configure RPC completed.")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--server-bin", required=True, help="Path to potserv executable"
     )
     parser.add_argument("--port", type=int, default=12345)
+    parser.add_argument(
+        "--nwchem-smoke",
+        action="store_true",
+        help="Also run NWChem configure() smoke on a second server port",
+    )
     args = parser.parse_args()
 
     # 1. Start Server
@@ -105,6 +147,28 @@ def main():
     if not success:
         sys.exit(1)
     print("Integration test passed.")
+
+    if args.nwchem_smoke:
+        nw_port = args.port + 1
+        print(f"Starting NWChem smoke server: {args.server_bin} {nw_port} NWChem")
+        nw_proc = subprocess.Popen(
+            [args.server_bin, str(nw_port), "NWChem"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            nw_ok = asyncio.run(capnp.run(run_nwchem_smoke(nw_port)))
+        except Exception as e:
+            print(f"NWChem smoke exception: {e}")
+            print("Server stderr:")
+            print(nw_proc.stderr.read().decode())
+            nw_ok = False
+        finally:
+            nw_proc.kill()
+            nw_proc.wait()
+        if not nw_ok:
+            sys.exit(1)
+        print("NWChem smoke passed.")
 
 
 if __name__ == "__main__":

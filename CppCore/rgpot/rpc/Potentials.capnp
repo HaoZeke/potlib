@@ -30,6 +30,27 @@ struct PotentialResult {
   forces @1 :List(Float64); # @brief Flat array of atomic forces [natoms * 3].
 }
 
+# @struct NWChemParams
+# @brief Runtime configuration for the NWChem potential backend.
+struct NWChemParams {
+  basis        @0 :Text = "sto-3g";  # @brief Gaussian basis set name.
+  theory       @1 :Text = "scf";     # @brief NWChem theory task (scf, dft, ...).
+  scfType      @2 :Text = "rhf";     # @brief SCF type (rhf, uhf, ...).
+  charge       @3 :Int32 = 0;        # @brief Molecular charge.
+  multiplicity @4 :Int32 = 1;        # @brief Spin multiplicity (2S+1).
+  enginePath   @5 :Text = "";        # @brief Optional libnwchem_engine path.
+  nwchemRoot   @6 :Text = "";        # @brief Optional NWCHEM_TOP override.
+}
+
+# @struct PotentialConfig
+# @brief Tagged configuration for configure() on a live Potential server.
+struct PotentialConfig {
+  union {
+    none   @0 :Void;          # @brief No backend-specific config.
+    nwchem @1 :NWChemParams;  # @brief NWChem backend parameters.
+  }
+}
+
 # @interface Potential
 # @brief The RPC interface for remote calculations.
 interface Potential {
@@ -37,4 +58,9 @@ interface Potential {
   # @param fip The input atomic configuration.
   # @return The resulting energy and force vector.
   calculate @0 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Apply backend-specific configuration before calculate().
+  # @param config Tagged parameters (e.g. NWChemParams).
+  # @return ok=false if the backend rejects or cannot apply config.
+  configure @1 (config :PotentialConfig) -> (ok :Bool, message :Text);
 }

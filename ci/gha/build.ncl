@@ -80,8 +80,12 @@ in
   },
   jobs = {
     "ci-tools" = S.job_ci_tools_os_matrix [P.ubuntu, P.macos],
-    // Psi4Pot is opt-in only (-Dwith_psi4=true); default CI matrix does not enable it.
-    build_and_test = {
+    // build_and_test: default meson/cmake matrix does NOT enable with_nwchem or with_psi4.
+// NWChemPot frontend + nwchem_abi_stub compile unconditionally in the main C++ lib;
+// optional libnwchem_engine requires -Dwith_nwchem=true -Dnwchem_root=... (host NWChem).
+// Suite `nwchem` tests SKIP energy/grad without RGPOT_NWCHEM_ENGINE; stub ABI probe always runs.
+// Psi4Pot remains behind -Dwith_psi4=true (frontend + libpsi4_engine only when opted in).
+  build_and_test = {
       needs = ["ci-tools"],
       name = "${{ matrix.sys }} / ${{ matrix.os }} [RPC:${{ matrix.rpc }} CACHE:${{ matrix.cache }}]",
       "runs-on" = "${{ matrix.os }}",

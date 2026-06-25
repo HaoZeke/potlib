@@ -119,6 +119,20 @@ if get_option('with_psi4')
     has_psi4 = true
 endif
 
+# NWChemPot: frontend always builds (dlopen libnwchem_engine). Engine optional.
+# Minimal probe: with_nwchem + nwchem_root set => has_nwchem for engine target.
+nwchem_root = get_option('nwchem_root')
+nwchem_target = get_option('nwchem_target')
+has_nwchem = false
+if get_option('with_nwchem') and nwchem_root != ''
+    # Full MA/global/rtdb probe is host-specific; enable engine build path when
+    # the user explicitly requests it with a non-empty install/source root.
+    _args += ['-DRGPOT_HAS_NWCHEM=TRUE']
+    has_nwchem = true
+endif
+# Frontend always available in the C++ tree (subdir always entered).
+_args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
+
 has_tblite = false
 if get_option('with_tblite')
     tblite_dep = dependency('tblite', required: true)

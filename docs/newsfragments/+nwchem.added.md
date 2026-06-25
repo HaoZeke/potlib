@@ -1,0 +1,1 @@
+NWChemPot backend: stable C ABI (`nwchem_c_abi.h`), always-built frontend with `dlopen` of optional `libnwchem_engine`, stub ABI for CI without NWChem, Cap'n Proto `NWChemParams`/`configure @1`, and `potserv … NWChem`.

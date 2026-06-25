@@ -26,6 +26,16 @@ This collides with any consumer that defines its own =class Potential= at global
 scope.
 
 Both names are extremely common in computational chemistry codebases.
+
+*** NWChem backend over RPC
+
+When the server is started with =potserv <port> NWChem=, clients may call
+=configure= with =PotentialConfig.nwchem= (=NWChemParams=: basis, theory,
+=scfType=, charge, multiplicity, optional =enginePath= / =nwchemRoot=) before
+=calculate=. Without =libnwchem_engine= on the server host, =configure= may
+return =ok=false= while the RPC still completes; =calculate= fails until an
+engine is provided. Python helpers: =tests/nwchem_params.py=.
+
 For example, [[https://github.com/TheochemUI/eOn][eOn]] defines:
 
 - =AtomMatrix= :: A typedef for =Eigen::Matrix<double, Eigen::Dynamic, 3>=.

@@ -125,7 +125,8 @@ prek ∥ docs_snapper ∥ docs_lychee ∥ towncrier(PR) ∥ ci-tools
     ↓ (after ci-tools; skipped on schedule except docs_*)
 build_and_test ∥ rust_tests ∥ client_bridge_stress
   ∥ potentials_metatomic ∥ potentials_tight_binding
-  (Psi4Pot only if with_psi4; not in default CI matrix.)
+  (NWChemPot frontend/stub always in default meson build; no with_nwchem in CI matrix.
+   Psi4Pot only if with_psi4; NWChem engine only with with_nwchem+nwchem_root on host.)
     ↓
 ci_gate   ← single required-check aggregator
 ```

@@ -51,6 +51,10 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [psi4pot]
     endif
 
+    # NWChemPot frontend always builds (stub ABI always; engine optional).
+    subdir('rgpot/NWChemPot')  # 'nwchempot' (+ optional libnwchem_engine)
+    rgpotentials += [nwchempot]
+
     _linkto += rgpotentials
 
     # Create library
@@ -164,10 +168,53 @@ if get_option('with_tests')
             ['Psi4test', 'psi4_test', 'Psi4PotTest.cc', ''],
         ]
     endif
+    # NWChem frontend tests (main lib build only; skip at runtime if engine missing)
+    if not get_option('with_rpc_client_only')
+        test(
+            'NWChemPotTest',
+            executable(
+                'nwchem_pot_test',
+                sources: ['tests/NWChemPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'nwchem',
+        )
+        test(
+            'test_nwchem_abi',
+            executable(
+                'test_nwchem_abi',
+                sources: ['tests/test_nwchem_abi_main.c'],
+                dependencies: [nwchem_abi_stub_dep],
+                include_directories: include_directories('rgpot/NWChemPot'),
+            ),
+            suite: 'nwchem',
+        )
+    endif
     if rpc_enabled
         test_deps += dependency('capnp-rpc')
         test_deps += ptlrpc_dep
         test_array += [['RPCTest', 'test_rpc', 'CapnpAdapterTest.cc', '']]
+        if not get_option('with_rpc_client_only')
+            test(
+                'NWChemCapnpMapTest',
+                executable(
+                    'nwchem_capnp_map_test',
+                    sources: ['tests/NWChemCapnpMapTest.cc'],
+                    dependencies: test_deps,
+                    include_directories: _incdirs + ['.'],
+                    cpp_args: test_args,
+                    link_with: _linkto,
+                    link_language: 'cpp',
+                ),
+                workdir: meson.source_root(),
+                suite: 'nwchem',
+            )
+        endif
         if get_option('with_rpc_client_only')
             test_deps += rgpot_bridge_dep
             test_array += [
