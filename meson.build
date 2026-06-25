@@ -113,8 +113,7 @@ if get_option('with_xtb')
 endif
 
 # NWChemPot: frontend always builds (dlopen libnwchem_engine).
-# Engine shared lib always built with CLI backend (nwchem on PATH).
-# has_nwchem=true only when with_nwchem + nwchem_root for optional Fortran embed.
+# Real engine only when with_nwchem + nwchem_root (in-process Fortran embed).
 nwchem_root = get_option('nwchem_root')
 nwchem_target = get_option('nwchem_target')
 has_nwchem = false

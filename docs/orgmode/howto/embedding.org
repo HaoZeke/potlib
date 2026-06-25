@@ -47,12 +47,12 @@ Enable only what the host project needs:
 | =-Dwith_xtb=true= | =xtbbld= / =tbbld= | =XTBPot= (GFNFF, GFN0/1/2-xTB) |
 | =-Dwith_tblite=true= | =tblitebld= / =tbbld= | =TBLitePot= (GFN1, GFN2, IPEA1) |
 | =-Dwith_metatomic=true= | =metatomicbld= (linux-64) | =MetatomicPot= (TorchScript models) |
-| =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | (NWChem install) | optional =libnwchem_engine=; =NWChemPot= frontend always built |
+| =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | full NWChem source/install | =libnwchem_engine.so= in-process embed (C ABI, =dlopen=) |
 
-=NWChemPot= is always compiled into the main library (frontend only). Enable
-=-Dwith_nwchem=true= with a non-empty =-Dnwchem_root=...= to build the optional
-shared engine that embeds NWChem via =nwchem_embed.F=. At runtime set
-=RGPOT_NWCHEM_ENGINE= / =NWCHEM_TOP= as needed. See =CppCore/rgpot/NWChemPot/README.md=.
+=NWChemPot= frontend is always compiled; it =dlopen=s optional =libnwchem_engine.so=
+built only with embed flags (stable C symbols in =nwchem_c_abi.h=). No =nwchem=
+CLI/subprocess path. Clone+build NWChem once (=scripts/setup_nwchem_embed.sh=),
+then set =RGPOT_NWCHEM_ENGINE=. See =CppCore/rgpot/NWChemPot/README.md=.
 
 Example -- embed with metatomic support:
 

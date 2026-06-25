@@ -86,9 +86,20 @@ C     One-time NWChem runtime init (idempotent best-effort).
       if (tstr(1:1) .eq. ' ') tstr = 'scf'
       if (bstr(1:1) .eq. ' ') bstr = 'sto-3g'
       if (sstr(1:1) .eq. ' ') sstr = 'rhf'
+C     Map theory aliases: blyp/b3lyp/pbe => dft with xc in scf_type / theory
+      if (tstr(1:4) .eq. 'blyp' .or. tstr(1:5) .eq. 'b3lyp' .or.
+     $     tstr(1:3) .eq. 'pbe' .or. tstr(1:3) .eq. 'dft') then
+         if (tstr(1:3) .ne. 'dft') sstr = tstr
+         tstr = 'dft'
+      endif
       status = rtdb_put(rtdb_handle, 'task:theory', mt_char, 1, tstr)
       status = rtdb_put(rtdb_handle, 'basis:name', mt_char, 1, bstr)
-      status = rtdb_put(rtdb_handle, 'scf:type', mt_char, 1, sstr)
+      if (tstr(1:3) .eq. 'dft') then
+         status = rtdb_put(rtdb_handle, 'dft:xc', mt_char, 1, sstr)
+         status = rtdb_put(rtdb_handle, 'dft:mult', mt_int, 1, mult)
+      else
+         status = rtdb_put(rtdb_handle, 'scf:type', mt_char, 1, sstr)
+      endif
       status = rtdb_put(rtdb_handle, 'charge', mt_int, 1, charge)
       status = rtdb_put(rtdb_handle, 'spin mult', mt_int, 1, mult)
       if (status) rgpot_nwchem_embed_set_config_ = 0

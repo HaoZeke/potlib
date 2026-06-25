@@ -1,5 +1,5 @@
-// Smoke: load NWChemPot via engine, run water energy/forces once.
-// Build+run via meson test or: c++ -std=c++17 ... (see README)
+// Direct NWChemPot via runtime-loaded libnwchem_engine (in-process C ABI).
+// No RPC/potserv. No nwchem CLI. Build via scripts/setup_nwchem_embed.sh configure.
 #include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
@@ -22,7 +22,8 @@ int main() {
     return 2;
   }
   if (!rgpot::NWChemPot::abi_available()) {
-    std::cerr << "nwchem executable not found (set RGPOT_NWCHEM_EXE or PATH)\n";
+    std::cerr << "engine loaded but embed stub/unavailable (build with -Dwith_nwchem "
+                 "-Dnwchem_root=NWCHEM_TOP)\n";
     return 3;
   }
 

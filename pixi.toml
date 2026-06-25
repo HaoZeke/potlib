@@ -24,7 +24,6 @@ xtbbld = { features = ["xtb"] }
 tblitebld = { features = ["tblite"] }
 tbbld = { features = ["xtb", "tblite"] }
 metatomicbld = { features = ["metatomic"] }
-
 [feature.cache.dependencies]
 rocksdb = ">=10.9.1,<11"
 xxhash = ">=0.8.3,<0.9"
@@ -130,6 +129,11 @@ release-sync-versions = { cmd = "cargo run -q -p potctl -- release sync", descri
 release-assert-lockstep = { cmd = "cargo run -q -p potctl -- release assert", description = "Assert meson/cmake/cargo/towncrier/pixi agree. Optional version; --require-changelog" }
 release-extract-changelog = { cmd = "cargo run -q -p potctl -- release notes", description = "Print CHANGELOG section. Usage: pixi r release-extract-changelog -- 1.2.0 -o /tmp/notes.md" }
 ci-preflight = { cmd = "cargo run -q -p potctl -- ci preflight", description = "Repo sanity + lockstep (CI first step parity)" }
+
+# NWChem embed (in-process C ABI only; needs cloned+built NWCHEM_TOP, not conda nwchem alone)
+nwchem-clone = { cmd = "bash scripts/setup_nwchem_embed.sh clone", description = "Shallow clone NWChem to third_party/nwchem" }
+nwchem-embed-setup = { cmd = "bash scripts/setup_nwchem_embed.sh configure", description = "Meson build libnwchem_engine embed against NWCHEM_TOP" }
+nwchem-embed-calc = { cmd = "bash scripts/setup_nwchem_embed.sh calc", description = "Direct NWChemPot water via embed .so (no RPC, no CLI)" }
 ci-darwin-env = { cmd = "cargo run -q -p potctl -- ci darwin-env", description = "Print macOS/pixi host clang/SDK exports (eval in shell)" }
 potctl-test = { cmd = "cargo test -p potctl", description = "Unit tests for potctl (lockstep + CI helpers)" }
 release-cog-dry = { cmd = "cog bump --auto --dry-run", description = "Preview next cog bump without writing" }

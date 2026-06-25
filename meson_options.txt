@@ -12,8 +12,8 @@ option('with_xtb', type : 'boolean', value : false)
 option('with_tblite', type : 'boolean', value : false)
 option('with_metatomic', type : 'boolean', value : false)
 option('with_nwchem', type : 'boolean', value : false,
-       description : 'Enable in-process NWChem Fortran embed (needs nwchem_root); CLI engine always builds')
+       description : 'Build libnwchem_engine with in-process NWChem embed (needs nwchem_root + Fortran)')
 option('nwchem_root', type : 'string', value : '',
-       description : 'NWCHEM_TOP install/source root for optional Fortran embed engine')
+       description : 'NWCHEM_TOP source/install root for embed (headers under src/include, libs under lib/<target>)')
 option('nwchem_target', type : 'string', value : 'LINUX64',
        description : 'NWChem target name (lib/<target>/ layout)')

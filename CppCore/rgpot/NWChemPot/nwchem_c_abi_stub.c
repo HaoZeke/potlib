@@ -31,8 +31,9 @@ RgpotNWChemResult rgpot_nwchem_energy_grad(
   r.ok = 0;
   r.energy_h = 0.0;
   snprintf(r.message, sizeof(r.message),
-           "NWChem engine not available (stub only; build with -Dwith_nwchem=true "
-           "and set nwchem_root, or set RGPOT_NWCHEM_ENGINE to libnwchem_engine)");
+           "NWChem embed not available (stub only). Build libnwchem_engine with "
+           "-Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP> and set "
+           "RGPOT_NWCHEM_ENGINE to that .so (in-process C ABI, no CLI).");
   return r;
 }
 
