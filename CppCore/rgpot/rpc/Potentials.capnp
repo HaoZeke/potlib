@@ -43,6 +43,12 @@ struct NWChemParams {
   multiplicity @4 :Int32 = 1;        # 2S+1.
   enginePath   @5 :Text = "";        # libnwchem_engine.so (dlopen); empty => probe/env.
   nwchemRoot   @6 :Text = "";        # NWCHEM_TOP for embed; empty => env.
+  task         @7 :Text = "gradient"; # energy | gradient | property; frontend usually calls gradient.
+  title        @8 :Text = "";         # Optional NWChem title/start prefix.
+  memoryMb     @9 :UInt32 = 0;        # 0 => NWChem defaults / environment.
+  scratchDir   @10 :Text = "";        # Optional NWChem scratch directory.
+  permanentDir @11 :Text = "";        # Optional NWChem permanent directory.
+  inputBlocks  @12 :List(Text);       # Raw NWChem directive blocks applied before task.
 }
 
 # Future backend option structs (extend here, then add a PotentialConfig union arm):

@@ -101,6 +101,12 @@ do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
 | `multiplicity` | `1` | 2S+1 |
 | `enginePath` | `""` | Frontend: explicit `libnwchemc.so` or transitional `libnwchem_engine.so`; empty -> env/probe |
 | `nwchemRoot` | `""` | Frontend: `NWCHEM_TOP`; empty -> env |
+| `task` | `gradient` | NWChem task hint; rgpot force calls use gradient |
+| `title` | `""` | Optional NWChem title/start prefix |
+| `memoryMb` | `0` | 0 -> NWChem defaults / environment |
+| `scratchDir` | `""` | Optional NWChem scratch directory |
+| `permanentDir` | `""` | Optional NWChem permanent directory |
+| `inputBlocks` | `[]` | Raw NWChem directive blocks applied by `nwchemc` before task execution |
 
 Defaults are the Cap'n Proto schema defaults.
 

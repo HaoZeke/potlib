@@ -94,6 +94,14 @@ TEST_CASE("NWChemPot setParams updates Cap'n Proto-visible params", "[nwchem]") 
   p.setTheory("dft");
   p.setCharge(-1);
   p.setMultiplicity(1);
+  p.setTask("energy");
+  p.setTitle("anion");
+  p.setMemoryMb(768);
+  p.setScratchDir("/scratch/rgpot-nwchem-test");
+  p.setPermanentDir("/perm/rgpot-nwchem-test");
+  auto blocks = p.initInputBlocks(2);
+  blocks.set(0, "dft; xc b3lyp; end");
+  blocks.set(1, "set int:acc_std 1e-8");
   // setParams returns false if engine not loaded; stored params still roundtrip.
   (void)pot.setParams(p.asReader());
   ::capnp::MallocMessageBuilder out_msg;
@@ -102,5 +110,17 @@ TEST_CASE("NWChemPot setParams updates Cap'n Proto-visible params", "[nwchem]") 
   REQUIRE(std::string(out.getBasis().cStr()) == "6-31g");
   REQUIRE(std::string(out.getTheory().cStr()) == "dft");
   REQUIRE(out.getCharge() == -1);
+  REQUIRE(std::string(out.getTask().cStr()) == "energy");
+  REQUIRE(std::string(out.getTitle().cStr()) == "anion");
+  REQUIRE(out.getMemoryMb() == 768);
+  REQUIRE(std::string(out.getScratchDir().cStr()) ==
+          "/scratch/rgpot-nwchem-test");
+  REQUIRE(std::string(out.getPermanentDir().cStr()) ==
+          "/perm/rgpot-nwchem-test");
+  REQUIRE(out.getInputBlocks().size() == 2);
+  REQUIRE(std::string(out.getInputBlocks()[0].cStr()) ==
+          "dft; xc b3lyp; end");
+  REQUIRE(std::string(out.getInputBlocks()[1].cStr()) ==
+          "set int:acc_std 1e-8");
   SUCCEED();
 }
