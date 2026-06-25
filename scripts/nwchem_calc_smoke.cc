@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <vector>
 
@@ -19,6 +20,10 @@ int main() {
   p.setScfType("rhf");
   p.setCharge(0);
   p.setMultiplicity(1);
+  if (const char *top = std::getenv("NWCHEM_TOP")) {
+    if (top[0])
+      p.setNwchemRoot(top);
+  }
 
   rgpot::NWChemPot pot(p.asReader());
   if (!pot.available()) {

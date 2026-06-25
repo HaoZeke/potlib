@@ -7,7 +7,8 @@
  * only at the embed boundary (fixed buffers for Fortran/C embed code).
  *
  * Build engine: -Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP> (nwchem_c_abi.c +
- * nwchem_embed.F). Without embed, only the stub exists (abi_available == 0).
+ * nwchem_embed_c_api.f90 bind(C) + nwchem_embed_legacy.F). Without embed, only
+ * the stub exists (abi_available == 0).
  *
  * theory / scf_type examples:
  *   theory="scf",  scf_type="rhf"|"uhf"     — Hartree–Fock

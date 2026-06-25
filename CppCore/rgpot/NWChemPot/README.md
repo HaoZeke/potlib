@@ -26,7 +26,9 @@ user / client
     RgpotNWChemParams (embed C buffers only — fixed at .so boundary)
             │  rgpot_nwchem_set_params / energy_grad
             ▼
-    libnwchem_engine.so  (nwchem_c_abi.c + nwchem_embed.F → rtdb/task_energy)
+    libnwchem_engine / static embed
+      nwchem_c_abi.c → nwchem_embed_c_api.f90 (bind(C), iso_c_binding)
+      → nwchem_embed_legacy.F (geom/bas/rtdb/task_* only; no input files)
 ```
 
 Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.

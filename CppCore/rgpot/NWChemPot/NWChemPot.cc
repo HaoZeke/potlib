@@ -66,6 +66,11 @@ void apply_env_hints(const RgpotNWChemParams &p) {
   if (p.nwchem_root[0]) {
 #if !defined(_WIN32)
     setenv("NWCHEM_TOP", p.nwchem_root, 1);
+    if (!std::getenv("NWCHEM_BASIS_LIBRARY") ||
+        !std::getenv("NWCHEM_BASIS_LIBRARY")[0]) {
+      std::string bas = std::string(p.nwchem_root) + "/src/basis/libraries/";
+      setenv("NWCHEM_BASIS_LIBRARY", bas.c_str(), 0);
+    }
 #endif
   }
 }
