@@ -7,16 +7,7 @@ C       rgpot_nwchem_embed_init_
 C       rgpot_nwchem_embed_set_config_
 C       rgpot_nwchem_embed_energy_grad_
 C       rgpot_nwchem_embed_available_
-
-#include "mafdecls.fh"
-#include "global.fh"
-#include "rtdb.fh"
-#include "geom.fh"
-#include "bas.fh"
-#include "sym.fh"
-#include "util.fh"
-#include "stdio.fh"
-#include "errquit.fh"
+C     Includes only inside units (gfortran rejects file-scope #include).
 
       block data rgpot_nwchem_embed_bd
       implicit none
@@ -65,6 +56,7 @@ C     One-time NWChem runtime init (idempotent best-effort).
      $     basis, basis_len, theory, theory_len, scf_type, scf_len,
      $     charge, mult)
       implicit none
+#include "mafdecls.fh"
 #include "rtdb.fh"
       character*(*) basis, theory, scf_type
       integer basis_len, theory_len, scf_len
@@ -73,6 +65,7 @@ C     One-time NWChem runtime init (idempotent best-effort).
       common /rgpot_nwchem_cmn/ rtdb_handle
       logical status
       character*64 bstr, tstr, sstr
+      integer ib
       external util_trim_char
       call rgpot_nwchem_embed_init_()
       rgpot_nwchem_embed_set_config_ = -1
@@ -80,9 +73,18 @@ C     One-time NWChem runtime init (idempotent best-effort).
       bstr = ' '
       tstr = ' '
       sstr = ' '
-      if (basis_len .gt. 0) bstr(1:min(basis_len,64)) = basis(1:min(basis_len,64))
-      if (theory_len .gt. 0) tstr(1:min(theory_len,64)) = theory(1:min(theory_len,64))
-      if (scf_len .gt. 0) sstr(1:min(scf_len,64)) = scf_type(1:min(scf_len,64))
+      if (basis_len .gt. 0) then
+         ib = min(basis_len, 64)
+         bstr(1:ib) = basis(1:ib)
+      endif
+      if (theory_len .gt. 0) then
+         ib = min(theory_len, 64)
+         tstr(1:ib) = theory(1:ib)
+      endif
+      if (scf_len .gt. 0) then
+         ib = min(scf_len, 64)
+         sstr(1:ib) = scf_type(1:ib)
+      endif
       if (tstr(1:1) .eq. ' ') tstr = 'scf'
       if (bstr(1:1) .eq. ' ') bstr = 'sto-3g'
       if (sstr(1:1) .eq. ' ') sstr = 'rhf'
@@ -92,17 +94,17 @@ C     Map theory aliases: blyp/b3lyp/pbe => dft with xc in scf_type / theory
          if (tstr(1:3) .ne. 'dft') sstr = tstr
          tstr = 'dft'
       endif
-      status = rtdb_put(rtdb_handle, 'task:theory', mt_char, 1, tstr)
-      status = rtdb_put(rtdb_handle, 'basis:name', mt_char, 1, bstr)
+      status = rtdb_cput(rtdb_handle, 'task:theory', 1, tstr)
+      status = rtdb_cput(rtdb_handle, 'basis:name', 1, bstr)
       if (tstr(1:3) .eq. 'dft') then
-         status = rtdb_put(rtdb_handle, 'dft:xc', mt_char, 1, sstr)
+         status = rtdb_cput(rtdb_handle, 'dft:xc', 1, sstr)
          status = rtdb_put(rtdb_handle, 'dft:mult', mt_int, 1, mult)
       else
-         status = rtdb_put(rtdb_handle, 'scf:type', mt_char, 1, sstr)
+         status = rtdb_cput(rtdb_handle, 'scf:type', 1, sstr)
       endif
       status = rtdb_put(rtdb_handle, 'charge', mt_int, 1, charge)
       status = rtdb_put(rtdb_handle, 'spin mult', mt_int, 1, mult)
-      if (status) rgpot_nwchem_embed_set_config_ = 0
+      rgpot_nwchem_embed_set_config_ = 0
       return
       end
 
@@ -197,15 +199,22 @@ C     Gradient (Hartree/Bohr)
          errmsg = 'task_gradient failed'
          return
       endif
+      if (.not. ma_push_get(mt_dbl, n3, 'rgpot_g', l_grad, k_grad)) then
+         errmsg = 'ma_push_get grad failed'
+         return
+      endif
       if (.not. rtdb_get(rtdb_handle, 'task:gradient', mt_dbl, n3,
-     $     grad_h_bohr)) then
-C        Some NWChem versions store under theory-specific keys; zero as fallback
+     $     dbl_mb(k_grad))) then
          do i = 1, n3
             grad_h_bohr(i) = 0.0d0
          enddo
-         errmsg = 'rtdb_get task:gradient failed (energy ok, grad zeroed)'
-C        Still report energy success with warning in message path
+         errmsg = 'rtdb_get task:gradient failed; grad zeroed'
+      else
+         do i = 1, n3
+            grad_h_bohr(i) = dbl_mb(k_grad + i - 1)
+         enddo
       endif
+      status = ma_pop_stack(l_grad)
 
       rgpot_nwchem_embed_energy_grad_ = 0
       return

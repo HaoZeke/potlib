@@ -10,26 +10,33 @@
 
 #ifdef RGPOT_HAS_NWCHEM
 
-extern void rgpot_nwchem_embed_init_(void);
-extern int rgpot_nwchem_embed_set_config_(const char *basis, int basis_len,
-                                          const char *theory, int theory_len,
-                                          const char *scf_type, int scf_len,
-                                          int *charge, int *mult);
-extern int rgpot_nwchem_embed_energy_grad_(int *n_atoms,
-                                           const double *positions_ang,
-                                           const int *atomic_numbers,
-                                           int *charge, int *multiplicity,
-                                           double *energy_h,
-                                           double *grad_h_bohr, char *errmsg,
-                                           int errmsg_len);
-extern int rgpot_nwchem_embed_available_(void);
+/* gfortran adds an extra trailing underscore on symbols that already end in _. */
+#if defined(__GFORTRAN__) || defined(GFORTRAN)
+#define RGPOT_F(name) name##_
+#else
+#define RGPOT_F(name) name
+#endif
+
+extern void RGPOT_F(rgpot_nwchem_embed_init_)(void);
+extern int RGPOT_F(rgpot_nwchem_embed_set_config_)(const char *basis,
+                                                   int basis_len,
+                                                   const char *theory,
+                                                   int theory_len,
+                                                   const char *scf_type,
+                                                   int scf_len, int *charge,
+                                                   int *mult);
+extern int RGPOT_F(rgpot_nwchem_embed_energy_grad_)(
+    int *n_atoms, const double *positions_ang, const int *atomic_numbers,
+    int *charge, int *multiplicity, double *energy_h, double *grad_h_bohr,
+    char *errmsg, int errmsg_len);
+extern int RGPOT_F(rgpot_nwchem_embed_available_)(void);
 
 static int g_initialized = 0;
 static RgpotNWChemParams g_params;
 
 static void ensure_init(void) {
   if (!g_initialized) {
-    rgpot_nwchem_embed_init_();
+    RGPOT_F(rgpot_nwchem_embed_init_)();
     rgpot_nwchem_params_default(&g_params);
     g_initialized = 1;
   }
@@ -68,7 +75,7 @@ static int apply_params_to_embed(const RgpotNWChemParams *p) {
   ensure_init();
   int ch = p->charge;
   int mult = p->multiplicity > 0 ? p->multiplicity : 1;
-  return rgpot_nwchem_embed_set_config_(
+  return RGPOT_F(rgpot_nwchem_embed_set_config_)(
       p->basis, cstr_len(p->basis), p->theory, cstr_len(p->theory),
       p->scf_type, cstr_len(p->scf_type), &ch, &mult);
 }
@@ -112,9 +119,9 @@ RgpotNWChemResult rgpot_nwchem_energy_grad(int n_atoms,
   int ch = g_params.charge;
   int mult = g_params.multiplicity > 0 ? g_params.multiplicity : 1;
   double eh = 0.0;
-  int rc = rgpot_nwchem_embed_energy_grad_(&n, positions_ang, atomic_numbers,
-                                           &ch, &mult, &eh, grad_h_bohr, errmsg,
-                                           (int)sizeof(errmsg) - 1);
+  int rc = RGPOT_F(rgpot_nwchem_embed_energy_grad_)(
+      &n, positions_ang, atomic_numbers, &ch, &mult, &eh, grad_h_bohr, errmsg,
+      (int)sizeof(errmsg) - 1);
   if (rc != 0) {
     snprintf(r.message, sizeof(r.message), "%s",
              errmsg[0] ? errmsg : "nwchem embed energy/grad failed");
@@ -147,7 +154,7 @@ const char *rgpot_nwchem_engine_version(void) {
 
 int rgpot_nwchem_abi_available(void) {
   ensure_init();
-  return rgpot_nwchem_embed_available_() ? 1 : 0;
+  return RGPOT_F(rgpot_nwchem_embed_available_)() ? 1 : 0;
 }
 
 #else /* !RGPOT_HAS_NWCHEM */
