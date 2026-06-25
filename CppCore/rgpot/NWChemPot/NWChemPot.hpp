@@ -3,14 +3,14 @@
 // Copyright 2023--present rgpot developers
 
 /**
- * @brief NWChem potential: user options via Cap'n Proto NWChemParams only.
+ * @brief NWChem potential under rgpot `PotentialConfig` user parameters.
  *
- * **User contract (in/out):** `NWChemParams` in Potentials.capnp — one schema for
- * RPC configure, Python clients, and in-process C++ (`setParams` / `getParams`).
- * No separate user TOML/JSON/YAML; no second public C++ option struct.
+ * **rgpot params:** Cap'n Proto `PotentialConfig` (union: none | nwchem | … later
+ * metatomic/xtb). NWChem uses the `nwchem` arm (`NWChemParams` payload only).
+ * Apply via `setPotentialConfig` / RPC `configure`; typed `setParams`/`getParams`
+ * for the nwchem payload when the arm is already selected.
  *
- * **Internal only:** `NWChemConfig` mirrors Cap'n Proto while calling embed;
- * `RgpotNWChemParams` (nwchem_c_abi.h) is fixed buffers at the engine .so boundary.
+ * **Internal only:** `NWChemConfig` / embed `RgpotNWChemParams` are not user formats.
  */
 
 #include <string>
@@ -53,13 +53,21 @@ public:
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /**
-   * Apply user options from Cap'n Proto NWChemParams (primary configure path,
-   * in-process or via applyPotentialConfig / potserv.configure).
+   * Apply NWChem arm of rgpot user params (Cap'n Proto NWChemParams).
+   * Prefer applyPotentialConfig(PotentialConfig) at the generic layer; this is
+   * the typed entry when the caller already has the nwchem struct.
    */
   bool setParams(const ::NWChemParams::Reader &params);
 
-  /** Write current options back to Cap'n Proto (symmetric get for users). */
+  /** Write current NWChem knobs back to Cap'n Proto (NWChemParams arm payload). */
   void getParams(::NWChemParams::Builder out) const;
+
+  /**
+   * Apply full rgpot PotentialConfig; only succeeds for none or nwchem arms
+   * (other backends' arms rejected here — use the matching *Pot type later).
+   */
+  bool setPotentialConfig(const ::PotentialConfig::Reader &cfg,
+                          std::string *message_out = nullptr);
 
   /** Internal: apply already-mirrored config (tests / embed only). */
   bool setConfig(const NWChemConfig &config);
