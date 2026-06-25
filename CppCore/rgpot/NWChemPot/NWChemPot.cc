@@ -132,10 +132,30 @@ NWChemPot::NWChemPot(const NWChemConfig &config)
 NWChemPot::~NWChemPot() { delete impl_; }
 
 bool NWChemPot::setConfig(const NWChemConfig &config) {
+  // Full NWChemConfig (Cap'n Proto NWChemParams mirror) applied in order:
+  // 1) nwchem_root -> NWCHEM_TOP env for embed data/libs
+  // 2) engine_path -> (re)dlopen libnwchem_engine if path changed / not loaded
+  // 3) basis, theory, scf_type, charge, multiplicity -> C ABI set_config
+  const bool need_reload =
+      !impl_ || !impl_->bundle.loaded ||
+      (!config.engine_path.empty() && config.engine_path != config_.engine_path);
+
   config_ = config;
   apply_env_hints(config_);
-  if (!impl_ || !impl_->bundle.loaded || !impl_->bundle.set_config)
+
+  if (!impl_)
+    impl_ = new Impl;
+
+  if (need_reload) {
+    impl_->bundle = EngineBundle{};
+    if (!try_load_engine(impl_->bundle, config_.engine_path))
+      return false;
+  }
+
+  if (!impl_->bundle.loaded || !impl_->bundle.set_config)
     return false;
+
+  // Maps directly from Cap'n Proto: basis, theory, scfType, charge, multiplicity.
   return impl_->bundle.set_config(config_.basis.c_str(), config_.theory.c_str(),
                                   config_.scf_type.c_str(), config_.charge,
                                   config_.multiplicity) == 0;

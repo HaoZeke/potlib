@@ -16,16 +16,25 @@
 
 namespace rgpot {
 
+/**
+ * @brief Native mirror of Cap'n Proto NWChemParams (rpc/Potentials.capnp).
+ *
+ * Field names differ only by snake_case; wire names use camelCase in schema.
+ * Passed through rgpot::types::adapt::capnp::{nwchemConfigFromCapnp,ToCapnp}
+ * and Potential.configure(PotentialConfig.nwchem).
+ *
+ * Engine compute path uses basis/theory/scf_type/charge/multiplicity via
+ * rgpot_nwchem_set_config / rgpot_nwchem_energy_grad. engine_path/nwchem_root
+ * control dlopen and embed environment only.
+ */
 struct NWChemConfig {
-  std::string basis = "sto-3g";
-  std::string theory = "scf";
-  std::string scf_type = "rhf";
-  int charge = 0;
-  int multiplicity = 1;
-  /// Optional explicit path to libnwchem_engine; empty => probe candidates.
-  std::string engine_path;
-  /// Optional NWCHEM_TOP / install prefix hint for engine-side paths.
-  std::string nwchem_root;
+  std::string basis = "sto-3g";       ///< NWChemParams.basis
+  std::string theory = "scf";         ///< NWChemParams.theory (scf|dft|blyp|...)
+  std::string scf_type = "rhf";       ///< NWChemParams.scfType (rhf|uhf|blyp xc)
+  int charge = 0;                     ///< NWChemParams.charge
+  int multiplicity = 1;               ///< NWChemParams.multiplicity
+  std::string engine_path;            ///< NWChemParams.enginePath -> RGPOT_NWCHEM_ENGINE
+  std::string nwchem_root;            ///< NWChemParams.nwchemRoot -> NWCHEM_TOP
 };
 
 class NWChemPot : public Potential<NWChemPot> {

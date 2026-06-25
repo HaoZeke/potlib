@@ -3,9 +3,13 @@
 // Copyright 2023--present rgpot developers
 
 /**
- * @brief Map Cap'n Proto NWChemParams / PotentialConfig to rgpot::NWChemConfig.
+ * @brief Bidirectional map: Cap'n Proto NWChemParams <-> rgpot::NWChemConfig.
+ *
+ * Every NWChemParams field is mapped; no Cap'n Proto option is dropped on the
+ * way into NWChemPot::setConfig / C ABI. See Potentials.capnp NWChemParams docs.
  */
 
+#include <sstream>
 #include <string>
 
 #include "rgpot/NWChemPot/NWChemPot.hpp"
@@ -16,25 +20,27 @@ namespace types {
 namespace adapt {
 namespace capnp {
 
-/**
- * @brief Convert an NWChemParams reader into a native NWChemConfig.
- */
-inline NWChemConfig
-nwchemConfigFromCapnp(const NWChemParams::Reader &p) {
+/** Cap'n Proto NWChemParams -> C++ NWChemConfig (all fields). */
+inline NWChemConfig nwchemConfigFromCapnp(const NWChemParams::Reader &p) {
   NWChemConfig cfg;
+  // NWChemParams.basis        -> cfg.basis
   cfg.basis = p.getBasis().cStr();
+  // NWChemParams.theory       -> cfg.theory
   cfg.theory = p.getTheory().cStr();
+  // NWChemParams.scfType      -> cfg.scf_type
   cfg.scf_type = p.getScfType().cStr();
+  // NWChemParams.charge       -> cfg.charge
   cfg.charge = p.getCharge();
+  // NWChemParams.multiplicity -> cfg.multiplicity
   cfg.multiplicity = p.getMultiplicity();
+  // NWChemParams.enginePath   -> cfg.engine_path (dlopen target)
   cfg.engine_path = p.getEnginePath().cStr();
+  // NWChemParams.nwchemRoot   -> cfg.nwchem_root (NWCHEM_TOP)
   cfg.nwchem_root = p.getNwchemRoot().cStr();
   return cfg;
 }
 
-/**
- * @brief Populate an NWChemParams builder from a native NWChemConfig.
- */
+/** C++ NWChemConfig -> Cap'n Proto NWChemParams (all fields). */
 inline void nwchemConfigToCapnp(NWChemParams::Builder b,
                                 const NWChemConfig &cfg) {
   b.setBasis(cfg.basis);
@@ -46,9 +52,23 @@ inline void nwchemConfigToCapnp(NWChemParams::Builder b,
   b.setNwchemRoot(cfg.nwchem_root);
 }
 
+/** Human-readable summary of applied NWChemConfig (for configure() message). */
+inline std::string nwchemConfigSummary(const NWChemConfig &cfg) {
+  std::ostringstream os;
+  os << "basis=" << cfg.basis << " theory=" << cfg.theory
+     << " scfType=" << cfg.scf_type << " charge=" << cfg.charge
+     << " mult=" << cfg.multiplicity;
+  if (!cfg.engine_path.empty())
+    os << " enginePath=" << cfg.engine_path;
+  if (!cfg.nwchem_root.empty())
+    os << " nwchemRoot=" << cfg.nwchem_root;
+  return os.str();
+}
+
 /**
- * @brief Apply PotentialConfig to an NWChemPot instance if the union is nwchem.
- * @return true if config applied (or was none); false if setConfig failed.
+ * Apply PotentialConfig to NWChemPot.
+ * - none: success, no change
+ * - nwchem: full NWChemParams -> NWChemConfig -> setConfig (all options mapped)
  */
 inline bool applyPotentialConfig(NWChemPot &pot,
                                  const PotentialConfig::Reader &cfg,
@@ -56,18 +76,27 @@ inline bool applyPotentialConfig(NWChemPot &pot,
   switch (cfg.which()) {
   case PotentialConfig::NONE:
     if (message_out)
-      *message_out = "no-op";
+      *message_out = "no-op (PotentialConfig.none)";
     return true;
   case PotentialConfig::NWCHEM: {
-    auto nc = nwchemConfigFromCapnp(cfg.getNwchem());
-    bool ok = pot.setConfig(nc);
-    if (message_out)
-      *message_out = ok ? "nwchem config applied" : "nwchem setConfig failed";
+    const NWChemConfig nc = nwchemConfigFromCapnp(cfg.getNwchem());
+    const bool ok = pot.setConfig(nc);
+    if (message_out) {
+      if (ok)
+        *message_out = "nwchem config applied: " + nwchemConfigSummary(nc);
+      else if (!pot.available())
+        *message_out =
+            "nwchem setConfig failed (engine not loaded): " +
+            nwchemConfigSummary(nc);
+      else
+        *message_out =
+            "nwchem setConfig rejected by engine ABI: " + nwchemConfigSummary(nc);
+    }
     return ok;
   }
   default:
     if (message_out)
-      *message_out = "unsupported PotentialConfig arm";
+      *message_out = "unsupported PotentialConfig arm (expected none|nwchem)";
     return false;
   }
 }

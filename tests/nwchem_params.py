@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Helpers for NWChemParams / PotentialConfig in Python RPC clients."""
+"""Helpers for NWChemParams / PotentialConfig in Python RPC clients.
+
+Every keyword maps to an NWChemParams field (Cap'n Proto camelCase on the wire),
+then server-side to rgpot::NWChemConfig and the embed C ABI.
+"""
 
 from __future__ import annotations
 
@@ -18,13 +22,23 @@ def make_nwchem_params(
     engine_path: str = "",
     nwchem_root: str = "",
 ):
-    """Build an NWChemParams message from keyword arguments."""
+    """Build NWChemParams with all configure() options set.
+
+    Args:
+        basis: Gaussian basis (sto-3g, 6-31g*, ...).
+        theory: scf | dft | blyp | b3lyp | ...
+        scf_type: HF rhf/uhf, or DFT xc (blyp, b3lyp) when theory is dft/blyp.
+        charge: molecular charge.
+        multiplicity: 2S+1.
+        engine_path: libnwchem_engine.so (default: RGPOT_NWCHEM_ENGINE env).
+        nwchem_root: NWCHEM_TOP (default: NWCHEM_TOP env).
+    """
     p = pot_capnp.NWChemParams.new_message()
     p.basis = basis
     p.theory = theory
     p.scfType = scf_type
-    p.charge = charge
-    p.multiplicity = multiplicity
+    p.charge = int(charge)
+    p.multiplicity = int(multiplicity)
     p.enginePath = engine_path or os.environ.get("RGPOT_NWCHEM_ENGINE", "")
     p.nwchemRoot = nwchem_root or os.environ.get("NWCHEM_TOP", "")
     return p
