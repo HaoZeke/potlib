@@ -1,15 +1,38 @@
-# NWChemPot — stable C ABI / params (direct, no RPC required)
+# NWChemPot — backend under rgpot `PotentialConfig` params
 
-In-process NWChem through a **stable C ABI** (`nwchem_c_abi.h`). Options live in
-`RgpotNWChemParams` and pass straight into the embed via `rgpot_nwchem_set_params`
-/ `rgpot_nwchem_energy_grad`. The C++ `NWChemConfig` is only a thin mirror
-(`toAbiParams` / `fromAbiParams`).
+## User options = rgpot `PotentialConfig` (Cap'n Proto)
 
-**Not** Cap'n Proto / potserv as the option path (RPC is optional and maps into
-the same `NWChemConfig` if used). **Not** a subprocess `nwchem` CLI.
+rgpot has **one** user-facing parameter carrier: `PotentialConfig` in
+`Potentials.capnp` — an extensible **union** of backend-specific option structs.
+`NWChemParams` is only the **nwchem arm**, not a separate config ecosystem.
 
-Real backend: Fortran embed (`nwchem_embed.F`) in `libnwchem_engine.so` against
-`NWCHEM_TOP`.
+Same schema for RPC and in-process; add future arms without new TOML/JSON:
+
+| Arm (today / planned) | Payload | Backend |
+|----------------------|---------|---------|
+| `none` | void | no backend knobs / no-op configure |
+| `nwchem` | `NWChemParams` | NWChemPot |
+| *(later)* `metatomic` | `MetatomicParams` | MetatomicPot |
+| *(later)* `xtb` / `tblite` | … | XTBPot / TBLitePot |
+
+```
+user / client
+    PotentialConfig  { nwchem = NWChemParams{...} }   ← rgpot params (in/out)
+            │
+            ├── RPC:  configure(config)
+            └── C++:  setPotentialConfig(config)  or  setParams(nwchem only)
+            │
+            ▼  (nwchem arm only on this pot)
+    NWChemConfig (internal) → RgpotNWChemParams (embed buffers only)
+            │
+            ▼
+    libnwchem_engine.so / nwchem_embed.F
+```
+
+Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
+
+**Not** a subprocess `nwchem` CLI. Embed still needs `NWCHEM_TOP` + built
+`libnwchem_engine.so` (`-Dwith_nwchem=true -Dnwchem_root=...`).
 
 ## Layers
 
@@ -61,18 +84,30 @@ do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
 | `NWCHEM_TOP` | Hint for engine/data paths (optional; also `NWChemConfig.nwchem_root`) |
 | `LD_LIBRARY_PATH` | NWChem `lib/<target>` (and deps) when embed was linked with unresolved symbols |
 
-## Config / theory (ABI strings)
+## Options = `NWChemParams` (Cap'n Proto)
 
-`rgpot_nwchem_set_config(basis, theory, scf_type, charge, mult)` and the same
-three strings on `rgpot_nwchem_energy_grad(...)`.
+| field (schema) | meaning |
+|----------------|---------|
+| `basis` | Gaussian basis |
+| `theory` | `scf` / `dft` / `blyp` / `b3lyp` / … |
+| `scfType` | HF `rhf`/`uhf`, or DFT XC when theory is dft/blyp* |
+| `charge`, `multiplicity` | charge, 2S+1 |
+| `enginePath` | `libnwchem_engine.so` (frontend dlopen) |
+| `nwchemRoot` | `NWCHEM_TOP` (frontend env for embed) |
 
-| `theory` | `scf_type` | NWChem side |
-|----------|------------|-------------|
-| `scf` (default) | `rhf` / `uhf` | HF SCF |
-| `dft` | `blyp`, `b3lyp`, … | DFT + `dft:xc` |
-| `blyp` / `b3lyp` | (optional override) | mapped to `dft` + XC |
+C++ in-process (same struct as RPC):
 
-`NWChemConfig` in C++ mirrors these fields.
+```cpp
+::capnp::MallocMessageBuilder msg;
+auto p = msg.initRoot<::NWChemParams>();
+p.setTheory("dft");
+p.setScfType("blyp");
+p.setEnginePath("/path/to/libnwchem_engine.so");
+rgpot::NWChemPot pot(p.asReader());  // setParams from Cap'n Proto only
+// pot(pos, Z, box) internally: NWChemParams -> embed C buffers
+```
+
+Python/RPC: `configure_nwchem(pot, pot_capnp, theory="dft", scf_type="blyp", ...)`.
 
 ## Direct C++ smoke (no RPC)
 

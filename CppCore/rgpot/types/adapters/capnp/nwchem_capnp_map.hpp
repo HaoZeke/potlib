@@ -3,10 +3,11 @@
 // Copyright 2023--present rgpot developers
 
 /**
- * @brief Optional RPC shim only: Cap'n Proto NWChemParams <-> NWChemConfig.
+ * @brief rgpot user params: PotentialConfig (Cap'n Proto), NWChem arm only here.
  *
- * Primary option path is C ABI RgpotNWChemParams via NWChemPot::setConfig /
- * toAbiParams (no RPC). This adapter exists solely for potserv configure().
+ * Top-level user contract is PotentialConfig (extensible union). NWChemParams is
+ * one backend payload. This adapter maps nwchem arm <-> internal NWChemConfig
+ * <-> embed buffers. Future MetatomicParams/XTBParams get sibling adapters.
  */
 
 #include <sstream>
@@ -20,28 +21,21 @@ namespace types {
 namespace adapt {
 namespace capnp {
 
-/** Cap'n Proto NWChemParams -> C++ NWChemConfig (all fields). */
-inline NWChemConfig nwchemConfigFromCapnp(const NWChemParams::Reader &p) {
+/** User NWChemParams (Cap'n Proto) -> internal mirror. */
+inline NWChemConfig nwchemConfigFromCapnp(const ::NWChemParams::Reader &p) {
   NWChemConfig cfg;
-  // NWChemParams.basis        -> cfg.basis
   cfg.basis = p.getBasis().cStr();
-  // NWChemParams.theory       -> cfg.theory
   cfg.theory = p.getTheory().cStr();
-  // NWChemParams.scfType      -> cfg.scf_type
   cfg.scf_type = p.getScfType().cStr();
-  // NWChemParams.charge       -> cfg.charge
   cfg.charge = p.getCharge();
-  // NWChemParams.multiplicity -> cfg.multiplicity
   cfg.multiplicity = p.getMultiplicity();
-  // NWChemParams.enginePath   -> cfg.engine_path (dlopen target)
   cfg.engine_path = p.getEnginePath().cStr();
-  // NWChemParams.nwchemRoot   -> cfg.nwchem_root (NWCHEM_TOP)
   cfg.nwchem_root = p.getNwchemRoot().cStr();
   return cfg;
 }
 
-/** C++ NWChemConfig -> Cap'n Proto NWChemParams (all fields). */
-inline void nwchemConfigToCapnp(NWChemParams::Builder b,
+/** Internal mirror -> user NWChemParams (Cap'n Proto out). */
+inline void nwchemConfigToCapnp(::NWChemParams::Builder b,
                                 const NWChemConfig &cfg) {
   b.setBasis(cfg.basis);
   b.setTheory(cfg.theory);
@@ -52,7 +46,18 @@ inline void nwchemConfigToCapnp(NWChemParams::Builder b,
   b.setNwchemRoot(cfg.nwchem_root);
 }
 
-/** Human-readable summary of applied NWChemConfig (for configure() message). */
+inline std::string nwchemParamsSummary(const ::NWChemParams::Reader &p) {
+  std::ostringstream os;
+  os << "basis=" << p.getBasis().cStr() << " theory=" << p.getTheory().cStr()
+     << " scfType=" << p.getScfType().cStr() << " charge=" << p.getCharge()
+     << " mult=" << p.getMultiplicity();
+  if (p.getEnginePath().size() > 0)
+    os << " enginePath=" << p.getEnginePath().cStr();
+  if (p.getNwchemRoot().size() > 0)
+    os << " nwchemRoot=" << p.getNwchemRoot().cStr();
+  return os.str();
+}
+
 inline std::string nwchemConfigSummary(const NWChemConfig &cfg) {
   std::ostringstream os;
   os << "basis=" << cfg.basis << " theory=" << cfg.theory
@@ -66,9 +71,8 @@ inline std::string nwchemConfigSummary(const NWChemConfig &cfg) {
 }
 
 /**
- * Apply PotentialConfig to NWChemPot.
- * - none: success, no change
- * - nwchem: full NWChemParams -> NWChemConfig -> setConfig (all options mapped)
+ * Apply PotentialConfig using Cap'n Proto as the only user option carrier.
+ * nwchem arm: setParams(reader) on NWChemPot.
  */
 inline bool applyPotentialConfig(NWChemPot &pot,
                                  const PotentialConfig::Reader &cfg,
@@ -79,18 +83,17 @@ inline bool applyPotentialConfig(NWChemPot &pot,
       *message_out = "no-op (PotentialConfig.none)";
     return true;
   case PotentialConfig::NWCHEM: {
-    const NWChemConfig nc = nwchemConfigFromCapnp(cfg.getNwchem());
-    const bool ok = pot.setConfig(nc);
+    const auto nw = cfg.getNwchem();
+    const bool ok = pot.setParams(nw);
     if (message_out) {
+      const std::string sum = nwchemParamsSummary(nw);
       if (ok)
-        *message_out = "nwchem config applied: " + nwchemConfigSummary(nc);
+        *message_out = "nwchem params applied (Cap'n Proto): " + sum;
       else if (!pot.available())
         *message_out =
-            "nwchem setConfig failed (engine not loaded): " +
-            nwchemConfigSummary(nc);
+            "nwchem setParams failed (engine not loaded): " + sum;
       else
-        *message_out =
-            "nwchem setConfig rejected by engine ABI: " + nwchemConfigSummary(nc);
+        *message_out = "nwchem setParams rejected by embed: " + sum;
     }
     return ok;
   }

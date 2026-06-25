@@ -1,10 +1,10 @@
 /**
  * @file nwchem_c_abi.h
- * @brief Stable C ABI between NWChemPot (dlopen) and libnwchem_engine (embed).
+ * @brief Embed-only C ABI between NWChemPot frontend and libnwchem_engine.so.
  *
- * This is the contract for in-process NWChem. There is no RPC and no CLI here:
- * the frontend resolves symbols from libnwchem_engine.so and passes options via
- * RgpotNWChemParams. Cap'n Proto / potserv are optional higher layers only.
+ * **Not** the user configuration format. Users pass options as Cap'n Proto
+ * `NWChemParams` (Potentials.capnp); the frontend copies fields into this POD
+ * only at the embed boundary (fixed buffers for Fortran/C embed code).
  *
  * Build engine: -Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP> (nwchem_c_abi.c +
  * nwchem_embed.F). Without embed, only the stub exists (abi_available == 0).

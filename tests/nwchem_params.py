@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Helpers for NWChemParams / PotentialConfig in Python RPC clients.
+"""Helpers for rgpot PotentialConfig with the nwchem arm (Python RPC / tests).
 
-Every keyword maps to an NWChemParams field (Cap'n Proto camelCase on the wire),
-then server-side to rgpot::NWChemConfig and the embed C ABI.
+rgpot user parameters = PotentialConfig (extensible union). NWChemParams is only
+the payload when config.nwchem is set; other backends will use other arms.
 """
 
 from __future__ import annotations

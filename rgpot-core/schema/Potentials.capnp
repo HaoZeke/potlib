@@ -31,37 +31,24 @@ struct PotentialResult {
 }
 
 # @struct NWChemParams
-# @brief Runtime configuration for the NWChem potential backend.
-#
-# Maps 1:1 to C++ rgpot::NWChemConfig and (except engine/path fields) to the
-# stable C ABI rgpot_nwchem_set_config(basis, theory, scf_type, charge, mult).
-# apply via Potential.configure(PotentialConfig.nwchem = this).
-#
-# | NWChemParams   | NWChemConfig     | C ABI / embed          |
-# |----------------|------------------|------------------------|
-# | basis          | basis            | basis set name         |
-# | theory         | theory           | scf | dft | blyp | ... |
-# | scfType        | scf_type         | rhf/uhf, or dft:xc     |
-# | charge         | charge           | molecular charge       |
-# | multiplicity   | multiplicity     | 2S+1                   |
-# | enginePath     | engine_path      | RGPOT_NWCHEM_ENGINE .so|
-# | nwchemRoot     | nwchem_root      | NWCHEM_TOP env/hint    |
+# @brief NWChem-specific knobs (one arm of PotentialConfig / rgpot params).
 struct NWChemParams {
-  basis        @0 :Text = "sto-3g";  # @brief Gaussian basis (e.g. sto-3g, 6-31g*).
-  theory       @1 :Text = "scf";     # @brief Method: scf, dft, blyp, b3lyp, ...
-  scfType      @2 :Text = "rhf";     # @brief HF: rhf/uhf; DFT: xc name (blyp, b3lyp).
-  charge       @3 :Int32 = 0;        # @brief Molecular charge.
-  multiplicity @4 :Int32 = 1;        # @brief Spin multiplicity (2S+1).
-  enginePath   @5 :Text = "";        # @brief libnwchem_engine.so path (dlopen).
-  nwchemRoot   @6 :Text = "";        # @brief NWCHEM_TOP override for embed data/libs.
+  basis        @0 :Text = "sto-3g";
+  theory       @1 :Text = "scf";
+  scfType      @2 :Text = "rhf";
+  charge       @3 :Int32 = 0;
+  multiplicity @4 :Int32 = 1;
+  enginePath   @5 :Text = "";
+  nwchemRoot   @6 :Text = "";
 }
 
 # @struct PotentialConfig
-# @brief Tagged configuration for configure() on a live Potential server.
+# @brief **rgpot user parameters** — extensible union of backend options (Cap'n Proto only).
+# NWChem is one arm; add MetatomicParams / XTBParams / … as other potentials need knobs.
 struct PotentialConfig {
   union {
-    none   @0 :Void;          # @brief No backend-specific config.
-    nwchem @1 :NWChemParams;  # @brief NWChem backend parameters.
+    none   @0 :Void;
+    nwchem @1 :NWChemParams;
   }
 }
 

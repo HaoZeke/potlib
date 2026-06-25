@@ -27,27 +27,21 @@ scope.
 
 Both names are extremely common in computational chemistry codebases.
 
-*** NWChem backend over RPC
+*** rgpot user parameters (=PotentialConfig=) over RPC
 
-When the server is started with =potserv <port> NWChem=, clients should call
-=configure= with =PotentialConfig.nwchem= (=NWChemParams=) before =calculate=.
-Every option is mapped server-side to =rgpot::NWChemConfig= and (for compute
-fields) the embed C ABI:
+Backend knobs for a live =Potential= use Cap'n Proto =PotentialConfig=: an
+extensible union (=none=, =nwchem=, later =metatomic= / =xtb= / …). Geometry stays
+on =ForceInput=; =configure(config)= applies method/backend setup only.
 
-| =NWChemParams= (capnp) | =NWChemConfig= (C++) | embed / runtime |
-|------------------------+----------------------+-----------------|
-| =basis= | =basis= | basis set |
-| =theory= | =theory= | =scf= / =dft= / =blyp= / =b3lyp= / … |
-| =scfType= | =scf_type= | =rhf=/=uhf= or DFT =xc= (=blyp=, …) |
-| =charge= | =charge= | molecular charge |
-| =multiplicity= | =multiplicity= | =2S+1= |
-| =enginePath= | =engine_path= | =dlopen= =libnwchem_engine.so= |
-| =nwchemRoot= | =nwchem_root= | =NWCHEM_TOP= for embed data/libs |
+*** NWChem arm (=PotentialConfig.nwchem= / =NWChemParams=)
 
-Example BLYP: =theory="dft"=, =scfType="blyp"= (or =theory="blyp"=). Python:
-=tests/nwchem_params.py= (=make_nwchem_params= / =configure_nwchem=). Without a
-built embed =.so=, =configure= may return =ok=false=; =calculate= fails until
-=RGPOT_NWCHEM_ENGINE= points at a real engine.
+With =potserv <port> NWChem=, pass =configure= with the =nwchem= arm set. Payload
+fields (=basis=, =theory=, =scfType=, =charge=, =multiplicity=, =enginePath=,
+=nwchemRoot=) are NWChem-specific; the outer message is still generic rgpot
+params so other backends can add arms without a new config language.
+
+Python: =tests/nwchem_params.py= builds =PotentialConfig= + =nwchem=. BLYP:
+=theory="dft"=, =scfType="blyp"=. Embed =.so= still required for =calculate=.
 
 For example, [[https://github.com/TheochemUI/eOn][eOn]] defines:
 

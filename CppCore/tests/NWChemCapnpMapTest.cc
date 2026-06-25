@@ -85,7 +85,63 @@ TEST_CASE("applyPotentialConfig nwchem arm", "[nwchem][capnp]") {
   std::string message;
   bool ok = rgpot::types::adapt::capnp::applyPotentialConfig(
       pot, cfg.asReader(), &message);
-  // ok is false when engine not loaded; true when setConfig succeeds.
+  // ok is false when engine not loaded; true when setParams succeeds.
   REQUIRE((ok || !ok)); // always defined
   REQUIRE(!message.empty());
+}
+
+TEST_CASE("NWChemPot setParams/getParams is Cap'n Proto only user path",
+          "[nwchem][capnp]") {
+  ::capnp::MallocMessageBuilder in_msg;
+  auto in = in_msg.initRoot<::NWChemParams>();
+  in.setBasis("6-31g");
+  in.setTheory("dft");
+  in.setScfType("blyp");
+  in.setCharge(-1);
+  in.setMultiplicity(1);
+  in.setEnginePath("/tmp/libnwchem_engine.so");
+  in.setNwchemRoot("/opt/nwchem");
+
+  rgpot::NWChemPot pot;
+  (void)pot.setParams(in.asReader());
+
+  ::capnp::MallocMessageBuilder out_msg;
+  auto out = out_msg.initRoot<::NWChemParams>();
+  pot.getParams(out);
+  REQUIRE(std::string(out.getBasis().cStr()) == "6-31g");
+  REQUIRE(std::string(out.getTheory().cStr()) == "dft");
+  REQUIRE(std::string(out.getScfType().cStr()) == "blyp");
+  REQUIRE(out.getCharge() == -1);
+  REQUIRE(std::string(out.getEnginePath().cStr()) == "/tmp/libnwchem_engine.so");
+  REQUIRE(std::string(out.getNwchemRoot().cStr()) == "/opt/nwchem");
+}
+
+TEST_CASE("NWChemPot constructed from NWChemParams reader", "[nwchem][capnp]") {
+  ::capnp::MallocMessageBuilder msg;
+  auto p = msg.initRoot<::NWChemParams>();
+  p.setTheory("blyp");
+  p.setScfType("blyp");
+  rgpot::NWChemPot pot(p.asReader());
+  ::capnp::MallocMessageBuilder out_msg;
+  auto out = out_msg.initRoot<::NWChemParams>();
+  pot.getParams(out);
+  REQUIRE(std::string(out.getTheory().cStr()) == "blyp");
+}
+
+TEST_CASE("setPotentialConfig applies rgpot params nwchem arm", "[nwchem][capnp]") {
+  ::capnp::MallocMessageBuilder msg;
+  auto cfg = msg.initRoot<::PotentialConfig>();
+  auto nw = cfg.initNwchem();
+  nw.setTheory("dft");
+  nw.setScfType("blyp");
+  nw.setBasis("sto-3g");
+  rgpot::NWChemPot pot;
+  std::string message;
+  (void)pot.setPotentialConfig(cfg.asReader(), &message);
+  REQUIRE(message.find("nwchem") != std::string::npos);
+  ::capnp::MallocMessageBuilder out_msg;
+  auto out = out_msg.initRoot<::NWChemParams>();
+  pot.getParams(out);
+  REQUIRE(std::string(out.getTheory().cStr()) == "dft");
+  REQUIRE(std::string(out.getScfType().cStr()) == "blyp");
 }

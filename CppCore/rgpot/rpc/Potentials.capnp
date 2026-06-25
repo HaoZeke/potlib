@@ -31,37 +31,43 @@ struct PotentialResult {
 }
 
 # @struct NWChemParams
-# @brief Runtime configuration for the NWChem potential backend.
+# @brief NWChem-specific knobs (one backend arm inside PotentialConfig / rgpot params).
 #
-# Maps 1:1 to C++ rgpot::NWChemConfig and (except engine/path fields) to the
-# stable C ABI rgpot_nwchem_set_config(basis, theory, scf_type, charge, mult).
-# apply via Potential.configure(PotentialConfig.nwchem = this).
-#
-# | NWChemParams   | NWChemConfig     | C ABI / embed          |
-# |----------------|------------------|------------------------|
-# | basis          | basis            | basis set name         |
-# | theory         | theory           | scf | dft | blyp | ... |
-# | scfType        | scf_type         | rhf/uhf, or dft:xc     |
-# | charge         | charge           | molecular charge       |
-# | multiplicity   | multiplicity     | 2S+1                   |
-# | enginePath     | engine_path      | RGPOT_NWCHEM_ENGINE .so|
-# | nwchemRoot     | nwchem_root      | NWCHEM_TOP env/hint    |
+# Not a standalone "rgpot config language" — only used when the active potential
+# is NWChem (or configure targets that backend). Same fields in/out via Cap'n Proto.
 struct NWChemParams {
-  basis        @0 :Text = "sto-3g";  # @brief Gaussian basis (e.g. sto-3g, 6-31g*).
-  theory       @1 :Text = "scf";     # @brief Method: scf, dft, blyp, b3lyp, ...
-  scfType      @2 :Text = "rhf";     # @brief HF: rhf/uhf; DFT: xc name (blyp, b3lyp).
-  charge       @3 :Int32 = 0;        # @brief Molecular charge.
-  multiplicity @4 :Int32 = 1;        # @brief Spin multiplicity (2S+1).
-  enginePath   @5 :Text = "";        # @brief libnwchem_engine.so path (dlopen).
-  nwchemRoot   @6 :Text = "";        # @brief NWCHEM_TOP override for embed data/libs.
+  basis        @0 :Text = "sto-3g";  # Gaussian basis (sto-3g, 6-31g*, ...).
+  theory       @1 :Text = "scf";     # scf | dft | blyp | b3lyp | ...
+  scfType      @2 :Text = "rhf";     # HF: rhf/uhf; DFT: xc (blyp, b3lyp, ...).
+  charge       @3 :Int32 = 0;
+  multiplicity @4 :Int32 = 1;        # 2S+1.
+  enginePath   @5 :Text = "";        # libnwchem_engine.so (dlopen); empty => probe/env.
+  nwchemRoot   @6 :Text = "";        # NWCHEM_TOP for embed; empty => env.
 }
 
+# Future backend option structs (extend here, then add a PotentialConfig union arm):
+#   struct XTBParams { method @0 :Text = "GFN2-xTB"; ... }
+#   struct TBLiteParams { method @0 :Text = "GFN2-xTB"; ... }
+#   struct MetatomicParams { modelPath @0 :Text; device @1 :Text = "cpu"; ... }
+
 # @struct PotentialConfig
-# @brief Tagged configuration for configure() on a live Potential server.
+# @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
+#
+# This is the single user-facing options carrier for rgpot: pass in to configure
+# a live Potential (RPC `configure` or in-process apply), and/or round-trip out
+# when a backend supports get. One schema for wire + embed — no parallel
+# TOML/JSON/YAML option files for backends.
+#
+# Tagged union: exactly one backend's options (or none). Add new arms as new
+# potentials gain runtime knobs (e.g. metatomic @2 :MetatomicParams).
+# `calculate` geometry stays on ForceInput; this struct is method/backend setup only.
 struct PotentialConfig {
   union {
-    none   @0 :Void;          # @brief No backend-specific config.
-    nwchem @1 :NWChemParams;  # @brief NWChem backend parameters.
+    none      @0 :Void;         # No backend-specific options (or no-op configure).
+    nwchem    @1 :NWChemParams; # NWChemPot / potserv … NWChem
+    # metatomic @2 :MetatomicParams;  # reserved pattern for later
+    # xtb       @3 :XTBParams;
+    # tblite    @4 :TBLiteParams;
   }
 }
 

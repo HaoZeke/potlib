@@ -1,9 +1,12 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 
+#include <capnp/message.h>
+
 #include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/NWChemPot/DynLib.hpp"
 #include "rgpot/NWChemPot/nwchem_c_abi.h"
+#include "rgpot/types/adapters/capnp/nwchem_capnp_map.hpp"
 #include "rgpot/units.hpp"
 
 #include <cstdio>
@@ -169,7 +172,24 @@ struct NWChemPot::Impl {
   EngineBundle bundle;
 };
 
-NWChemPot::NWChemPot() : NWChemPot(NWChemConfig{}) {}
+NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
+  // Default user options = schema defaults on NWChemParams (empty reader path).
+  ::capnp::MallocMessageBuilder msg;
+  auto root = msg.initRoot<::NWChemParams>();
+  (void)root; // schema defaults already applied by initRoot
+  config_ = types::adapt::capnp::nwchemConfigFromCapnp(root.asReader());
+  apply_env_hints(config_);
+  if (try_load_engine(impl_->bundle, config_.engine_path))
+    (void)push_params_to_engine(impl_->bundle, config_);
+}
+
+NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
+    : Potential(PotType::NWChem), impl_(new Impl) {
+  config_ = types::adapt::capnp::nwchemConfigFromCapnp(params);
+  apply_env_hints(config_);
+  if (try_load_engine(impl_->bundle, config_.engine_path))
+    (void)push_params_to_engine(impl_->bundle, config_);
+}
 
 NWChemPot::NWChemPot(const NWChemConfig &config)
     : Potential(PotType::NWChem), impl_(new Impl), config_(config) {
@@ -180,8 +200,22 @@ NWChemPot::NWChemPot(const NWChemConfig &config)
 
 NWChemPot::~NWChemPot() { delete impl_; }
 
+bool NWChemPot::setParams(const ::NWChemParams::Reader &params) {
+  // NWChem arm payload of rgpot PotentialConfig; mirror then embed ABI.
+  return setConfig(types::adapt::capnp::nwchemConfigFromCapnp(params));
+}
+
+void NWChemPot::getParams(::NWChemParams::Builder out) const {
+  types::adapt::capnp::nwchemConfigToCapnp(out, config_);
+}
+
+bool NWChemPot::setPotentialConfig(const ::PotentialConfig::Reader &cfg,
+                                   std::string *message_out) {
+  return types::adapt::capnp::applyPotentialConfig(*this, cfg, message_out);
+}
+
 bool NWChemPot::setConfig(const NWChemConfig &config) {
-  // Direct C ABI path: env + dlopen, then rgpot_nwchem_set_params(all fields).
+  // Internal: env + dlopen, then rgpot_nwchem_set_params (embed-only C buffers).
   const bool need_reload =
       !impl_ || !impl_->bundle.loaded ||
       (!config.engine_path.empty() && config.engine_path != config_.engine_path);
