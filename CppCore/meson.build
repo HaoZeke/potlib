@@ -174,6 +174,32 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'nwchem',
         )
+        nwchemc_fake_engine = shared_library(
+            'nwchemc_fake_engine',
+            sources: ['tests/nwchemc_fake_engine.c'],
+            include_directories: include_directories('rgpot/NWChemPot'),
+            install: false,
+        )
+        nwchemc_fake_env = environment()
+        nwchemc_fake_env.set(
+            'RGPOT_NWCHEM_ENGINE',
+            nwchemc_fake_engine.full_path(),
+        )
+        test(
+            'NWChemPotMessageAbiTest',
+            executable(
+                'nwchem_pot_message_abi_test',
+                sources: ['tests/NWChemPotMessageAbiTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: nwchemc_fake_env,
+            workdir: meson.source_root(),
+            suite: 'nwchem',
+        )
         test(
             'test_nwchem_abi',
             executable(
@@ -198,22 +224,6 @@ if get_option('with_tests')
         test_deps += dependency('capnp-rpc')
         test_deps += ptlrpc_dep
         test_array += [['RPCTest', 'test_rpc', 'CapnpAdapterTest.cc', '']]
-        if not get_option('with_rpc_client_only')
-            test(
-                'NWChemCapnpMapTest',
-                executable(
-                    'nwchem_capnp_map_test',
-                    sources: ['tests/NWChemCapnpMapTest.cc'],
-                    dependencies: test_deps,
-                    include_directories: _incdirs + ['.'],
-                    cpp_args: test_args,
-                    link_with: _linkto,
-                    link_language: 'cpp',
-                ),
-                workdir: meson.source_root(),
-                suite: 'nwchem',
-            )
-        endif
         if get_option('with_rpc_client_only')
             test_deps += rgpot_bridge_dep
             test_array += [

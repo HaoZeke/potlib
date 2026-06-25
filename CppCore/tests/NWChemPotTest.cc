@@ -86,7 +86,7 @@ TEST_CASE("NWChemPot water energy when engine present", "[nwchem]") {
   }
 }
 
-TEST_CASE("NWChemPot setParams updates stored abi params", "[nwchem]") {
+TEST_CASE("NWChemPot setParams updates Cap'n Proto-visible params", "[nwchem]") {
   rgpot::NWChemPot pot;
   ::capnp::MallocMessageBuilder msg;
   auto p = msg.initRoot<::NWChemParams>();
@@ -94,10 +94,13 @@ TEST_CASE("NWChemPot setParams updates stored abi params", "[nwchem]") {
   p.setTheory("dft");
   p.setCharge(-1);
   p.setMultiplicity(1);
-  // setParams returns false if engine not loaded; still updates stored POD.
+  // setParams returns false if engine not loaded; stored params still roundtrip.
   (void)pot.setParams(p.asReader());
-  REQUIRE(std::string(pot.abiParams().basis) == "6-31g");
-  REQUIRE(std::string(pot.abiParams().theory) == "dft");
-  REQUIRE(pot.abiParams().charge == -1);
+  ::capnp::MallocMessageBuilder out_msg;
+  auto out = out_msg.initRoot<::NWChemParams>();
+  pot.getParams(out);
+  REQUIRE(std::string(out.getBasis().cStr()) == "6-31g");
+  REQUIRE(std::string(out.getTheory().cStr()) == "dft");
+  REQUIRE(out.getCharge() == -1);
   SUCCEED();
 }

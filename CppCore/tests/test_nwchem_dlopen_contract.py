@@ -28,6 +28,29 @@ def main() -> int:
         require(token not in meson, f"meson.build leaks static embed token {token}")
         require(token not in frontend, f"NWChemPot.cc leaks static embed token {token}")
 
+    mirror_forbidden = [
+        "RgpotNWChemParams",
+        "nwchemParamsToAbi",
+        "nwchemAbiToParams",
+        "nwchemAbiDefaults",
+        "nwchemAbiSummary",
+        "abiParams",
+    ]
+    mirror_files = [
+        nwchem_dir / "NWChemPot.cc",
+        nwchem_dir / "NWChemPot.hpp",
+        root / "CppCore" / "rgpot" / "types" / "adapters" / "capnp" / "nwchem_capnp_map.hpp",
+        root / "CppCore" / "tests" / "NWChemCapnpMapTest.cc",
+        root / "CppCore" / "tests" / "NWChemPotTest.cc",
+        root / "CppCore" / "tests" / "test_nwchem_abi_main.c",
+    ]
+    for path in mirror_files:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in mirror_forbidden:
+            require(token not in text, f"{path.relative_to(root)} keeps local ABI mirror token {token}")
+
     require("shared_library(" in meson, "NWChem engine is not a shared_library")
     require("'nwchem_engine'" in meson, "NWChem engine target is missing")
     require(
