@@ -21,7 +21,7 @@ TEST_CASE("nwchemParamsToAbi / AbiToParams roundtrip all fields",
   root.setScfType("blyp"); // DFT xc when theory=dft
   root.setCharge(1);
   root.setMultiplicity(2);
-  root.setEnginePath("/tmp/libnwchem_engine.so");
+  root.setEnginePath("/opt/rgpot/libnwchem_engine.so");
   root.setNwchemRoot("/opt/nwchem");
 
   RgpotNWChemParams abi{};
@@ -31,7 +31,7 @@ TEST_CASE("nwchemParamsToAbi / AbiToParams roundtrip all fields",
   REQUIRE(std::string(abi.scf_type) == "blyp");
   REQUIRE(abi.charge == 1);
   REQUIRE(abi.multiplicity == 2);
-  REQUIRE(std::string(abi.engine_path) == "/tmp/libnwchem_engine.so");
+  REQUIRE(std::string(abi.engine_path) == "/opt/rgpot/libnwchem_engine.so");
   REQUIRE(std::string(abi.nwchem_root) == "/opt/nwchem");
 
   ::capnp::MallocMessageBuilder msg2;
@@ -43,7 +43,7 @@ TEST_CASE("nwchemParamsToAbi / AbiToParams roundtrip all fields",
   REQUIRE(root2.getCharge() == 1);
   REQUIRE(root2.getMultiplicity() == 2);
   REQUIRE(std::string(root2.getEnginePath().cStr()) ==
-          "/tmp/libnwchem_engine.so");
+          "/opt/rgpot/libnwchem_engine.so");
   REQUIRE(std::string(root2.getNwchemRoot().cStr()) == "/opt/nwchem");
 }
 
@@ -55,10 +55,11 @@ TEST_CASE("blyp theory option maps through NWChemParams", "[nwchem][capnp]") {
   root.setScfType("blyp");
   root.setCharge(0);
   root.setMultiplicity(1);
-  auto cfg = rgpot::types::adapt::capnp::nwchemConfigFromCapnp(root.asReader());
-  REQUIRE(cfg.theory == "blyp");
-  REQUIRE(cfg.scf_type == "blyp");
-  auto sum = rgpot::types::adapt::capnp::nwchemConfigSummary(cfg);
+  RgpotNWChemParams abi{};
+  rgpot::types::adapt::capnp::nwchemParamsToAbi(root.asReader(), &abi);
+  REQUIRE(std::string(abi.theory) == "blyp");
+  REQUIRE(std::string(abi.scf_type) == "blyp");
+  auto sum = rgpot::types::adapt::capnp::nwchemAbiSummary(abi);
   REQUIRE(sum.find("theory=blyp") != std::string::npos);
 }
 
@@ -101,7 +102,7 @@ TEST_CASE("NWChemPot setParams/getParams is Cap'n Proto only user path",
   in.setScfType("blyp");
   in.setCharge(-1);
   in.setMultiplicity(1);
-  in.setEnginePath("/tmp/libnwchem_engine.so");
+  in.setEnginePath("/opt/rgpot/libnwchem_engine.so");
   in.setNwchemRoot("/opt/nwchem");
 
   rgpot::NWChemPot pot;
@@ -114,7 +115,8 @@ TEST_CASE("NWChemPot setParams/getParams is Cap'n Proto only user path",
   REQUIRE(std::string(out.getTheory().cStr()) == "dft");
   REQUIRE(std::string(out.getScfType().cStr()) == "blyp");
   REQUIRE(out.getCharge() == -1);
-  REQUIRE(std::string(out.getEnginePath().cStr()) == "/tmp/libnwchem_engine.so");
+  REQUIRE(std::string(out.getEnginePath().cStr()) ==
+          "/opt/rgpot/libnwchem_engine.so");
   REQUIRE(std::string(out.getNwchemRoot().cStr()) == "/opt/nwchem");
 }
 
