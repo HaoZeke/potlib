@@ -43,7 +43,7 @@ Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/back
 | `NWChemPot.cc` frontend | always | `dlopen` engine, units to eV/Å |
 | `nwchem_c_abi.h` | header | stable symbols (`rgpot_nwchem_*`) |
 | `nwchem_c_abi_stub.c` | always | `abi_available()==0`, compute fails |
-| `nwchem_c_abi.c` + `nwchem_embed.F` | `-Dwith_nwchem=true` `-Dnwchem_root=...` | real embed → `libnwchem_engine.so` |
+| `nwchem_c_abi.c` + `nwchem_embed_c_api.f90` + `nwchem_embed_legacy.F` | `-Dwith_nwchem=true` `-Dnwchem_root=...` | real embed → static/shared engine |
 
 ```
 app / potserv

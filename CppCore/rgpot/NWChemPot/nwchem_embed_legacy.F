@@ -21,13 +21,15 @@ C     (env / .nwchemrc), not embed-local constants.
       external util_set_default_scratch_dir
       external util_set_default_permanent_dir
       external util_file_prefix_set, util_file_info_rtdb
+      external util_blas_set_num_threads, rtdb_init, nxtask_init
       save g_init
       data g_init /0/
       ok = -1
       rtdb = -1
       if (g_init .eq. 0) then
-         call pbeginf()
-         call ga_initialize()
+C        Host may already have MPI_Init (C driver / mpirun). Only start MPI
+C        from Fortran when embed owns the process (matches in-process embed).
+         call rgpot_mpi_start_if_needed()
 C        Same path as nwchem.F when no input "memory" directive: defaults
 C        from environment / .nwchemrc / compiled-in limits.
          tsrc = 'N'
@@ -36,11 +38,20 @@ C        from environment / .nwchemrc / compiled-in limits.
          gsrc = 'N'
          call memory_defaults(total, tsrc, heap, hsrc, stack,
      $        ssrc, global, gsrc)
+C        Match nwchem.F order: GA limited init, then MA (GA may use MA).
+C        Fallback if memory_defaults yields zero (no .nwchemrc / env).
+         if (stack .le. 0) stack = 4000000
+         if (heap .le. 0) heap = 4000000
+         if (global .le. 0) global = 8000000
+C        Match NWChemWrap / geninterface embed path (not full nwchem.F).
+         call ga_initialize()
          if (ga_uses_ma()) then
             if (.not. ma_init(mt_dbl, stack, heap + global)) return
          else
             if (.not. ma_init(mt_dbl, stack, heap)) return
+            call ga_set_memory_limit(ma_sizeof(mt_dbl, global, mt_byte))
          endif
+         call util_blas_set_num_threads(1)
 C        NWChem file prefix / scratch / permanent (env: NWCHEM_SCRATCH_DIR,
 C        NWCHEM_PERMANENT_DIR, or .nwchemrc; else CWD). No embed-local paths.
          call util_file_prefix_set('rgpot')
@@ -59,6 +70,8 @@ C     RTDB in permanent/scratch via util_file_name (needs dirs above).
       call util_file_info_rtdb(rtdb)
       call util_set_rtdb_state(rtdb, .true., .false.,
      $     .false.)
+      call geom_hnd_parallel(.true.)
+      call nxtask_init(rtdb)
       ok = 0
       return
       end
@@ -89,8 +102,9 @@ C     RTDB in permanent/scratch via util_file_name (needs dirs above).
       return
       end
 
-C     Direct embed: geom + library basis on RTDB, then task_energy/gradient.
-C     No NWChem input files, no input_parse — library API only.
+C     Direct embed: build geom+basis via NWChem embed API nw_inp_from_character
+C     (same path as NWChemWrap/geninterface; internal util_file_name temp only),
+C     then task_energy/gradient. No user-facing .nw files; coords from C ABI.
       subroutine nwchem_legacy_energy_grad(rtdb, n_atoms, pos_ang,
      $     atmnrs, basis_name, charge, mult, energy_h,
      $     grad_h_bohr, errmsg, ok)
@@ -98,8 +112,6 @@ C     No NWChem input files, no input_parse — library API only.
 #include "mafdecls.fh"
 #include "global.fh"
 #include "rtdb.fh"
-#include "geom.fh"
-#include "bas.fh"
 #include "stdio.fh"
 #include "errquit.fh"
 #include "inp.fh"
@@ -110,19 +122,20 @@ C     No NWChem input files, no input_parse — library API only.
       double precision energy_h
       double precision grad_h_bohr(*)
       character*(*) errmsg
-      integer geom, basis, iat, n3, i
+      integer iat, n3, i, ipos, lb
       integer l_grad, k_grad
+      integer maxat
+      parameter (maxat = 64)
       logical status
-      double precision coords(3), qat, chg
-      character*16 tag, tag_lib
-      character*1024 libfile, nwtop, nwbas
-      integer lnw, lbas
+      double precision chg
+      character*16 tag
       character*16 vectors_in
+      character*8192 blk
+      character*128 line
       external task_energy, task_gradient
       logical task_energy, task_gradient
-      logical bas_add_ucnt_init, bas_add_ucnt_tidy
-      external bas_add_ucnt_init, bas_add_ucnt_tidy
-      external bas_library_file, bas_tag_lib, util_getenv
+      external nw_inp_from_character
+      logical nw_inp_from_character
 
       ok = -1
       energy_h = 0.0d0
@@ -131,109 +144,68 @@ C     No NWChem input files, no input_parse — library API only.
          errmsg = 'invalid rtdb or n_atoms'
          return
       endif
+      if (n_atoms .gt. maxat) then
+         errmsg = 'n_atoms exceeds embed maxat=64'
+         return
+      endif
 
-C     --- geometry (geom_ncent_set + geom_cent_set) ---
-      if (.not. geom_create(geom, 'geometry')) then
-         errmsg = 'geom_create failed'
-         return
-      endif
-      if (.not. geom_set_user_units(geom, 'angstrom')) then
-         errmsg = 'geom_set_user_units failed'
-         status = geom_destroy(geom)
-         return
-      endif
-      if (.not. geom_ncent_set(geom, n_atoms)) then
-         errmsg = 'geom_ncent_set failed'
-         status = geom_destroy(geom)
-         return
-      endif
+C     Geometry (Angstrom from C) + library basis — one embed directive block.
+C     Proven to yield finite SCF; thin geom_cent_set path leaves incomplete
+C     symmetry/mass/autoz state and NaN integrals.
+      blk = 'geometry units angstrom' // char(10)
+      ipos = inp_strlen(blk) + 1
       do iat = 1, n_atoms
-         coords(1) = pos_ang(3 * (iat - 1) + 1)
-         coords(2) = pos_ang(3 * (iat - 1) + 2)
-         coords(3) = pos_ang(3 * (iat - 1) + 3)
          call rgpot_z_to_elem(atmnrs(iat), tag)
-         qat = dble(atmnrs(iat))
-         if (.not. geom_cent_set(geom, iat, tag, coords, qat))
-     $        then
-            errmsg = 'geom_cent_set failed'
-            status = geom_destroy(geom)
+         write (line, '(1x,a2,1x,3f20.12)') tag(1:2),
+     $        pos_ang(3 * (iat - 1) + 1),
+     $        pos_ang(3 * (iat - 1) + 2),
+     $        pos_ang(3 * (iat - 1) + 3)
+         lb = inp_strlen(line)
+         if (ipos + lb + 1 .gt. len(blk)) then
+            errmsg = 'embed directive block overflow'
             return
          endif
+         blk(ipos:ipos + lb - 1) = line(1:lb)
+         ipos = ipos + lb
+         blk(ipos:ipos) = char(10)
+         ipos = ipos + 1
       enddo
-      if (.not. geom_rtdb_store(rtdb, geom, 'geometry')) then
-         errmsg = 'geom_rtdb_store failed'
-         status = geom_destroy(geom)
+      blk(ipos:ipos + 3) = 'end' // char(10)
+      ipos = ipos + 4
+      write (line, '(''basis; * library '',a,'' ; end'')')
+     $     basis_name(1:inp_strlen(basis_name))
+      lb = inp_strlen(line)
+      if (ipos + lb + 1 .gt. len(blk)) then
+         errmsg = 'embed directive block overflow (basis)'
          return
       endif
-
-C     --- AO basis from NWChem library via bas_tag_lib (no input file) ---
-      if (.not. bas_create(basis, 'ao basis')) then
-         errmsg = 'bas_create failed'
-         status = geom_destroy(geom)
+      blk(ipos:ipos + lb - 1) = line(1:lb)
+      ipos = ipos + lb
+      blk(ipos:ipos) = char(10)
+      if (.not. nw_inp_from_character(rtdb, blk(1:ipos))) then
+         errmsg = 'nw_inp_from_character geom/basis failed'
          return
       endif
-      if (.not. bas_add_ucnt_init(basis)) then
-         errmsg = 'bas_add_ucnt_init failed'
-         status = bas_destroy(basis)
-         status = geom_destroy(geom)
-         return
-      endif
-      libfile = ' '
-      call util_getenv('NWCHEM_BASIS_LIBRARY', nwbas)
-      lbas = inp_strlen(nwbas)
-      if (lbas .gt. 0) then
-         libfile = nwbas(1:lbas)
-      else
-         call util_getenv('NWCHEM_TOP', nwtop)
-         lnw = inp_strlen(nwtop)
-         if (lnw .gt. 0) then
-            libfile = nwtop(1:lnw) //
-     $           '/src/basis/libraries/'
-         else
-            call bas_library_file(libfile)
-         endif
-      endif
-      lbas = inp_strlen(libfile)
-      if (lbas .gt. 0 .and. libfile(lbas:lbas) .ne. '/') then
-         libfile(lbas + 1:lbas + 1) = '/'
-      endif
-      do iat = 1, n_atoms
-         call rgpot_z_to_elem(atmnrs(iat), tag)
-         tag_lib = tag
-         call bas_tag_lib(basis, .true., tag, tag_lib,
-     $        basis_name, libfile, .false., .false.)
-      enddo
-      if (.not. bas_add_ucnt_tidy(basis)) then
-         errmsg = 'bas_add_ucnt_tidy failed'
-         status = bas_destroy(basis)
-         status = geom_destroy(geom)
-         return
-      endif
-      if (.not. bas_rtdb_store(rtdb, 'ao basis', basis)) then
-         errmsg = 'bas_rtdb_store failed'
-         status = bas_destroy(basis)
-         status = geom_destroy(geom)
-         return
-      endif
-      status = bas_destroy(basis)
-      status = geom_destroy(geom)
 
       chg = dble(charge)
       status = rtdb_put(rtdb, 'charge', mt_dbl, 1, chg)
       status = rtdb_put(rtdb, 'spin mult', mt_int, 1, mult)
-C     SCF vector source (no input_parse defaults). hcore avoids extra
-C     diagonalizations in the atomic-density guess path.
-      vectors_in = 'hcore'
+      vectors_in = 'atomic'
       status = rtdb_cput(rtdb, 'scf:input vectors', 1, vectors_in)
+      status = rtdb_cput(rtdb, 'scf:type', 1, 'rhf')
+      status = rtdb_cput(rtdb, 'task:operation', 1, 'energy')
+      status = rtdb_cput(rtdb, 'task:theory', 1, 'scf')
 
       if (.not. task_energy(rtdb)) then
-         errmsg = 'task_energy failed'
+         errmsg = 'task_energy/scf failed'
          return
       endif
-      if (.not. rtdb_get(rtdb, 'task:energy', mt_dbl, 1,
-     $     energy_h)) then
-         errmsg = 'rtdb_get task:energy failed'
-         return
+      if (.not. rtdb_get(rtdb, 'task:energy', mt_dbl, 1, energy_h)) then
+         if (.not. rtdb_get(rtdb, 'scf:energy', mt_dbl, 1,
+     $        energy_h)) then
+            errmsg = 'rtdb_get task/scf energy failed'
+            return
+         endif
       endif
 
       n3 = 3 * n_atoms
@@ -272,10 +244,28 @@ C     diagonalizations in the atomic-density guess path.
      $     'Ne','Na','Mg','Al','Si','P ','S ','Cl','Ar','K ','Ca',
      $     'Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga',
      $     'Ge','As','Se','Br','Kr'/
+C     Left-align element symbol in character*16 (matches geom_input tags).
+      elem = ' '
       if (z .ge. 0 .and. z .le. 36) then
-         elem = sym(z)
+         elem(1:2) = sym(z)
       else
-         elem = 'X '
+         elem(1:2) = 'X '
+      endif
+      return
+      end
+
+C     Call pbeginf only when MPI is not already initialized (C/MPI host).
+C     Open MPI Fortran bindings use default INTEGER (not necessarily
+C     -fdefault-integer-8); force integer*4 for mpi_initialized args.
+      subroutine rgpot_mpi_start_if_needed()
+      implicit none
+      integer*4 ierr4, flag4
+      external mpi_initialized, pbeginf
+      flag4 = 0
+      ierr4 = 0
+      call mpi_initialized(flag4, ierr4)
+      if (flag4 .eq. 0) then
+         call pbeginf()
       endif
       return
       end
