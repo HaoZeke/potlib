@@ -1,5 +1,5 @@
-// Direct NWChemPot via runtime-loaded libnwchem_engine (in-process C ABI).
-// No RPC/potserv. No nwchem CLI. Build via scripts/setup_nwchem_embed.sh configure.
+// Direct NWChemPot: NWChemConfig -> RgpotNWChemParams -> embed C ABI (dlopen).
+// No RPC. No CLI. scripts/setup_nwchem_embed.sh configure.
 #include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 

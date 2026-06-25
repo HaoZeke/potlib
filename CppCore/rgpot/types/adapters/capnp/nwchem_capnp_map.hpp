@@ -3,10 +3,10 @@
 // Copyright 2023--present rgpot developers
 
 /**
- * @brief Bidirectional map: Cap'n Proto NWChemParams <-> rgpot::NWChemConfig.
+ * @brief Optional RPC shim only: Cap'n Proto NWChemParams <-> NWChemConfig.
  *
- * Every NWChemParams field is mapped; no Cap'n Proto option is dropped on the
- * way into NWChemPot::setConfig / C ABI. See Potentials.capnp NWChemParams docs.
+ * Primary option path is C ABI RgpotNWChemParams via NWChemPot::setConfig /
+ * toAbiParams (no RPC). This adapter exists solely for potserv configure().
  */
 
 #include <sstream>

@@ -1,11 +1,15 @@
-# NWChemPot — stable C ABI, runtime-loaded engine (no CLI)
+# NWChemPot — stable C ABI / params (direct, no RPC required)
 
-In-process NWChem via a **stable C ABI** (`nwchem_c_abi.h`), loaded at runtime
-with `dlopen` (`DynLib.hpp`), same *optional backend* idea as other rgpot pots.
+In-process NWChem through a **stable C ABI** (`nwchem_c_abi.h`). Options live in
+`RgpotNWChemParams` and pass straight into the embed via `rgpot_nwchem_set_params`
+/ `rgpot_nwchem_energy_grad`. The C++ `NWChemConfig` is only a thin mirror
+(`toAbiParams` / `fromAbiParams`).
 
-There is **no subprocess / `nwchem` CLI driver**. The only real backend is the
-Fortran embed (`nwchem_embed.F`) compiled into `libnwchem_engine.so` against a
-full `NWCHEM_TOP` tree.
+**Not** Cap'n Proto / potserv as the option path (RPC is optional and maps into
+the same `NWChemConfig` if used). **Not** a subprocess `nwchem` CLI.
+
+Real backend: Fortran embed (`nwchem_embed.F`) in `libnwchem_engine.so` against
+`NWCHEM_TOP`.
 
 ## Layers
 

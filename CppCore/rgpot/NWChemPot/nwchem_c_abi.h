@@ -1,69 +1,91 @@
 /**
  * @file nwchem_c_abi.h
- * @brief Stable C ABI: rgpot NWChemPot frontend <-> libnwchem_engine (dlopen).
+ * @brief Stable C ABI between NWChemPot (dlopen) and libnwchem_engine (embed).
  *
- * Pattern mirrors runtime-loaded backends (e.g. XTBPot links xtb at build time;
- * here the *engine* is optional and resolved at runtime via RTLD_GLOBAL).
+ * This is the contract for in-process NWChem. There is no RPC and no CLI here:
+ * the frontend resolves symbols from libnwchem_engine.so and passes options via
+ * RgpotNWChemParams. Cap'n Proto / potserv are optional higher layers only.
  *
- * Engine implementation: Fortran embed (nwchem_embed.F) + nwchem_c_abi.c, built
- * only when -Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP> against a full NWChem
- * source/install tree. Without that build, only the stub (nwchem_c_abi_stub.c)
- * exists and rgpot_nwchem_abi_available() returns 0.
+ * Build engine: -Dwith_nwchem=true -Dnwchem_root=<NWCHEM_TOP> (nwchem_c_abi.c +
+ * nwchem_embed.F). Without embed, only the stub exists (abi_available == 0).
  *
- * Theory strings (examples):
- *   "scf" / "rhf" / "uhf"  — Hartree–Fock SCF
- *   "dft"                  — DFT (use scf_type / extra config for functional)
- *   "blyp" / "b3lyp"       — DFT with named XC (engine maps to NWChem dft block)
+ * theory / scf_type examples:
+ *   theory="scf",  scf_type="rhf"|"uhf"     — Hartree–Fock
+ *   theory="dft",  scf_type="blyp"|"b3lyp"  — DFT + XC
+ *   theory="blyp"  (scf_type ignored/copied) — embed maps to dft + xc=blyp
  *
- * Units at the ABI boundary: energy Hartree, gradient Hartree/Bohr.
- * Frontend converts to eV / eV/Å.
+ * Units at ABI: energy Hartree, gradient Hartree/Bohr. Frontend -> eV, eV/Å.
  */
 #pragma once
+
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Result of an energy+gradient evaluation (atomic units). */
+/** Fixed-size string slots in RgpotNWChemParams (NUL-terminated C strings). */
+#define RGPOT_NWCHEM_STR 64
+#define RGPOT_NWCHEM_PATH 512
+
+/**
+ * @brief All engine/runtime options in one POD struct (the C-side "params").
+ *
+ * Every field is meaningful to the embed except engine_path / nwchem_root which
+ * are consumed by the C++ frontend for dlopen + NWCHEM_TOP before calling in.
+ * Still included here so one params object carries the full option set.
+ */
+typedef struct RgpotNWChemParams {
+  char basis[RGPOT_NWCHEM_STR];       /**< e.g. "sto-3g", "6-31g*" */
+  char theory[RGPOT_NWCHEM_STR];      /**< "scf", "dft", "blyp", ... */
+  char scf_type[RGPOT_NWCHEM_STR];    /**< "rhf"/"uhf" or DFT xc name */
+  int charge;                         /**< molecular charge */
+  int multiplicity;                   /**< 2S+1 */
+  char engine_path[RGPOT_NWCHEM_PATH];/**< optional libnwchem_engine.so path */
+  char nwchem_root[RGPOT_NWCHEM_PATH];/**< optional NWCHEM_TOP */
+} RgpotNWChemParams;
+
+/** Result of energy+gradient (atomic units). */
 typedef struct RgpotNWChemResult {
-  int ok;            /**< 1 on success, 0 on failure */
-  double energy_h;   /**< Total energy in Hartree */
-  char message[512]; /**< Error / status (NUL-terminated) */
+  int ok;            /**< 1 success, 0 failure */
+  double energy_h;   /**< total energy Hartree */
+  char message[512]; /**< status / error, NUL-terminated */
 } RgpotNWChemResult;
 
-/**
- * Energy + nuclear gradient via embedded NWChem (task_energy / task_gradient).
- *
- * @param n_atoms          Atom count (>0)
- * @param positions_ang    n_atoms*3 positions in Angstrom (row-major xyz)
- * @param atomic_numbers   n_atoms atomic numbers (Z)
- * @param charge           Molecular charge
- * @param multiplicity     Spin multiplicity (2S+1)
- * @param basis            Basis set (e.g. "sto-3g", "6-31g*"); NULL => engine default
- * @param theory           Theory / method key (see file header); NULL => default
- * @param scf_type         SCF/DFT detail (e.g. "rhf", "uhf", "blyp"); NULL => default
- * @param grad_h_bohr      Out: n_atoms*3 gradient Hartree/Bohr (row-major)
- */
-RgpotNWChemResult rgpot_nwchem_energy_grad(
-    int n_atoms, const double *positions_ang, const int *atomic_numbers,
-    int charge, int multiplicity, const char *basis, const char *theory,
-    const char *scf_type, double *grad_h_bohr);
+/** Fill params with defaults (sto-3g / scf / rhf / charge 0 / mult 1 / empty paths). */
+void rgpot_nwchem_params_default(RgpotNWChemParams *p);
 
 /**
- * Apply configuration before energy/grad (basis, theory, scf/xc, charge, mult).
- * @return 0 on success, non-zero if embed not live or rtdb update failed
+ * Apply full params to embed (basis, theory, scf_type, charge, mult).
+ * engine_path / nwchem_root are ignored inside the engine .so (frontend only).
+ * @return 0 on success, non-zero if embed unavailable or rtdb update failed
  */
+int rgpot_nwchem_set_params(const RgpotNWChemParams *params);
+
+/**
+ * Energy + nuclear gradient. If params is non-NULL, applies it first (same as
+ * set_params then compute). If NULL, uses last successful set_params / defaults.
+ *
+ * @param n_atoms        atom count
+ * @param positions_ang  n_atoms*3 Angstrom, row-major xyz
+ * @param atomic_numbers n_atoms Z values
+ * @param params         full option set, or NULL for sticky engine state
+ * @param grad_h_bohr    out n_atoms*3 Hartree/Bohr, row-major
+ */
+RgpotNWChemResult rgpot_nwchem_energy_grad(int n_atoms,
+                                           const double *positions_ang,
+                                           const int *atomic_numbers,
+                                           const RgpotNWChemParams *params,
+                                           double *grad_h_bohr);
+
+/** Compatibility: set only the five embed fields (empty paths). */
 int rgpot_nwchem_set_config(const char *basis, const char *theory,
                             const char *scf_type, int charge, int mult);
 
-/** Engine build / version string (static buffer). */
+/** Engine version string (static buffer). */
 const char *rgpot_nwchem_engine_version(void);
 
-/**
- * 1 if this .so was built with a real NWChem embed (RGPOT_HAS_NWCHEM), else 0.
- * Stub always returns 0; frontend uses this to distinguish "engine loaded but
- * stub" vs "engine can compute".
- */
+/** 1 if real embed (RGPOT_HAS_NWCHEM), 0 if stub. */
 int rgpot_nwchem_abi_available(void);
 
 #ifdef __cplusplus
