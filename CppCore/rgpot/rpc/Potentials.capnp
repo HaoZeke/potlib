@@ -35,6 +35,53 @@ struct PotentialResult {
 #
 # Not a standalone "rgpot config language" — only used when the active potential
 # is NWChem (or configure targets that backend). Same fields in/out via Cap'n Proto.
+struct NWChemDirective {
+  keyword @0 :Text;       # Directive keyword inside a block, e.g. "convergence".
+  args    @1 :List(Text); # Tokenized directive arguments.
+}
+
+struct NWChemGenericStanza {
+  name       @0 :Text;                   # NWChem block name, e.g. "driver".
+  directives @1 :List(NWChemDirective);  # Structured block body.
+}
+
+struct NWChemSetDirective {
+  key   @0 :Text; # RTDB key, e.g. "dft:avg_fon".
+  value @1 :Text; # NWChem input literal, e.g. ".false.".
+}
+
+struct NWChemDftSmearing {
+  sigmaHartree @0 :Float64 = 0.0; # Molecular DFT smear sigma in Hartree.
+  mode         @1 :Mode = fixsz;
+
+  enum Mode {
+    fixsz   @0;
+    nofixsz @1;
+  }
+}
+
+struct NWChemDftStanza {
+  xc         @0 :Text = "";                  # Exchange-correlation keyword.
+  direct     @1 :Bool = false;               # Emit "direct".
+  smearing   @2 :NWChemDftSmearing;          # Emit "smear ...".
+  directives @3 :List(NWChemDirective);      # Extra structured DFT directives.
+}
+
+struct NWChemInputStanza {
+  kind    @0 :Kind = generic;
+  generic @1 :NWChemGenericStanza;
+  dft     @2 :NWChemDftStanza;
+  set     @3 :NWChemSetDirective;
+  raw     @4 :Text;
+
+  enum Kind {
+    generic @0;
+    dft     @1;
+    set     @2;
+    raw     @3;
+  }
+}
+
 struct NWChemParams {
   basis        @0 :Text = "sto-3g";  # Gaussian basis (sto-3g, 6-31g*, ...).
   theory       @1 :Text = "scf";     # scf | dft | blyp | b3lyp | ...
@@ -49,6 +96,7 @@ struct NWChemParams {
   scratchDir   @10 :Text = "";        # Optional NWChem scratch directory.
   permanentDir @11 :Text = "";        # Optional NWChem permanent directory.
   inputBlocks  @12 :List(Text);       # Raw NWChem directive blocks applied before task.
+  inputStanzas @13 :List(NWChemInputStanza); # Structured NWChem input stanzas.
 }
 
 # Future backend option structs (extend here, then add a PotentialConfig union arm):

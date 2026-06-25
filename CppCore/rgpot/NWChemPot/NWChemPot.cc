@@ -188,6 +188,7 @@ void copy_params_to_builder(const ::NWChemParams::Reader &params,
   auto out_blocks = out.initInputBlocks(blocks.size());
   for (unsigned int i = 0; i < blocks.size(); ++i)
     out_blocks.set(i, blocks[i]);
+  out.setInputStanzas(params.getInputStanzas());
 }
 
 ::NWChemParams::Reader

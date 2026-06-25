@@ -102,6 +102,15 @@ TEST_CASE("NWChemPot setParams updates Cap'n Proto-visible params", "[nwchem]") 
   auto blocks = p.initInputBlocks(2);
   blocks.set(0, "dft; xc b3lyp; end");
   blocks.set(1, "set int:acc_std 1e-8");
+  auto stanzas = p.initInputStanzas(1);
+  auto stanza = stanzas[0];
+  stanza.setKind(::NWChemInputStanza::Kind::DFT);
+  auto dft = stanza.initDft();
+  dft.setDirect(true);
+  dft.setXc("pbe0");
+  auto smear = dft.initSmearing();
+  smear.setSigmaHartree(0.001);
+  smear.setMode(::NWChemDftSmearing::Mode::FIXSZ);
   // setParams returns false if engine not loaded; stored params still roundtrip.
   (void)pot.setParams(p.asReader());
   ::capnp::MallocMessageBuilder out_msg;
@@ -122,5 +131,20 @@ TEST_CASE("NWChemPot setParams updates Cap'n Proto-visible params", "[nwchem]") 
           "dft; xc b3lyp; end");
   REQUIRE(std::string(out.getInputBlocks()[1].cStr()) ==
           "set int:acc_std 1e-8");
+  REQUIRE(out.getInputStanzas().size() == 1);
+  REQUIRE(out.getInputStanzas()[0].getKind() ==
+          ::NWChemInputStanza::Kind::DFT);
+  REQUIRE(out.getInputStanzas()[0].getDft().getDirect());
+  REQUIRE(std::string(out.getInputStanzas()[0].getDft().getXc().cStr()) ==
+          "pbe0");
+  REQUIRE(out.getInputStanzas()[0]
+              .getDft()
+              .getSmearing()
+              .getMode() == ::NWChemDftSmearing::Mode::FIXSZ);
+  REQUIRE_THAT(out.getInputStanzas()[0]
+                   .getDft()
+                   .getSmearing()
+                   .getSigmaHartree(),
+               Catch::Matchers::WithinAbs(0.001, 1e-12));
   SUCCEED();
 }

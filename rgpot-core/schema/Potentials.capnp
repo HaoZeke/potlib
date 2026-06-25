@@ -32,6 +32,53 @@ struct PotentialResult {
 
 # @struct NWChemParams
 # @brief NWChem-specific knobs (one arm of PotentialConfig / rgpot params).
+struct NWChemDirective {
+  keyword @0 :Text;
+  args    @1 :List(Text);
+}
+
+struct NWChemGenericStanza {
+  name       @0 :Text;
+  directives @1 :List(NWChemDirective);
+}
+
+struct NWChemSetDirective {
+  key   @0 :Text;
+  value @1 :Text;
+}
+
+struct NWChemDftSmearing {
+  sigmaHartree @0 :Float64 = 0.0;
+  mode         @1 :Mode = fixsz;
+
+  enum Mode {
+    fixsz   @0;
+    nofixsz @1;
+  }
+}
+
+struct NWChemDftStanza {
+  xc         @0 :Text = "";
+  direct     @1 :Bool = false;
+  smearing   @2 :NWChemDftSmearing;
+  directives @3 :List(NWChemDirective);
+}
+
+struct NWChemInputStanza {
+  kind    @0 :Kind = generic;
+  generic @1 :NWChemGenericStanza;
+  dft     @2 :NWChemDftStanza;
+  set     @3 :NWChemSetDirective;
+  raw     @4 :Text;
+
+  enum Kind {
+    generic @0;
+    dft     @1;
+    set     @2;
+    raw     @3;
+  }
+}
+
 struct NWChemParams {
   basis        @0 :Text = "sto-3g";
   theory       @1 :Text = "scf";
@@ -40,6 +87,13 @@ struct NWChemParams {
   multiplicity @4 :Int32 = 1;
   enginePath   @5 :Text = "";
   nwchemRoot   @6 :Text = "";
+  task         @7 :Text = "gradient";
+  title        @8 :Text = "";
+  memoryMb     @9 :UInt32 = 0;
+  scratchDir   @10 :Text = "";
+  permanentDir @11 :Text = "";
+  inputBlocks  @12 :List(Text);
+  inputStanzas @13 :List(NWChemInputStanza);
 }
 
 # @struct PotentialConfig
