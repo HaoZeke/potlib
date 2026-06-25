@@ -55,16 +55,3 @@ pot_bridge = library(
 pot_bridge_dep = declare_dependency(
     link_with: pot_bridge,
 )
-
-if not get_option('with_rpc_client_only')
-    server = executable(
-        'potserv',
-        ['server.cpp', gen_rpc],
-        link_with: [ptlrpc, _linkto],
-        dependencies: _deps + capnp_rpc_dep,
-        cpp_args: _args,
-        include_directories: _incdirs,
-        link_language: 'cpp',
-        install: not meson.is_subproject(),
-    )
-endif

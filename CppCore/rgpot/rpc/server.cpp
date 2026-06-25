@@ -33,7 +33,6 @@
 #include "rgpot/Potential.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 #include "rgpot/types/adapters/capnp/capnp_adapter.hpp"
-#include "rgpot/types/adapters/capnp/nwchem_capnp_map.hpp"
 #include "rgpot/units.hpp"
 
 /**
@@ -144,8 +143,7 @@ public:
       return kj::READY_NOW;
     }
     std::string msg;
-    bool ok = rgpot::types::adapt::capnp::applyPotentialConfig(*m_nwchem, cfg,
-                                                               &msg);
+    bool ok = m_nwchem->setPotentialConfig(cfg, &msg);
     results.setOk(ok);
     results.setMessage(msg);
     return kj::READY_NOW;

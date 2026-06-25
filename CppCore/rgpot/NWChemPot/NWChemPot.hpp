@@ -5,16 +5,15 @@
 /**
  * @brief NWChem potential under rgpot `PotentialConfig` user parameters.
  *
- * User path: Cap'n Proto `PotentialConfig` / `NWChemParams` only → copy fields
- * into embed `RgpotNWChemParams` → `rgpot_nwchem_set_params` / `energy_grad`.
- * No intermediate C++ config struct on the public configure/setParams surface.
+ * User path: Cap'n Proto `PotentialConfig` / `NWChemParams` only. The frontend
+ * serializes that message and passes it through C ABI symbols resolved by
+ * dlopen.
  */
 
-#include <string>
-
-#include "rgpot/NWChemPot/nwchem_c_abi.h"
 #include "rgpot/Potential.hpp"
 #include "rgpot/rpc/Potentials.capnp.h"
+
+#include <string>
 
 namespace rgpot {
 
@@ -30,12 +29,10 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
-  /**
-   * Apply NWChem arm payload (Cap'n Proto NWChemParams) → embed C ABI params.
-   */
+  /** Apply NWChem arm payload as the next Cap'n Proto message for the engine. */
   bool setParams(const ::NWChemParams::Reader &params);
 
-  /** Write last applied knobs back to Cap'n Proto. */
+  /** Write last applied NWChem params back to Cap'n Proto. */
   void getParams(::NWChemParams::Builder out) const;
 
   /**
@@ -44,9 +41,6 @@ public:
   bool setPotentialConfig(const ::PotentialConfig::Reader &cfg,
                           std::string *message_out = nullptr);
 
-  /** Last embed-boundary params (fixed buffers; not a user format). */
-  const RgpotNWChemParams &abiParams() const { return abi_params_; }
-
   bool available() const;
   static bool probe_available();
   static bool abi_available();
@@ -54,8 +48,6 @@ public:
 private:
   struct Impl;
   Impl *impl_;
-  /** Sticky last-applied options at embed boundary (Cap'n Proto → this POD). */
-  RgpotNWChemParams abi_params_{};
 };
 
 } // namespace rgpot

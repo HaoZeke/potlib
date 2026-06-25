@@ -10,6 +10,8 @@ endif
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
 
+subdir('rgpot/rpc')
+
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
     rgpot_core = static_library(
@@ -53,9 +55,10 @@ if not get_option('with_rpc_client_only')
     _linkto += rgpotentials
 
     # Create library
+    rgpot_deps = _deps + [ptlrpc_dep]
     rgpot = library(
         'rgpot',
-        dependencies: _deps,
+        dependencies: rgpot_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_with: _linkto,
@@ -64,8 +67,17 @@ if not get_option('with_rpc_client_only')
 endif
 
 # ------------------------ Server
-if rpc_enabled
-    subdir('rgpot/rpc')
+if rpc_enabled and not get_option('with_rpc_client_only')
+    server = executable(
+        'potserv',
+        ['rgpot/rpc/server.cpp', gen_rpc],
+        link_with: [ptlrpc, _linkto],
+        dependencies: _deps + [capnp_rpc_dep],
+        cpp_args: _args,
+        include_directories: _incdirs,
+        link_language: 'cpp',
+        install: not meson.is_subproject(),
+    )
 endif
 
 # ------------------------ Examples
@@ -165,7 +177,7 @@ if get_option('with_tests')
             executable(
                 'nwchem_pot_test',
                 sources: ['tests/NWChemPotTest.cc'],
-                dependencies: test_deps,
+                dependencies: test_deps + [ptlrpc_dep],
                 include_directories: _incdirs + ['.'],
                 cpp_args: test_args,
                 link_with: _linkto,
@@ -190,7 +202,7 @@ if get_option('with_tests')
             executable(
                 'nwchem_pot_message_abi_test',
                 sources: ['tests/NWChemPotMessageAbiTest.cc'],
-                dependencies: test_deps,
+                dependencies: test_deps + [ptlrpc_dep],
                 include_directories: _incdirs + ['.'],
                 cpp_args: test_args,
                 link_with: _linkto,

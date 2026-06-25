@@ -8,24 +8,24 @@
 #include <string.h>
 
 int main(void) {
-  if (rgpot_nwchem_abi_available() != 0) {
-    fprintf(stderr, "FAIL: stub should report abi_available=0\n");
+  if (nwchemc_available() != 0) {
+    fprintf(stderr, "FAIL: stub should report available=0\n");
     return 1;
   }
-  const char *ver = rgpot_nwchem_engine_version();
+  const char *ver = nwchemc_version();
   if (!ver || strstr(ver, "stub") == NULL) {
     fprintf(stderr, "FAIL: expected stub version string, got '%s'\n",
             ver ? ver : "(null)");
     return 1;
   }
-  RgpotNWChemResult r = rgpot_nwchem_energy_grad(0, NULL, NULL, 0, 1,
-                                                 "sto-3g", "scf", "rhf", NULL);
+  NWChemCResult r =
+      nwchemc_energy_gradient(0, NULL, NULL, NULL, 0, NULL);
   if (r.ok != 0) {
-    fprintf(stderr, "FAIL: stub energy_grad should set ok=0\n");
+    fprintf(stderr, "FAIL: stub energy_gradient should set ok=0\n");
     return 1;
   }
-  if (rgpot_nwchem_set_config("sto-3g", "scf", "rhf", 0, 1) == 0) {
-    fprintf(stderr, "FAIL: stub set_config should fail\n");
+  if (nwchemc_set_params(NULL, 0) == 0) {
+    fprintf(stderr, "FAIL: stub set_params should fail\n");
     return 1;
   }
   printf("ok: stub ABI version=%s\n", ver);
