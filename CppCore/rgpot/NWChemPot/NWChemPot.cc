@@ -3,13 +3,12 @@
 
 #include <capnp/message.h>
 
-#include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/NWChemPot/DynLib.hpp"
+#include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/NWChemPot/nwchem_c_abi.h"
 #include "rgpot/types/adapters/capnp/nwchem_capnp_map.hpp"
 #include "rgpot/units.hpp"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -24,16 +23,6 @@ using units::NEG_GRAD_TO_FORCE;
 
 namespace {
 
-static void copy_to_buf(char *dst, size_t n, const std::string &src) {
-  if (!dst || n == 0)
-    return;
-  if (src.empty()) {
-    dst[0] = '\0';
-    return;
-  }
-  std::snprintf(dst, n, "%s", src.c_str());
-}
-
 using ParamsDefaultFn = void (*)(RgpotNWChemParams *);
 using SetParamsFn = int (*)(const RgpotNWChemParams *);
 using EnergyGradFn = RgpotNWChemResult (*)(int, const double *, const int *,
@@ -42,10 +31,10 @@ using SetConfigFn = int (*)(const char *, const char *, const char *, int, int);
 using VersionFn = const char *(*)(void);
 using AbiAvailFn = int (*)(void);
 
-std::vector<std::string> engine_lib_candidates(const std::string &explicit_path) {
+std::vector<std::string> engine_lib_candidates(const char *explicit_path) {
   std::vector<std::string> out;
-  if (!explicit_path.empty())
-    out.push_back(explicit_path);
+  if (explicit_path && explicit_path[0])
+    out.emplace_back(explicit_path);
   if (const char *e = std::getenv("RGPOT_NWCHEM_ENGINE"))
     out.emplace_back(e);
   out.emplace_back("libnwchem_engine.so");
@@ -56,10 +45,10 @@ std::vector<std::string> engine_lib_candidates(const std::string &explicit_path)
   return out;
 }
 
-void apply_env_hints(const NWChemConfig &cfg) {
-  if (!cfg.nwchem_root.empty()) {
+void apply_env_hints(const RgpotNWChemParams &p) {
+  if (p.nwchem_root[0]) {
 #if !defined(_WIN32)
-    setenv("NWCHEM_TOP", cfg.nwchem_root.c_str(), 1);
+    setenv("NWCHEM_TOP", p.nwchem_root, 1);
 #endif
   }
 }
@@ -69,14 +58,14 @@ struct EngineBundle {
   ParamsDefaultFn params_default = nullptr;
   SetParamsFn set_params = nullptr;
   EnergyGradFn energy_grad = nullptr;
-  SetConfigFn set_config = nullptr; // legacy fallback
+  SetConfigFn set_config = nullptr; // compat only
   VersionFn version = nullptr;
   AbiAvailFn abi_available = nullptr;
   std::string load_error;
   bool loaded = false;
 };
 
-bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
+bool try_load_engine(EngineBundle &b, const char *engine_path) {
   b.load_error.clear();
   b.loaded = false;
   b.params_default = nullptr;
@@ -123,16 +112,38 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   return true;
 }
 
-bool push_params_to_engine(EngineBundle &b, const NWChemConfig &cfg) {
-  RgpotNWChemParams p;
-  cfg.toAbiParams(&p);
+bool push_params_to_engine(EngineBundle &b, const RgpotNWChemParams &p) {
   if (b.set_params)
     return b.set_params(&p) == 0;
   if (b.set_config)
-    return b.set_config(cfg.basis.c_str(), cfg.theory.c_str(),
-                        cfg.scf_type.c_str(), cfg.charge,
-                        cfg.multiplicity) == 0;
+    return b.set_config(p.basis, p.theory, p.scf_type, p.charge,
+                        p.multiplicity) == 0;
   return false;
+}
+
+/** Apply Cap'n Proto reader into stored POD, load engine, push embed. */
+bool apply_abi_params(EngineBundle &bundle, RgpotNWChemParams &stored,
+                      const RgpotNWChemParams &incoming) {
+  const bool need_reload =
+      !bundle.loaded ||
+      (incoming.engine_path[0] &&
+       std::strcmp(incoming.engine_path, stored.engine_path) != 0);
+
+  stored = incoming;
+  apply_env_hints(stored);
+
+  if (need_reload) {
+    bundle = EngineBundle{};
+    if (!try_load_engine(bundle, stored.engine_path))
+      return false;
+  } else if (!bundle.loaded) {
+    if (!try_load_engine(bundle, stored.engine_path))
+      return false;
+  }
+
+  if (!bundle.loaded)
+    return false;
+  return push_params_to_engine(bundle, stored);
 }
 
 std::mutex g_probe_mu;
@@ -143,98 +154,59 @@ bool g_abi_probe_ok = false;
 
 } // namespace
 
-void NWChemConfig::toAbiParams(RgpotNWChemParams *out) const {
-  if (!out)
-    return;
-  std::memset(out, 0, sizeof(*out));
-  copy_to_buf(out->basis, sizeof(out->basis), basis);
-  copy_to_buf(out->theory, sizeof(out->theory), theory);
-  copy_to_buf(out->scf_type, sizeof(out->scf_type), scf_type);
-  out->charge = charge;
-  out->multiplicity = multiplicity;
-  copy_to_buf(out->engine_path, sizeof(out->engine_path), engine_path);
-  copy_to_buf(out->nwchem_root, sizeof(out->nwchem_root), nwchem_root);
-}
-
-NWChemConfig NWChemConfig::fromAbiParams(const RgpotNWChemParams &p) {
-  NWChemConfig cfg;
-  cfg.basis = p.basis;
-  cfg.theory = p.theory;
-  cfg.scf_type = p.scf_type;
-  cfg.charge = p.charge;
-  cfg.multiplicity = p.multiplicity;
-  cfg.engine_path = p.engine_path;
-  cfg.nwchem_root = p.nwchem_root;
-  return cfg;
-}
-
 struct NWChemPot::Impl {
   EngineBundle bundle;
 };
 
 NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
-  // Default user options = schema defaults on NWChemParams (empty reader path).
-  ::capnp::MallocMessageBuilder msg;
-  auto root = msg.initRoot<::NWChemParams>();
-  (void)root; // schema defaults already applied by initRoot
-  config_ = types::adapt::capnp::nwchemConfigFromCapnp(root.asReader());
-  apply_env_hints(config_);
-  if (try_load_engine(impl_->bundle, config_.engine_path))
-    (void)push_params_to_engine(impl_->bundle, config_);
+  types::adapt::capnp::nwchemAbiDefaults(&abi_params_);
+  apply_env_hints(abi_params_);
+  if (try_load_engine(impl_->bundle, abi_params_.engine_path))
+    (void)push_params_to_engine(impl_->bundle, abi_params_);
 }
 
 NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
     : Potential(PotType::NWChem), impl_(new Impl) {
-  config_ = types::adapt::capnp::nwchemConfigFromCapnp(params);
-  apply_env_hints(config_);
-  if (try_load_engine(impl_->bundle, config_.engine_path))
-    (void)push_params_to_engine(impl_->bundle, config_);
-}
-
-NWChemPot::NWChemPot(const NWChemConfig &config)
-    : Potential(PotType::NWChem), impl_(new Impl), config_(config) {
-  apply_env_hints(config_);
-  if (try_load_engine(impl_->bundle, config_.engine_path))
-    (void)push_params_to_engine(impl_->bundle, config_);
+  types::adapt::capnp::nwchemParamsToAbi(params, &abi_params_);
+  apply_env_hints(abi_params_);
+  if (try_load_engine(impl_->bundle, abi_params_.engine_path))
+    (void)push_params_to_engine(impl_->bundle, abi_params_);
 }
 
 NWChemPot::~NWChemPot() { delete impl_; }
 
 bool NWChemPot::setParams(const ::NWChemParams::Reader &params) {
-  // NWChem arm payload of rgpot PotentialConfig; mirror then embed ABI.
-  return setConfig(types::adapt::capnp::nwchemConfigFromCapnp(params));
+  // Always store Cap'n Proto → embed POD; engine push may fail without embed.
+  RgpotNWChemParams incoming;
+  types::adapt::capnp::nwchemParamsToAbi(params, &incoming);
+  if (!impl_)
+    impl_ = new Impl;
+  const bool need_reload =
+      !impl_->bundle.loaded ||
+      (incoming.engine_path[0] &&
+       std::strcmp(incoming.engine_path, abi_params_.engine_path) != 0);
+  abi_params_ = incoming;
+  apply_env_hints(abi_params_);
+  if (need_reload) {
+    impl_->bundle = EngineBundle{};
+    if (!try_load_engine(impl_->bundle, abi_params_.engine_path))
+      return false;
+  } else if (!impl_->bundle.loaded) {
+    if (!try_load_engine(impl_->bundle, abi_params_.engine_path))
+      return false;
+  }
+  if (!impl_->bundle.loaded)
+    return false;
+  return push_params_to_engine(impl_->bundle, abi_params_);
 }
 
 void NWChemPot::getParams(::NWChemParams::Builder out) const {
-  types::adapt::capnp::nwchemConfigToCapnp(out, config_);
+  types::adapt::capnp::nwchemAbiToParams(abi_params_, out);
 }
 
 bool NWChemPot::setPotentialConfig(const ::PotentialConfig::Reader &cfg,
                                    std::string *message_out) {
   return types::adapt::capnp::applyPotentialConfig(*this, cfg, message_out);
-}
-
-bool NWChemPot::setConfig(const NWChemConfig &config) {
-  // Internal: env + dlopen, then rgpot_nwchem_set_params (embed-only C buffers).
-  const bool need_reload =
-      !impl_ || !impl_->bundle.loaded ||
-      (!config.engine_path.empty() && config.engine_path != config_.engine_path);
-
-  config_ = config;
-  apply_env_hints(config_);
-
-  if (!impl_)
-    impl_ = new Impl;
-
-  if (need_reload) {
-    impl_->bundle = EngineBundle{};
-    if (!try_load_engine(impl_->bundle, config_.engine_path))
-      return false;
-  }
-
-  if (!impl_->bundle.loaded)
-    return false;
-  return push_params_to_engine(impl_->bundle, config_);
 }
 
 bool NWChemPot::available() const {
@@ -246,7 +218,7 @@ bool NWChemPot::probe_available() {
   if (g_probe_done)
     return g_probe_ok;
   EngineBundle tmp;
-  g_probe_ok = try_load_engine(tmp, {});
+  g_probe_ok = try_load_engine(tmp, nullptr);
   g_probe_done = true;
   return g_probe_ok;
 }
@@ -256,7 +228,7 @@ bool NWChemPot::abi_available() {
   if (g_abi_probe_done)
     return g_abi_probe_ok;
   EngineBundle tmp;
-  if (!try_load_engine(tmp, {})) {
+  if (!try_load_engine(tmp, nullptr)) {
     g_abi_probe_ok = false;
   } else if (tmp.abi_available) {
     g_abi_probe_ok = tmp.abi_available() != 0;
@@ -280,12 +252,10 @@ void NWChemPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (!in.pos || !in.atmnrs || !out || !out->F)
     throw std::runtime_error("NWChemPot: null positions/atmnrs/forces buffer");
 
-  RgpotNWChemParams params;
-  config_.toAbiParams(&params);
-
+  // Per-call full params from last configure (Cap'n Proto → stored POD).
   std::vector<double> grad(static_cast<size_t>(n) * 3u, 0.0);
   RgpotNWChemResult res = impl_->bundle.energy_grad(
-      n, in.pos, in.atmnrs, &params, grad.data());
+      n, in.pos, in.atmnrs, &abi_params_, grad.data());
 
   if (!res.ok) {
     throw std::runtime_error(std::string("NWChem engine failed: ") +

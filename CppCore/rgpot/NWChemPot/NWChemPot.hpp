@@ -5,12 +5,9 @@
 /**
  * @brief NWChem potential under rgpot `PotentialConfig` user parameters.
  *
- * **rgpot params:** Cap'n Proto `PotentialConfig` (union: none | nwchem | … later
- * metatomic/xtb). NWChem uses the `nwchem` arm (`NWChemParams` payload only).
- * Apply via `setPotentialConfig` / RPC `configure`; typed `setParams`/`getParams`
- * for the nwchem payload when the arm is already selected.
- *
- * **Internal only:** `NWChemConfig` / embed `RgpotNWChemParams` are not user formats.
+ * User path: Cap'n Proto `PotentialConfig` / `NWChemParams` only → copy fields
+ * into embed `RgpotNWChemParams` → `rgpot_nwchem_set_params` / `energy_grad`.
+ * No intermediate C++ config struct on the public configure/setParams surface.
  */
 
 #include <string>
@@ -21,30 +18,11 @@
 
 namespace rgpot {
 
-/**
- * @brief Internal C++ mirror of Cap'n Proto NWChemParams (not a user format).
- * Populated only via adapt::capnp::nwchemConfigFromCapnp / toAbiParams for embed.
- */
-struct NWChemConfig {
-  std::string basis = "sto-3g";
-  std::string theory = "scf";
-  std::string scf_type = "rhf";
-  int charge = 0;
-  int multiplicity = 1;
-  std::string engine_path;
-  std::string nwchem_root;
-
-  void toAbiParams(RgpotNWChemParams *out) const;
-  static NWChemConfig fromAbiParams(const RgpotNWChemParams &p);
-};
-
 class NWChemPot : public Potential<NWChemPot> {
 public:
   NWChemPot();
-  /** Apply defaults then optional Cap'n Proto NWChemParams (user config). */
+  /** Apply schema defaults, then optional Cap'n Proto NWChemParams. */
   explicit NWChemPot(const ::NWChemParams::Reader &params);
-  /** @deprecated internal/tests: prefer NWChemParams::Reader constructor. */
-  explicit NWChemPot(const NWChemConfig &config);
   ~NWChemPot() override;
 
   NWChemPot(const NWChemPot &) = delete;
@@ -53,26 +31,21 @@ public:
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /**
-   * Apply NWChem arm of rgpot user params (Cap'n Proto NWChemParams).
-   * Prefer applyPotentialConfig(PotentialConfig) at the generic layer; this is
-   * the typed entry when the caller already has the nwchem struct.
+   * Apply NWChem arm payload (Cap'n Proto NWChemParams) → embed C ABI params.
    */
   bool setParams(const ::NWChemParams::Reader &params);
 
-  /** Write current NWChem knobs back to Cap'n Proto (NWChemParams arm payload). */
+  /** Write last applied knobs back to Cap'n Proto. */
   void getParams(::NWChemParams::Builder out) const;
 
   /**
-   * Apply full rgpot PotentialConfig; only succeeds for none or nwchem arms
-   * (other backends' arms rejected here — use the matching *Pot type later).
+   * Apply full rgpot PotentialConfig; only succeeds for none or nwchem arms.
    */
   bool setPotentialConfig(const ::PotentialConfig::Reader &cfg,
                           std::string *message_out = nullptr);
 
-  /** Internal: apply already-mirrored config (tests / embed only). */
-  bool setConfig(const NWChemConfig &config);
-
-  const NWChemConfig &config() const { return config_; }
+  /** Last embed-boundary params (fixed buffers; not a user format). */
+  const RgpotNWChemParams &abiParams() const { return abi_params_; }
 
   bool available() const;
   static bool probe_available();
@@ -81,7 +54,8 @@ public:
 private:
   struct Impl;
   Impl *impl_;
-  NWChemConfig config_;
+  /** Sticky last-applied options at embed boundary (Cap'n Proto → this POD). */
+  RgpotNWChemParams abi_params_{};
 };
 
 } // namespace rgpot

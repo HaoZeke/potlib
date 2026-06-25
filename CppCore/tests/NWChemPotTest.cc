@@ -4,11 +4,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <capnp/message.h>
+
 #include <array>
 #include <cmath>
+#include <string>
 #include <vector>
 
 #include "rgpot/NWChemPot/NWChemPot.hpp"
+#include "rgpot/rpc/Potentials.capnp.h"
 #include "rgpot/types/AtomMatrix.hpp"
 
 using rgpot::types::AtomMatrix;
@@ -47,13 +51,14 @@ TEST_CASE("NWChemPot water energy when engine present", "[nwchem]") {
     SKIP("libnwchem_engine not available (set RGPOT_NWCHEM_ENGINE, NWCHEM_TOP)");
   }
 
-  rgpot::NWChemConfig cfg;
-  cfg.basis = "sto-3g";
-  cfg.theory = "scf";
-  cfg.scf_type = "rhf";
-  cfg.charge = 0;
-  cfg.multiplicity = 1;
-  rgpot::NWChemPot pot(cfg);
+  ::capnp::MallocMessageBuilder msg;
+  auto p = msg.initRoot<::NWChemParams>();
+  p.setBasis("sto-3g");
+  p.setTheory("scf");
+  p.setScfType("rhf");
+  p.setCharge(0);
+  p.setMultiplicity(1);
+  rgpot::NWChemPot pot(p.asReader());
   REQUIRE(pot.available());
 
   if (!rgpot::NWChemPot::abi_available()) {
@@ -81,14 +86,18 @@ TEST_CASE("NWChemPot water energy when engine present", "[nwchem]") {
   }
 }
 
-TEST_CASE("NWChemPot setConfig updates stored config", "[nwchem]") {
+TEST_CASE("NWChemPot setParams updates stored abi params", "[nwchem]") {
   rgpot::NWChemPot pot;
-  rgpot::NWChemConfig cfg;
-  cfg.basis = "6-31g";
-  cfg.theory = "dft";
-  cfg.charge = -1;
-  cfg.multiplicity = 1;
-  // setConfig returns false if engine not loaded; still acceptable.
-  (void)pot.setConfig(cfg);
+  ::capnp::MallocMessageBuilder msg;
+  auto p = msg.initRoot<::NWChemParams>();
+  p.setBasis("6-31g");
+  p.setTheory("dft");
+  p.setCharge(-1);
+  p.setMultiplicity(1);
+  // setParams returns false if engine not loaded; still updates stored POD.
+  (void)pot.setParams(p.asReader());
+  REQUIRE(std::string(pot.abiParams().basis) == "6-31g");
+  REQUIRE(std::string(pot.abiParams().theory) == "dft");
+  REQUIRE(pot.abiParams().charge == -1);
   SUCCEED();
 }

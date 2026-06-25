@@ -3,17 +3,20 @@
 // Copyright 2023--present rgpot developers
 
 /**
- * @brief rgpot user params: PotentialConfig (Cap'n Proto), NWChem arm only here.
+ * @brief rgpot user params: PotentialConfig (Cap'n Proto) → embed RgpotNWChemParams.
  *
- * Top-level user contract is PotentialConfig (extensible union). NWChemParams is
- * one backend payload. This adapter maps nwchem arm <-> internal NWChemConfig
- * <-> embed buffers. Future MetatomicParams/XTBParams get sibling adapters.
+ * No intermediate C++ config type. Future MetatomicParams/XTBParams get siblings.
  */
 
+#include <capnp/message.h>
+
+#include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 
 #include "rgpot/NWChemPot/NWChemPot.hpp"
+#include "rgpot/NWChemPot/nwchem_c_abi.h"
 #include "rgpot/rpc/Potentials.capnp.h"
 
 namespace rgpot {
@@ -21,29 +24,52 @@ namespace types {
 namespace adapt {
 namespace capnp {
 
-/** User NWChemParams (Cap'n Proto) -> internal mirror. */
-inline NWChemConfig nwchemConfigFromCapnp(const ::NWChemParams::Reader &p) {
-  NWChemConfig cfg;
-  cfg.basis = p.getBasis().cStr();
-  cfg.theory = p.getTheory().cStr();
-  cfg.scf_type = p.getScfType().cStr();
-  cfg.charge = p.getCharge();
-  cfg.multiplicity = p.getMultiplicity();
-  cfg.engine_path = p.getEnginePath().cStr();
-  cfg.nwchem_root = p.getNwchemRoot().cStr();
-  return cfg;
+namespace detail {
+inline void copy_cstr(char *dst, size_t n, const char *src) {
+  if (!dst || n == 0)
+    return;
+  if (!src || !src[0]) {
+    dst[0] = '\0';
+    return;
+  }
+  std::snprintf(dst, n, "%s", src);
+}
+} // namespace detail
+
+/** Cap'n Proto NWChemParams → embed-boundary POD (only hop on user path). */
+inline void nwchemParamsToAbi(const ::NWChemParams::Reader &p,
+                              RgpotNWChemParams *out) {
+  if (!out)
+    return;
+  std::memset(out, 0, sizeof(*out));
+  detail::copy_cstr(out->basis, sizeof(out->basis), p.getBasis().cStr());
+  detail::copy_cstr(out->theory, sizeof(out->theory), p.getTheory().cStr());
+  detail::copy_cstr(out->scf_type, sizeof(out->scf_type), p.getScfType().cStr());
+  out->charge = p.getCharge();
+  out->multiplicity = p.getMultiplicity();
+  detail::copy_cstr(out->engine_path, sizeof(out->engine_path),
+                    p.getEnginePath().cStr());
+  detail::copy_cstr(out->nwchem_root, sizeof(out->nwchem_root),
+                    p.getNwchemRoot().cStr());
 }
 
-/** Internal mirror -> user NWChemParams (Cap'n Proto out). */
-inline void nwchemConfigToCapnp(::NWChemParams::Builder b,
-                                const NWChemConfig &cfg) {
-  b.setBasis(cfg.basis);
-  b.setTheory(cfg.theory);
-  b.setScfType(cfg.scf_type);
-  b.setCharge(cfg.charge);
-  b.setMultiplicity(cfg.multiplicity);
-  b.setEnginePath(cfg.engine_path);
-  b.setNwchemRoot(cfg.nwchem_root);
+/** Embed POD → Cap'n Proto out (getParams / roundtrip). */
+inline void nwchemAbiToParams(const RgpotNWChemParams &p,
+                              ::NWChemParams::Builder b) {
+  b.setBasis(p.basis);
+  b.setTheory(p.theory);
+  b.setScfType(p.scf_type);
+  b.setCharge(p.charge);
+  b.setMultiplicity(p.multiplicity);
+  b.setEnginePath(p.engine_path);
+  b.setNwchemRoot(p.nwchem_root);
+}
+
+/** Schema defaults into embed POD (empty NWChemParams reader / default ctor). */
+inline void nwchemAbiDefaults(RgpotNWChemParams *out) {
+  ::capnp::MallocMessageBuilder msg;
+  auto root = msg.initRoot<::NWChemParams>();
+  nwchemParamsToAbi(root.asReader(), out);
 }
 
 inline std::string nwchemParamsSummary(const ::NWChemParams::Reader &p) {
@@ -58,48 +84,48 @@ inline std::string nwchemParamsSummary(const ::NWChemParams::Reader &p) {
   return os.str();
 }
 
-inline std::string nwchemConfigSummary(const NWChemConfig &cfg) {
+inline std::string nwchemAbiSummary(const RgpotNWChemParams &p) {
   std::ostringstream os;
-  os << "basis=" << cfg.basis << " theory=" << cfg.theory
-     << " scfType=" << cfg.scf_type << " charge=" << cfg.charge
-     << " mult=" << cfg.multiplicity;
-  if (!cfg.engine_path.empty())
-    os << " enginePath=" << cfg.engine_path;
-  if (!cfg.nwchem_root.empty())
-    os << " nwchemRoot=" << cfg.nwchem_root;
+  os << "basis=" << p.basis << " theory=" << p.theory
+     << " scfType=" << p.scf_type << " charge=" << p.charge
+     << " mult=" << p.multiplicity;
+  if (p.engine_path[0])
+    os << " enginePath=" << p.engine_path;
+  if (p.nwchem_root[0])
+    os << " nwchemRoot=" << p.nwchem_root;
   return os.str();
 }
 
 /**
- * Apply PotentialConfig using Cap'n Proto as the only user option carrier.
- * nwchem arm: setParams(reader) on NWChemPot.
+ * Apply rgpot PotentialConfig to NWChemPot (only none | nwchem arms valid here).
  */
 inline bool applyPotentialConfig(NWChemPot &pot,
-                                 const PotentialConfig::Reader &cfg,
+                                 const ::PotentialConfig::Reader &cfg,
                                  std::string *message_out = nullptr) {
   switch (cfg.which()) {
-  case PotentialConfig::NONE:
+  case ::PotentialConfig::NONE:
     if (message_out)
-      *message_out = "no-op (PotentialConfig.none)";
+      *message_out = "no-op (rgpot params: none)";
     return true;
-  case PotentialConfig::NWCHEM: {
+  case ::PotentialConfig::NWCHEM: {
     const auto nw = cfg.getNwchem();
     const bool ok = pot.setParams(nw);
     if (message_out) {
       const std::string sum = nwchemParamsSummary(nw);
       if (ok)
-        *message_out = "nwchem params applied (Cap'n Proto): " + sum;
+        *message_out = "rgpot params applied (nwchem arm): " + sum;
       else if (!pot.available())
         *message_out =
-            "nwchem setParams failed (engine not loaded): " + sum;
+            "rgpot params nwchem arm failed (engine not loaded): " + sum;
       else
-        *message_out = "nwchem setParams rejected by embed: " + sum;
+        *message_out = "rgpot params nwchem arm rejected by embed: " + sum;
     }
     return ok;
   }
   default:
     if (message_out)
-      *message_out = "unsupported PotentialConfig arm (expected none|nwchem)";
+      *message_out =
+          "rgpot params arm not handled by NWChemPot (use matching backend pot)";
     return false;
   }
 }

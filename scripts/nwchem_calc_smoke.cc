@@ -1,6 +1,9 @@
-// Direct NWChemPot: NWChemConfig -> RgpotNWChemParams -> embed C ABI (dlopen).
+// Direct NWChemPot: Cap'n Proto NWChemParams -> RgpotNWChemParams -> embed ABI.
 // No RPC. No CLI. scripts/setup_nwchem_embed.sh configure.
+#include <capnp/message.h>
+
 #include "rgpot/NWChemPot/NWChemPot.hpp"
+#include "rgpot/rpc/Potentials.capnp.h"
 #include "rgpot/types/AtomMatrix.hpp"
 
 #include <array>
@@ -9,14 +12,15 @@
 #include <vector>
 
 int main() {
-  rgpot::NWChemConfig cfg;
-  cfg.basis = "sto-3g";
-  cfg.theory = "scf";
-  cfg.scf_type = "rhf";
-  cfg.charge = 0;
-  cfg.multiplicity = 1;
+  ::capnp::MallocMessageBuilder msg;
+  auto p = msg.initRoot<::NWChemParams>();
+  p.setBasis("sto-3g");
+  p.setTheory("scf");
+  p.setScfType("rhf");
+  p.setCharge(0);
+  p.setMultiplicity(1);
 
-  rgpot::NWChemPot pot(cfg);
+  rgpot::NWChemPot pot(p.asReader());
   if (!pot.available()) {
     std::cerr << "NWChemPot engine not loaded (set RGPOT_NWCHEM_ENGINE / LD_LIBRARY_PATH)\n";
     return 2;

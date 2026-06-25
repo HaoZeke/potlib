@@ -7,10 +7,11 @@
 #include <string>
 
 #include "rgpot/NWChemPot/NWChemPot.hpp"
+#include "rgpot/NWChemPot/nwchem_c_abi.h"
 #include "rgpot/rpc/Potentials.capnp.h"
 #include "rgpot/types/adapters/capnp/nwchem_capnp_map.hpp"
 
-TEST_CASE("nwchemConfigFromCapnp / ToCapnp roundtrip all fields",
+TEST_CASE("nwchemParamsToAbi / AbiToParams roundtrip all fields",
           "[nwchem][capnp]") {
   ::capnp::MallocMessageBuilder msg;
   auto root = msg.initRoot<NWChemParams>();
@@ -23,18 +24,19 @@ TEST_CASE("nwchemConfigFromCapnp / ToCapnp roundtrip all fields",
   root.setEnginePath("/tmp/libnwchem_engine.so");
   root.setNwchemRoot("/opt/nwchem");
 
-  auto cfg = rgpot::types::adapt::capnp::nwchemConfigFromCapnp(root.asReader());
-  REQUIRE(cfg.basis == "6-31g*");
-  REQUIRE(cfg.theory == "dft");
-  REQUIRE(cfg.scf_type == "blyp");
-  REQUIRE(cfg.charge == 1);
-  REQUIRE(cfg.multiplicity == 2);
-  REQUIRE(cfg.engine_path == "/tmp/libnwchem_engine.so");
-  REQUIRE(cfg.nwchem_root == "/opt/nwchem");
+  RgpotNWChemParams abi{};
+  rgpot::types::adapt::capnp::nwchemParamsToAbi(root.asReader(), &abi);
+  REQUIRE(std::string(abi.basis) == "6-31g*");
+  REQUIRE(std::string(abi.theory) == "dft");
+  REQUIRE(std::string(abi.scf_type) == "blyp");
+  REQUIRE(abi.charge == 1);
+  REQUIRE(abi.multiplicity == 2);
+  REQUIRE(std::string(abi.engine_path) == "/tmp/libnwchem_engine.so");
+  REQUIRE(std::string(abi.nwchem_root) == "/opt/nwchem");
 
   ::capnp::MallocMessageBuilder msg2;
   auto root2 = msg2.initRoot<NWChemParams>();
-  rgpot::types::adapt::capnp::nwchemConfigToCapnp(root2, cfg);
+  rgpot::types::adapt::capnp::nwchemAbiToParams(abi, root2);
   REQUIRE(std::string(root2.getBasis().cStr()) == "6-31g*");
   REQUIRE(std::string(root2.getTheory().cStr()) == "dft");
   REQUIRE(std::string(root2.getScfType().cStr()) == "blyp");

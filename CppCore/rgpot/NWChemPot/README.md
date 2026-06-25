@@ -23,10 +23,10 @@ user / client
             └── C++:  setPotentialConfig(config)  or  setParams(nwchem only)
             │
             ▼  (nwchem arm only on this pot)
-    NWChemConfig (internal) → RgpotNWChemParams (embed buffers only)
-            │
+    RgpotNWChemParams (embed C buffers only — fixed at .so boundary)
+            │  rgpot_nwchem_set_params / energy_grad
             ▼
-    libnwchem_engine.so / nwchem_embed.F
+    libnwchem_engine.so  (nwchem_c_abi.c + nwchem_embed.F → rtdb/task_energy)
 ```
 
 Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
@@ -81,33 +81,54 @@ do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
 | Variable | Purpose |
 |----------|---------|
 | `RGPOT_NWCHEM_ENGINE` | Path to `libnwchem_engine.so` |
-| `NWCHEM_TOP` | Hint for engine/data paths (optional; also `NWChemConfig.nwchem_root`) |
+| `NWCHEM_TOP` | Hint for engine/data paths (optional; also `NWChemParams.nwchemRoot`) |
 | `LD_LIBRARY_PATH` | NWChem `lib/<target>` (and deps) when embed was linked with unresolved symbols |
 
-## Options = `NWChemParams` (Cap'n Proto)
+## `NWChemParams` fields (payload inside `PotentialConfig.nwchem`)
 
-| field (schema) | meaning |
-|----------------|---------|
-| `basis` | Gaussian basis |
-| `theory` | `scf` / `dft` / `blyp` / `b3lyp` / … |
-| `scfType` | HF `rhf`/`uhf`, or DFT XC when theory is dft/blyp* |
-| `charge`, `multiplicity` | charge, 2S+1 |
-| `enginePath` | `libnwchem_engine.so` (frontend dlopen) |
-| `nwchemRoot` | `NWCHEM_TOP` (frontend env for embed) |
+| field | default | meaning |
+|-------|---------|---------|
+| `basis` | `sto-3g` | Gaussian basis |
+| `theory` | `scf` | Method: `scf`, `dft`, `blyp`, `b3lyp`, … |
+| `scfType` | `rhf` | HF: `rhf`/`uhf`; with DFT: XC functional (`blyp`, …) |
+| `charge` | `0` | Molecular charge |
+| `multiplicity` | `1` | 2S+1 |
+| `enginePath` | `""` | Frontend: `libnwchem_engine.so` (dlopen); empty → env/probe |
+| `nwchemRoot` | `""` | Frontend: `NWCHEM_TOP`; empty → env |
 
-C++ in-process (same struct as RPC):
+Defaults match schema + embed helper `rgpot_nwchem_params_default` (internal only).
+
+### DFT: two equivalent forms
+
+1. **Preferred:** `theory="dft"`, `scfType="blyp"` (or `b3lyp`, …) — explicit DFT + XC.
+2. **Shorthand:** `theory="blyp"` (embed maps theory alias → `dft` + XC); still fine if `scfType` left default.
+
+HF: `theory="scf"`, `scfType="rhf"` or `"uhf"`.
+
+### Lifecycle (apply vs calculate)
+
+| Step | What happens |
+|------|----------------|
+| `setPotentialConfig` / RPC `configure` / `setParams` | Sticky on the C++ pot: stores internal mirror until next configure |
+| Each `forceImpl` / `calculate` | Frontend copies full current options into embed buffers and calls `rgpot_nwchem_energy_grad(..., &params, ...)` (per-call at embed boundary) |
+| Embed only: `set_params` then `energy_grad(..., NULL, ...)` | Sticky inside engine `.so` via last `g_params` (advanced; normal path is through the pot) |
+
+### Units
+
+Embed / C ABI: energy **Hartree**, gradient **Hartree/Bohr**. Frontend converts to rgpot **eV** / **eV/Å**. Geometry units for `calculate` remain on `ForceInput`, not on `PotentialConfig`.
 
 ```cpp
 ::capnp::MallocMessageBuilder msg;
-auto p = msg.initRoot<::NWChemParams>();
-p.setTheory("dft");
-p.setScfType("blyp");
-p.setEnginePath("/path/to/libnwchem_engine.so");
-rgpot::NWChemPot pot(p.asReader());  // setParams from Cap'n Proto only
-// pot(pos, Z, box) internally: NWChemParams -> embed C buffers
+auto cfg = msg.initRoot<::PotentialConfig>();
+auto nw = cfg.initNwchem();
+nw.setTheory("dft");
+nw.setScfType("blyp");
+nw.setEnginePath("/path/to/libnwchem_engine.so");
+rgpot::NWChemPot pot;
+pot.setPotentialConfig(cfg.asReader());  // rgpot params, nwchem arm
 ```
 
-Python/RPC: `configure_nwchem(pot, pot_capnp, theory="dft", scf_type="blyp", ...)`.
+Python: `configure_nwchem` builds `PotentialConfig` with `nwchem` set.
 
 ## Direct C++ smoke (no RPC)
 
