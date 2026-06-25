@@ -38,6 +38,12 @@ Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/back
 `libnwchemc.so` / transitional `libnwchem_engine.so`
 (`-Dwith_nwchem=true -Dnwchem_root=...`).
 
+The preferred engine project is
+<https://github.com/OmniPotentRPC/nwchemc>. rgpot is the consumer: it serializes
+`NWChemParams`, loads `libnwchemc.so`, and passes the message bytes directly.
+The in-tree `libnwchem_engine.so` target remains a transitional compatibility
+build with the same `nwchemc_*` C symbols.
+
 ## Layers
 
 | Piece | Built when | Role |
@@ -67,7 +73,7 @@ nwchem_embed_legacy.F  ->  geom/basis via embed API + task_energy/gradient  (NWC
 # Frontend only (CI default): stub, no engine .so unless you build embed separately
 meson setup bbdir -Dwith_rpc=false
 
-# Real engine: need NWChem source/install with src/include and lib/<target>/
+# Transitional in-tree engine: need NWChem source/install with src/include and lib/<target>/
 export NWCHEM_TOP=/path/to/nwchem   # clone + build once; see scripts/setup_nwchem_embed.sh
 meson setup bbdir_nwc \
   -Dwith_nwchem=true \
@@ -79,6 +85,9 @@ meson compile -C bbdir_nwc
 
 conda/pixi `nwchem` packages ship the **driver binary**, not embed headers — they
 do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
+For `libnwchemc.so`, build the split `nwchemc` project against the same
+NWChem tree and point `NWCHEMC_LIBRARY` or `RGPOT_NWCHEMC_ENGINE` at that
+shared library.
 
 ## Runtime
 
