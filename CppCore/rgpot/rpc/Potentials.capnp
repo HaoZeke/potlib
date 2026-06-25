@@ -79,8 +79,8 @@ interface Potential {
   # @return The resulting energy and force vector.
   calculate @0 (fip :ForceInput) -> (result :PotentialResult);
 
-  # @brief Apply backend-specific configuration before calculate().
-  # @param config Tagged parameters (e.g. NWChemParams).
-  # @return ok=false if the backend rejects or cannot apply config.
+  # @brief Apply rgpot user parameters (PotentialConfig) before calculate().
+  # @param config Backend-tagged options (nwchem, future metatomic/xtb/…).
+  # @return ok=false if the arm does not match the server backend or apply failed.
   configure @1 (config :PotentialConfig) -> (ok :Bool, message :Text);
 }

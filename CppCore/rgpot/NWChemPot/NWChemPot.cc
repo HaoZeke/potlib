@@ -31,23 +31,6 @@ using SetConfigFn = int (*)(const char *, const char *, const char *, int, int);
 using VersionFn = const char *(*)(void);
 using AbiAvailFn = int (*)(void);
 
-#if defined(RGPOT_NWCHEM_STATIC_EMBED)
-// Direct link to embed (nwchem_c_abi.c + nwchem_embed.F + NWChem libs).
-extern "C" {
-void rgpot_nwchem_params_default(RgpotNWChemParams *p);
-int rgpot_nwchem_set_params(const RgpotNWChemParams *params);
-RgpotNWChemResult rgpot_nwchem_energy_grad(int n_atoms,
-                                           const double *positions_ang,
-                                           const int *atomic_numbers,
-                                           const RgpotNWChemParams *params,
-                                           double *grad_h_bohr);
-int rgpot_nwchem_set_config(const char *basis, const char *theory,
-                            const char *scf_type, int charge, int mult);
-const char *rgpot_nwchem_engine_version(void);
-int rgpot_nwchem_abi_available(void);
-}
-#endif
-
 std::vector<std::string> engine_lib_candidates(const char *explicit_path) {
   std::vector<std::string> out;
   if (explicit_path && explicit_path[0])
@@ -97,18 +80,6 @@ bool try_load_engine(EngineBundle &b, const char *engine_path) {
   b.version = nullptr;
   b.abi_available = nullptr;
 
-#if defined(RGPOT_NWCHEM_STATIC_EMBED)
-  (void)engine_path;
-  // Linked embed: no dlopen; symbols from nwchem_embed_static + NWChem libs.
-  b.params_default = &rgpot_nwchem_params_default;
-  b.set_params = &rgpot_nwchem_set_params;
-  b.energy_grad = &rgpot_nwchem_energy_grad;
-  b.set_config = &rgpot_nwchem_set_config;
-  b.version = &rgpot_nwchem_engine_version;
-  b.abi_available = &rgpot_nwchem_abi_available;
-  b.loaded = true;
-  return true;
-#else
   bool eng_ok = false;
   std::string eng_err;
   for (const auto &cand : engine_lib_candidates(engine_path)) {
@@ -144,7 +115,6 @@ bool try_load_engine(EngineBundle &b, const char *engine_path) {
   }
   b.loaded = true;
   return true;
-#endif
 }
 
 bool push_params_to_engine(EngineBundle &b, const RgpotNWChemParams &p) {

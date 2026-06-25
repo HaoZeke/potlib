@@ -1,7 +1,7 @@
 # NWChemPot: frontend always builds (dlopen libnwchem_engine at runtime).
 # Stub always built. Real engine ONLY when has_nwchem (with_nwchem + nwchem_root
-# + Fortran) — nwchem_c_abi.c + nwchem_embed_c_api.f90 (bind(C)) +
-# nwchem_embed_legacy.F (NWChem rtdb/ga only). No CLI.
+# + Fortran) as libnwchem_engine — nwchem_c_abi.c + nwchem_embed_c_api.f90
+# (bind(C)) + nwchem_embed_legacy.F (NWChem rtdb/ga only). No CLI.
 
 nwchem_inc = include_directories('.')
 
@@ -12,10 +12,7 @@ nwchem_abi_stub = static_library(
     install: false,
 )
 
-nwchem_engine_targets = []
-nwchem_static_embed_dep = []
 nwchem_frontend_cpp_args = ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
-nwchem_extra_link = []
 
 if has_nwchem
     if not has_fortran
@@ -51,8 +48,6 @@ if has_nwchem
         '-DEXT_INT',
         '-DOPENBLAS',
     ]
-    # NWChem archives are typically non-PIC; link embed statically into frontend
-    # executables/tests instead of a dlopen .so (see RGPOT_NWCHEM_STATIC_EMBED).
     nwchem_embed_legacy = static_library(
         'nwchem_embed_legacy',
         'nwchem_embed_legacy.F',
@@ -60,22 +55,7 @@ if has_nwchem
         fortran_args: nwchem_engine_f_legacy_args,
         install: false,
     )
-    nwchem_embed_static = static_library(
-        'nwchem_embed_static',
-        [
-            'nwchem_c_abi.c',
-            'nwchem_embed_c_api.f90',
-        ],
-        include_directories: _incdirs + [nwchem_inc],
-        c_args: nwchem_engine_c_args,
-        fortran_args: nwchem_engine_f90_args,
-        link_with: nwchem_embed_legacy,
-        install: false,
-    )
-    nwchem_engine_targets += [nwchem_embed_static]
-    nwchem_static_embed_dep = [nwchem_embed_static]
-    nwchem_frontend_cpp_args += ['-DRGPOT_NWCHEM_STATIC_EMBED=1']
-    nwchem_extra_link = [
+    nwchem_engine_link_args = [
         '-L' + nwchem_root + '/lib/' + nwchem_target,
         '-L' + nwchem_root + '/src/tools/install/lib',
         '-L' + nwchem_root + '/src/libext/lib',
@@ -95,12 +75,6 @@ if has_nwchem
         '-lpthread',
         '-lm',
     ]
-    # Try shared engine build for dlopen path (may fail if NWChem not -fPIC).
-    nwchem_engine_link_args = [
-        '-L' + nwchem_root + '/lib/' + nwchem_target,
-        '-lnwctask',
-        '-lnwcutil',
-    ]
     if host_machine.system() == 'linux'
         nwchem_engine_link_args += ['-Wl,--unresolved-symbols=ignore-all']
     endif
@@ -116,7 +90,6 @@ if has_nwchem
         link_with: nwchem_embed_legacy,
         link_args: nwchem_engine_link_args,
         install: not meson.is_subproject(),
-        build_by_default: false,
     )
 endif
 
@@ -129,18 +102,16 @@ nwchempot = static_library(
     'nwchempot',
     'NWChemPot.cc',
     dependencies: _deps + [nwchem_dl_dep],
-    link_with: nwchem_static_embed_dep,
     cpp_args: _args + nwchem_frontend_cpp_args,
     include_directories: _incdirs + [nwchem_inc],
     install: not meson.is_subproject(),
 )
 
 nwchempot_dep = declare_dependency(
-    link_with: [nwchempot] + nwchem_static_embed_dep,
+    link_with: [nwchempot],
     dependencies: [nwchem_dl_dep],
     include_directories: _incdirs + [nwchem_inc],
     compile_args: nwchem_frontend_cpp_args,
-    link_args: nwchem_extra_link,
 )
 
 nwchem_abi_stub_dep = declare_dependency(

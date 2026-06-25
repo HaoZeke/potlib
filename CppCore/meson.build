@@ -184,6 +184,15 @@ if get_option('with_tests')
             ),
             suite: 'nwchem',
         )
+        test(
+            'NWChemDlopenContract',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_nwchem_dlopen_contract.py',
+                meson.source_root(),
+            ],
+            suite: 'nwchem',
+        )
     endif
     if rpc_enabled
         test_deps += dependency('capnp-rpc')
