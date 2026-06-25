@@ -112,6 +112,13 @@ if get_option('with_xtb')
     has_xtb = true
 endif
 
+# Psi4Pot: frontend only (dlopen libpsi4 + libpsi4_engine). No link dep on Psi4.
+has_psi4 = false
+if get_option('with_psi4')
+    _args += ['-DRGPOT_HAS_PSI4=TRUE']
+    has_psi4 = true
+endif
+
 has_tblite = false
 if get_option('with_tblite')
     tblite_dep = dependency('tblite', required: true)

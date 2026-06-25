@@ -80,6 +80,7 @@ in
   },
   jobs = {
     "ci-tools" = S.job_ci_tools_os_matrix [P.ubuntu, P.macos],
+    // Psi4Pot is opt-in only (-Dwith_psi4=true); default CI matrix does not enable it.
     build_and_test = {
       needs = ["ci-tools"],
       name = "${{ matrix.sys }} / ${{ matrix.os }} [RPC:${{ matrix.rpc }} CACHE:${{ matrix.cache }}]",

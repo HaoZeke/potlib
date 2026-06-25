@@ -46,6 +46,11 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
+    if has_psi4
+        subdir('rgpot/Psi4Pot')  # 'psi4pot' (+ builds libpsi4_engine)
+        rgpotentials += [psi4pot]
+    endif
+
     _linkto += rgpotentials
 
     # Create library
@@ -152,6 +157,11 @@ if get_option('with_tests')
                 'MetatomicPotTest.cc',
                 '/CppCore/tests',
             ],
+        ]
+    endif
+    if has_psi4
+        test_array += [
+            ['Psi4test', 'psi4_test', 'Psi4PotTest.cc', ''],
         ]
     endif
     if rpc_enabled

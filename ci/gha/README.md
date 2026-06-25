@@ -125,6 +125,7 @@ prek ∥ docs_snapper ∥ docs_lychee ∥ towncrier(PR) ∥ ci-tools
     ↓ (after ci-tools; skipped on schedule except docs_*)
 build_and_test ∥ rust_tests ∥ client_bridge_stress
   ∥ potentials_metatomic ∥ potentials_tight_binding
+  (Psi4Pot only if with_psi4; not in default CI matrix.)
     ↓
 ci_gate   ← single required-check aggregator
 ```
