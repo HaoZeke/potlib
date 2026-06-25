@@ -28,7 +28,8 @@ user / client
             ▼
     libnwchem_engine / static embed
       nwchem_c_abi.c → nwchem_embed_c_api.f90 (bind(C), iso_c_binding)
-      → nwchem_embed_legacy.F (geom/bas/rtdb/task_* only; no input files)
+      → nwchem_embed_legacy.F (geom/basis via nw_inp_from_character embed API;
+        rtdb/task_energy/task_gradient; no user .nw / subprocess CLI)
 ```
 
 Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
@@ -56,7 +57,7 @@ libnwchem_engine.so
     rgpot_nwchem_energy_grad / set_config / abi_available
     │
     ▼
-nwchem_embed.F  →  rtdb / task_energy / task_gradient  (NWCHEM_TOP libs)
+nwchem_embed_legacy.F  →  geom/basis via embed API + task_energy/gradient  (NWCHEM_TOP libs)
 ```
 
 ## Meson
