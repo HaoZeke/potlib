@@ -312,6 +312,7 @@ ci/gha/out/
 
 # Local build scratch (meson/cmake/capnp-c registration trees)
 .build-tmp/
+build-rpc/
 
 # Vendored NWChem source clone (local nwchemc engine builds)
 third_party/
