@@ -309,3 +309,25 @@ Temporary Items
 
 # Nickel CI plan / audit exports (local or CI artifact source)
 ci/gha/out/
+
+# Local build scratch (meson/cmake/capnp-c registration trees)
+.build-tmp/
+
+# Vendored NWChem source clone (scripts/setup_nwchem_embed.sh clone)
+third_party/
+
+# NWChem embed/CLI runtime scratch written to the repo root (CWD) by the
+# nwchem smoke/embed tests. Root-anchored so they never shadow real sources.
+/*.db
+/*.movecs
+/*.zmat
+/*.cfock
+/*.b
+/*.b^-1
+/*.c
+/*.p
+/*.gridpts.*
+/*.aoints.*
+/*.hess
+/*_embed
+/*.temp0000.nw
