@@ -72,31 +72,28 @@ def main() -> int:
         "docs/orgmode/_static/eon_min_landscape.png")
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # 1. Minimize from several random starts; record the basin each reaches.
+    # 1. Minimize from several random starts; take the run that reaches the
+    #    lowest (global-most) basin for a clean single-trajectory landscape. A
+    #    single descent grids to its own extent, so the surface fills the axes
+    #    with no off-grid gap. (The two-well structure is shown separately by
+    #    tests/pes_double_well.py, which samples the full 2D surface densely.)
     runs = []
-    for seed in range(8):
+    for seed in range(6):
         d = work / f"seed{seed}"
         runs.append((seed, d, _minimize(d, seed)))
-    runs.sort(key=lambda r: r[2])
-    best = runs[0]                                   # lowest energy (global-most)
-    local = next((r for r in reversed(runs) if r[2] - best[2] > 0.2), None)
+    best = min(runs, key=lambda r: r[2])
 
-    # 2. Overlay the global-reaching and (if found) a higher local trajectory.
-    job_args, labels = ["--job-dir", str(best[1])], ["--label", f"global ({best[2]:.3f})"]
-    if local is not None:
-        job_args += ["--job-dir", str(local[1])]
-        labels += ["--label", f"local ({local[2]:.3f})"]
-
+    # 2. Render the trajectory on the (s, d) landscape, capping the energy color
+    #    scale so the bound well resolves.
     cmd = [
         sys.executable, "-m", "rgpycrumbs.eon.plt_min",
-        *job_args, *labels,
+        "--job-dir", str(best[1]),
         "--plot-type", "landscape",
         "--energy-cap-window", "12",
         "-o", str(out),
     ]
     subprocess.run(cmd, check=True)
-    print(f"wrote {out}: global={best[2]:.4f}"
-          + (f", local={local[2]:.4f}" if local else " (no distinct local basin found)"))
+    print(f"wrote {out}: EON minimization reached {best[2]:.4f}")
     return 0
 
 
