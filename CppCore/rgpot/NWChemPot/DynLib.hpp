@@ -5,7 +5,7 @@
 /**
  * @brief Portable dynamic library loader (dlopen / LoadLibrary family).
  *
- * Used by NWChemPot to resolve libnwchem_engine at runtime without a
+ * Used by NWChemPot to resolve libnwchemc at runtime without a
  * build-time link dependency on NWChem.
  */
 

@@ -47,15 +47,13 @@ Enable only what the host project needs:
 | =-Dwith_xtb=true= | =xtbbld= / =tbbld= | =XTBPot= (GFNFF, GFN0/1/2-xTB) |
 | =-Dwith_tblite=true= | =tblitebld= / =tbbld= | =TBLitePot= (GFN1, GFN2, IPEA1) |
 | =-Dwith_metatomic=true= | =metatomicbld= (linux-64) | =MetatomicPot= (TorchScript models) |
-| =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | full NWChem source/install | transitional =libnwchem_engine.so= in-process embed (same C ABI) |
 
-=NWChemPot= frontend is always compiled; it =dlopen=s optional =libnwchemc.so=
-from =https://github.com/OmniPotentRPC/nwchemc= with stable =nwchemc_*= C
-symbols. The in-tree Meson target still builds =libnwchem_engine.so= as a
-transitional artifact with the same C ABI. No =nwchem= CLI/subprocess path.
-Clone+build NWChem once (=scripts/setup_nwchem_embed.sh=), then set
-=NWCHEMC_LIBRARY= or =RGPOT_NWCHEMC_ENGINE=. See
-=CppCore/rgpot/NWChemPot/README.md=.
+=NWChemPot= is a pure consumer: the frontend is always compiled and =dlopen=s
+=libnwchemc.so= from =https://github.com/OmniPotentRPC/nwchemc= (stable
+=nwchemc_*= C symbols). rgpot builds no in-process NWChem embed of its own and
+has no =-Dwith_nwchem= option. No =nwchem= CLI/subprocess path. Build
+=libnwchemc.so= from the =nwchemc= project, then set =NWCHEMC_LIBRARY= or
+=RGPOT_NWCHEMC_ENGINE=. See =CppCore/rgpot/NWChemPot/README.md=.
 
 Example -- embed with metatomic support:
 

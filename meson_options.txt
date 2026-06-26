@@ -11,9 +11,3 @@ option('with_rust_core', type : 'boolean', value : false)
 option('with_xtb', type : 'boolean', value : false)
 option('with_tblite', type : 'boolean', value : false)
 option('with_metatomic', type : 'boolean', value : false)
-option('with_nwchem', type : 'boolean', value : false,
-       description : 'Build libnwchem_engine with in-process NWChem embed (needs nwchem_root + Fortran)')
-option('nwchem_root', type : 'string', value : '',
-       description : 'NWCHEM_TOP source/install root for embed (headers under src/include, libs under lib/<target>)')
-option('nwchem_target', type : 'string', value : 'LINUX64',
-       description : 'NWChem target name (lib/<target>/ layout)')

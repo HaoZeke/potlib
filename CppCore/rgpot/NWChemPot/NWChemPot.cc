@@ -51,11 +51,6 @@ engine_lib_candidates(const std::string &explicit_path) {
   out.emplace_back("libnwchemc.dylib");
   out.emplace_back("./libnwchemc.dylib");
   out.emplace_back("nwchemc.dll");
-  out.emplace_back("libnwchem_engine.so");
-  out.emplace_back("./libnwchem_engine.so");
-  out.emplace_back("libnwchem_engine.dylib");
-  out.emplace_back("./libnwchem_engine.dylib");
-  out.emplace_back("nwchem_engine.dll");
   return out;
 }
 

@@ -26,32 +26,31 @@ user / client
     serialized flat Cap'n Proto NWChemParams bytes
             │  nwchemc_set_params / nwchemc_energy_gradient
             ▼
-    libnwchemc.so (or transitional in-tree libnwchem_engine.so)
-      C parser + nwchem_embed_c_api.f90 (bind(C), iso_c_binding)
-      -> nwchem_embed_legacy.F (geom/basis via nw_inp_from_character embed API;
-        rtdb/task_energy/task_gradient; no user .nw / subprocess CLI)
+    libnwchemc.so  (the split nwchemc engine, resolved by dlopen)
+      C parser + iso_c_binding embed -> NWChem rtdb/task_energy/task_gradient
+      (no user .nw / subprocess CLI)
 ```
 
 Geometry for `calculate` stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
 
-**Not** a subprocess `nwchem` CLI. Embed still needs `NWCHEM_TOP` + built
-`libnwchemc.so` / transitional `libnwchem_engine.so`
-(`-Dwith_nwchem=true -Dnwchem_root=...`).
+**Not** a subprocess `nwchem` CLI. The engine needs `NWCHEM_TOP` and a built
+`libnwchemc.so` on the dlopen path.
 
-The preferred engine project is
-<https://github.com/OmniPotentRPC/nwchemc>. rgpot is the consumer: it serializes
-`NWChemParams`, loads `libnwchemc.so`, and passes the message bytes directly.
-The in-tree `libnwchem_engine.so` target remains a transitional compatibility
-build with the same `nwchemc_*` C symbols.
+rgpot is a pure consumer of the split engine project
+<https://github.com/OmniPotentRPC/nwchemc>: it serializes `NWChemParams`,
+`dlopen`s `libnwchemc.so`, and passes the message bytes directly. rgpot builds
+no in-process NWChem embed of its own; build `libnwchemc.so` from `nwchemc`.
 
 ## Layers
 
 | Piece | Built when | Role |
 |-------|------------|------|
 | `NWChemPot.cc` frontend | always | Serialize `NWChemParams`, `dlopen` engine, units to eV/Angstrom |
-| `nwchem_c_abi.h` | header | stable C symbols (`nwchemc_*`) |
-| `nwchem_c_abi_stub.c` | always | `nwchemc_available()==0`, compute fails |
-| `nwchem_c_abi.c` + `nwchem_embed_c_api.f90` + `nwchem_embed_legacy.F` | `-Dwith_nwchem=true` `-Dnwchem_root=...` | real embed -> runtime-loaded engine |
+| `nwchem_c_abi.h` | header | stable consumer C-ABI contract (`nwchemc_*`) |
+| `nwchem_c_abi_stub.c` | always | no-op ABI: `nwchemc_available()==0`, used by the ABI conformance test |
+
+The real engine (`nwchemc_*` implementation, NWChem embed, Fortran) lives in the
+split [`nwchemc`](https://github.com/OmniPotentRPC/nwchemc) project, not here.
 
 ```
 app / potserv
@@ -60,34 +59,26 @@ app / potserv
 NWChemPot (static, always in librgpot)
     │  dlopen(RTLD_GLOBAL)  NWCHEMC_LIBRARY / RGPOT_NWCHEMC_ENGINE / enginePath
     ▼
-libnwchemc.so
+libnwchemc.so  (split nwchemc engine)
     nwchemc_set_params / nwchemc_energy_gradient / nwchemc_available
     │
     ▼
-nwchem_embed_legacy.F  ->  geom/basis via embed API + task_energy/gradient  (NWCHEM_TOP libs)
+NWChem embed  ->  geom/basis via embed API + task_energy/gradient  (NWCHEM_TOP libs)
 ```
 
 ## Meson
 
 ```bash
-# Frontend only (CI default): stub, no engine .so unless you build embed separately
+# Frontend only: always builds. Resolves libnwchemc.so by dlopen at runtime.
 meson setup bbdir -Dwith_rpc=false
-
-# Transitional in-tree engine: need NWChem source/install with src/include and lib/<target>/
-export NWCHEM_TOP=/path/to/nwchem   # clone + build once; see scripts/setup_nwchem_embed.sh
-meson setup bbdir_nwc \
-  -Dwith_nwchem=true \
-  -Dnwchem_root=$NWCHEM_TOP \
-  -Dnwchem_target=LINUX64
-meson compile -C bbdir_nwc
-# => bbdir_nwc/CppCore/rgpot/NWChemPot/libnwchem_engine.so
+meson compile -C bbdir
 ```
 
-conda/pixi `nwchem` packages ship the **driver binary**, not embed headers — they
-do **not** satisfy `nwchem_root`. Use a source tree (clone) for embed builds.
-For `libnwchemc.so`, build the split `nwchemc` project against the same
-NWChem tree and point `NWCHEMC_LIBRARY` or `RGPOT_NWCHEMC_ENGINE` at that
-shared library.
+rgpot builds no NWChem engine. To get `libnwchemc.so`, build the split
+[`nwchemc`](https://github.com/OmniPotentRPC/nwchemc) project against an NWChem
+source tree, then point `NWCHEMC_LIBRARY` or `RGPOT_NWCHEMC_ENGINE` at the
+resulting shared library. conda/pixi `nwchem` packages ship the **driver
+binary**, not the embed SDK; `nwchemc` needs an NWChem source tree.
 
 ## Runtime
 
@@ -95,9 +86,9 @@ shared library.
 |----------|---------|
 | `NWCHEMC_LIBRARY` | Path to `libnwchemc.so` |
 | `RGPOT_NWCHEMC_ENGINE` | Path to `libnwchemc.so` |
-| `RGPOT_NWCHEM_ENGINE` | Transitional path to `libnwchem_engine.so` |
+| `RGPOT_NWCHEM_ENGINE` | Alternate path to `libnwchemc.so` |
 | `NWCHEM_TOP` | Hint for engine/data paths (optional; also `NWChemParams.nwchemRoot`) |
-| `LD_LIBRARY_PATH` | NWChem `lib/<target>` (and deps) when embed was linked with unresolved symbols |
+| `LD_LIBRARY_PATH` | NWChem `lib/<target>` (and deps) that `libnwchemc.so` resolves against |
 
 ## `NWChemParams` fields (payload inside `PotentialConfig.nwchem`)
 
@@ -108,7 +99,7 @@ shared library.
 | `scfType` | `rhf` | HF: `rhf`/`uhf`; with DFT: XC functional (`blyp`, …) |
 | `charge` | `0` | Molecular charge |
 | `multiplicity` | `1` | 2S+1 |
-| `enginePath` | `""` | Frontend: explicit `libnwchemc.so` or transitional `libnwchem_engine.so`; empty -> env/probe |
+| `enginePath` | `""` | Frontend: explicit `libnwchemc.so` path; empty -> env/probe |
 | `nwchemRoot` | `""` | Frontend: `NWCHEM_TOP`; empty -> env |
 | `task` | `gradient` | NWChem task hint; rgpot force calls use gradient |
 | `title` | `""` | Optional NWChem title/start prefix |
@@ -153,12 +144,11 @@ Python: `configure_nwchem` builds `PotentialConfig` with `nwchem` set.
 
 ## Direct C++ smoke (no RPC)
 
-```bash
-scripts/setup_nwchem_embed.sh clone   # third_party/nwchem (shallow)
-# build NWChem once per their docs, then:
-scripts/setup_nwchem_embed.sh configure   # meson with nwchem_root
-scripts/setup_nwchem_embed.sh calc        # water SCF/BLYP via NWChemPot only
-```
+Build `libnwchemc.so` from the split `nwchemc` project, put it on the dlopen
+path (`NWCHEMC_LIBRARY` / `LD_LIBRARY_PATH`), then drive `rgpot::NWChemPot`
+directly (serialize `NWChemParams`, call `setPotentialConfig`, then `force`).
+The dlopen boundary itself is covered by the `nwchem` meson test suite
+(`NWChemPotMessageAbiTest`, `NWChemDlopenContract`) using a fake engine.
 
 ## RPC (optional, separate)
 

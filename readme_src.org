@@ -44,7 +44,7 @@ matching pixi environments:
 | =XTBPot= | =-Dwith_xtb=true= | =xtbbld= / =tbbld= | GFNFF, GFN0/1/2-xTB via xtb |
 | =TBLitePot= | =-Dwith_tblite=true= | =tblitebld= / =tbbld= | GFN1, GFN2, IPEA1 via tblite |
 | =MetatomicPot= | =-Dwith_metatomic=true= | =metatomicbld= (linux-64) | TorchScript models via metatomic/PyTorch + vesin |
-| =NWChemPot= | frontend always; embed engine =-Dwith_nwchem=true= =-Dnwchem_root=$NWCHEM_TOP= | NWChem source/install tree | QM via =libnwchemc= (=dlopen= in-process C ABI; no CLI) |
+| =NWChemPot= | frontend always; engine =libnwchemc= built by the split =nwchemc= project | NWChem source/install tree | QM via =libnwchemc= (=dlopen= in-process C ABI; no CLI) |
 
 #+begin_src bash
 # Tight-binding (xtb + tblite)

@@ -80,9 +80,9 @@ in
   },
   jobs = {
     "ci-tools" = S.job_ci_tools_os_matrix [P.ubuntu, P.macos],
-    // build_and_test: does NOT enable with_nwchem (needs full NWCHEM_TOP embed tree).
-// NWChemPot frontend + nwchem_abi_stub always compile; libnwchem_engine only with embed flags.
-// Suite `nwchem` energy/grad SKIP without RGPOT_NWCHEM_ENGINE; stub probe always runs.
+    // build_and_test: rgpot has no in-tree NWChem engine; it dlopens libnwchemc.
+// NWChemPot frontend + nwchem_abi_stub always compile (pure consumer).
+// Suite `nwchem` energy/grad SKIP without an external libnwchemc; stub probe always runs.
   build_and_test = {
       needs = ["ci-tools"],
       name = "${{ matrix.sys }} / ${{ matrix.os }} [RPC:${{ matrix.rpc }} CACHE:${{ matrix.cache }}]",

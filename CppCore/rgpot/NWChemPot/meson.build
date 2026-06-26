@@ -1,7 +1,8 @@
-# NWChemPot: frontend always builds (dlopen libnwchem_engine at runtime).
-# Stub always built. Real engine ONLY when has_nwchem (with_nwchem + nwchem_root
-# + Fortran) as libnwchem_engine — nwchem_c_abi.c + nwchem_embed_c_api.f90
-# (bind(C)) + nwchem_embed_legacy.F (NWChem rtdb/ga only). No CLI.
+# NWChemPot: pure consumer of the split nwchemc engine.
+#
+# The frontend (NWChemPot.cc) always builds and resolves libnwchemc.so by
+# dlopen at runtime -- rgpot carries no in-process NWChem embed of its own.
+# The no-op ABI stub is built for the C ABI conformance test only.
 
 nwchem_inc = include_directories('.')
 
@@ -13,85 +14,6 @@ nwchem_abi_stub = static_library(
 )
 
 nwchem_frontend_cpp_args = ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
-
-if has_nwchem
-    if not has_fortran
-        error('with_nwchem requires a Fortran compiler for nwchem_embed_*.f90/.F')
-    endif
-    if nwchem_root == ''
-        error('with_nwchem requires -Dnwchem_root=<NWCHEM_TOP>')
-    endif
-
-    nwchem_engine_c_args = [
-        '-DRGPOT_HAS_NWCHEM=1',
-        '-DGFORTRAN=1',
-        '-I' + nwchem_root + '/src/include',
-        '-I' + nwchem_root + '/src/tools/install/include',
-    ]
-    # Modern F90 shim: iso_c_binding only; still ILP64 integers to match NWChem/GA.
-    nwchem_engine_f90_args = [
-        '-DRGPOT_HAS_NWCHEM=1',
-        '-fdefault-integer-8',
-        '-ffast-math',
-    ]
-    # Fixed-form legacy unit only: NWChem headers + EXT_INT LAPACK interface.
-    nwchem_engine_f_legacy_args = [
-        '-DRGPOT_HAS_NWCHEM=1',
-        '-I' + nwchem_root + '/src/include',
-        '-I' + nwchem_root + '/src/util',
-        '-I' + nwchem_root + '/src/tools/install/include',
-        '-fdefault-integer-8',
-        '-ffast-math',
-        '-std=legacy',
-        '-DGFORTRAN',
-        '-DLINUX64',
-        '-DEXT_INT',
-        '-DOPENBLAS',
-    ]
-    nwchem_embed_legacy = static_library(
-        'nwchem_embed_legacy',
-        'nwchem_embed_legacy.F',
-        include_directories: _incdirs + [nwchem_inc],
-        fortran_args: nwchem_engine_f_legacy_args,
-        install: false,
-    )
-    nwchem_engine_link_args = [
-        '-L' + nwchem_root + '/lib/' + nwchem_target,
-        '-L' + nwchem_root + '/src/tools/install/lib',
-        '-L' + nwchem_root + '/src/libext/lib',
-        '-Wl,--start-group',
-        '-lnwctask',
-        '-lnwdft',
-        '-lddscf',
-        '-lgradients',
-        '-lnwints',
-        '-lnwcutil',
-        '-lga',
-        '-larmci',
-        '-lcomex',
-        '-lnwc_openblas',
-        '-Wl,--end-group',
-        '-lgfortran',
-        '-lpthread',
-        '-lm',
-    ]
-    if host_machine.system() == 'linux'
-        nwchem_engine_link_args += ['-Wl,--unresolved-symbols=ignore-all']
-    endif
-    nwchem_engine = shared_library(
-        'nwchem_engine',
-        [
-            'nwchem_c_abi.c',
-            'nwchem_embed_c_api.f90',
-        ],
-        include_directories: _incdirs + [nwchem_inc],
-        c_args: nwchem_engine_c_args,
-        fortran_args: nwchem_engine_f90_args,
-        link_with: nwchem_embed_legacy,
-        link_args: nwchem_engine_link_args,
-        install: not meson.is_subproject(),
-    )
-endif
 
 nwchem_dl_dep = dependency('dl', required: false)
 if not nwchem_dl_dep.found()

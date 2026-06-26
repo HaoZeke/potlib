@@ -125,7 +125,7 @@ prek ∥ docs_snapper ∥ docs_lychee ∥ towncrier(PR) ∥ ci-tools
     ↓ (after ci-tools; skipped on schedule except docs_*)
 build_and_test ∥ rust_tests ∥ client_bridge_stress
   ∥ potentials_metatomic ∥ potentials_tight_binding
-  (NWChemPot frontend/stub always; libnwchem_engine embed only with with_nwchem+nwchem_root.)
+  (NWChemPot frontend/stub always; energy/grad need an external libnwchemc engine.)
     ↓
 ci_gate   ← single required-check aggregator
 ```

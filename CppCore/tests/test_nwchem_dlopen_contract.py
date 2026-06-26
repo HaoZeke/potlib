@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Build contract checks for the NWChem runtime-loaded engine boundary."""
+"""Build contract checks for the NWChem pure-consumer boundary.
+
+rgpot dlopens the split nwchemc engine (libnwchemc.so) at runtime and builds
+no in-tree NWChem engine of its own. These checks pin that boundary: no static
+embed, no local ABI/param mirror, and no shared_library engine target.
+"""
 
 from __future__ import annotations
 
@@ -51,12 +56,22 @@ def main() -> int:
         for token in mirror_forbidden:
             require(token not in text, f"{path.relative_to(root)} keeps local ABI mirror token {token}")
 
-    require("shared_library(" in meson, "NWChem engine is not a shared_library")
-    require("'nwchem_engine'" in meson, "NWChem engine target is missing")
-    require(
-        "build_by_default: false" not in meson,
-        "with_nwchem must build the runtime-loaded engine by default",
-    )
+    # Pure consumer: rgpot builds NO in-tree NWChem engine. The split nwchemc
+    # engine (libnwchemc.so) is resolved by dlopen at runtime only.
+    pure_consumer_forbidden = [
+        "shared_library(",
+        "'nwchem_engine'",
+        "with_nwchem",
+        "nwchem_root",
+        "nwchem_embed",
+        "RGPOT_HAS_NWCHEM=",
+    ]
+    for token in pure_consumer_forbidden:
+        require(
+            token not in meson,
+            f"meson.build builds an in-tree engine ({token}); rgpot must be a pure nwchemc consumer",
+        )
+
     require(
         "nwchempot_dep = declare_dependency(" in meson,
         "NWChem frontend dependency is missing",
@@ -64,6 +79,15 @@ def main() -> int:
     require(
         "dependencies: [nwchem_dl_dep, ptlrpc_dep]" in meson,
         "NWChem frontend dependency should expose dl plus the Cap'n Proto schema dependency",
+    )
+    # The frontend resolves the engine by dlopen, keyed on libnwchemc.
+    require(
+        "libnwchemc" in frontend,
+        "NWChemPot.cc must dlopen the split nwchemc engine (libnwchemc)",
+    )
+    require(
+        "libnwchem_engine" not in frontend,
+        "NWChemPot.cc still references the dropped in-tree libnwchem_engine",
     )
     return 0
 

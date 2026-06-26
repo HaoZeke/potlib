@@ -48,8 +48,8 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
-    # NWChemPot frontend always builds (stub ABI always; engine optional).
-    subdir('rgpot/NWChemPot')  # 'nwchempot' (+ optional libnwchem_engine)
+    # NWChemPot frontend always builds (no in-tree engine; dlopens libnwchemc).
+    subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
     rgpotentials += [nwchempot]
 
     _linkto += rgpotentials

@@ -112,15 +112,8 @@ if get_option('with_xtb')
     has_xtb = true
 endif
 
-# NWChemPot: frontend always builds (dlopen libnwchem_engine).
-# Real engine only when with_nwchem + nwchem_root (in-process Fortran embed).
-nwchem_root = get_option('nwchem_root')
-nwchem_target = get_option('nwchem_target')
-has_nwchem = false
-if get_option('with_nwchem') and nwchem_root != ''
-    _args += ['-DRGPOT_HAS_NWCHEM=TRUE']
-    has_nwchem = true
-endif
+# NWChemPot frontend always builds and dlopens the split nwchemc engine
+# (libnwchemc.so) at runtime. rgpot carries no in-process NWChem embed.
 _args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
 
 has_tblite = false
