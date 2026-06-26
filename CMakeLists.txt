@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
   rgpot
-  VERSION 1.2.0
+  VERSION 2.0.0
   DESCRIPTION "Cpp core for potential energy surface functionality"
   HOMEPAGE_URL "https://github.com/OmniPotentRPC/rgpot"
   LANGUAGES C CXX)
@@ -166,6 +166,13 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
          CppCore/rgpot/CuH2/cuh2Utils.cc)
   endif()
 
+  # NWChemPot is a pure dlopen consumer of the split nwchemc engine (parity with
+  # meson). Cap'n Proto params live in the generated schema, so the frontend is
+  # only compiled when RGPOT_WITH_RPC enables ptlrpc (same dep as meson ptlrpc_dep).
+  if(RGPOT_WITH_RPC)
+    list(APPEND RGPOT_SOURCES CppCore/rgpot/NWChemPot/NWChemPot.cc)
+  endif()
+
   add_library(rgpot ${RGPOT_SOURCES})
   set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -177,6 +184,13 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
 
   if(RGPOT_WITH_RPC)
     target_link_libraries(rgpot PUBLIC ptlrpc)
+    target_compile_definitions(rgpot PUBLIC RGPOT_HAS_NWCHEM_FRONTEND)
+    # DynLib / dlopen for libnwchemc.so at runtime
+    if(UNIX AND NOT APPLE)
+      target_link_libraries(rgpot PUBLIC ${CMAKE_DL_LIBS})
+    elseif(UNIX)
+      target_link_libraries(rgpot PUBLIC dl)
+    endif()
   endif()
 
   add_library(rgpot::rgpot ALIAS rgpot)
