@@ -12,6 +12,12 @@ _rgpot_srcs += files('rgpot/units.cc')
 
 subdir('rgpot/rpc')
 
+# NWChemPot is a pure dlopen consumer of the split nwchemc engine: it needs only
+# the generated rpc schema (ptlrpc_dep) and libdl, not rgpot_core or the other
+# potentials. Build it unconditionally and expose nwchempot_dep so consumers get
+# the in-process NWChem frontend even in lean (with_rpc_client_only) builds.
+subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
+
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
     rgpot_core = static_library(
@@ -48,8 +54,7 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
-    # NWChemPot frontend always builds (no in-tree engine; dlopens libnwchemc).
-    subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
+    # NWChemPot was built above (unconditionally); link it into the full lib.
     rgpotentials += [nwchempot]
 
     _linkto += rgpotentials
