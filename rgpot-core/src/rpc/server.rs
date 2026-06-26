@@ -180,7 +180,7 @@ pub unsafe extern "C" fn rgpot_rpc_server_start(
 
                 let server_impl = PotentialServer {
                     callback: pot_ref.callback,
-                    user_data: pot_ref.user_data,
+                    user_data: pot_ref.pot_user_data,
                 };
 
                 let potential_client =
