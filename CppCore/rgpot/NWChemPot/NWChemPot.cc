@@ -206,6 +206,9 @@ struct NWChemPot::Impl {
   std::vector<::capnp::word> params_words;
   std::string engine_path;
   std::string nwchem_root;
+  // Reused gradient buffer for the engine ABI; avoids a per-call heap
+  // allocation in forceImpl. forceImpl is const, hence mutable.
+  mutable std::vector<double> grad_scratch;
 };
 
 NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
@@ -343,7 +346,8 @@ void NWChemPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (!in.pos || !in.atmnrs || !out || !out->F)
     throw std::runtime_error("NWChemPot: null positions/atmnrs/forces buffer");
 
-  std::vector<double> grad(static_cast<size_t>(n) * 3u, 0.0);
+  std::vector<double> &grad = impl_->grad_scratch;
+  grad.assign(static_cast<size_t>(n) * 3u, 0.0);
   const ParamsView params = params_view(impl_->params_words);
   NWChemCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
