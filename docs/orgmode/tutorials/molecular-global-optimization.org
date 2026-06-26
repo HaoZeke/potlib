@@ -146,6 +146,26 @@ print("relaxed energy:", atoms.get_potential_energy())   # back to -6.474708
 
 =tests/con_relax_demo.py= runs this round-trip.
 
+** Visualize the minimization on the (s, d) landscape
+
+For an EON minimization, ``rgpycrumbs eon plt-min`` renders the trajectory on a
+gradient-enhanced 2D landscape: progress ``s`` toward the minimum against lateral
+deviation ``d``, with the energy surface fitted from the path. ``tests/eon_min_landscape.py``
+runs a real ``eonclient`` LJ minimization and produces it:
+
+#+begin_src bash
+pixi run -e eonviz eon-min-landscape
+#+end_src
+
+#+CAPTION: EON LJ minimization on the (s, d) optimization landscape: the path runs from the perturbed start (Init) to the minimum (Min) with near-zero lateral deviation, as a clean descent should.
+[[file:../_static/eon_min_landscape.png]]
+
+The ``eonviz`` environment is separate from the C++ build env: ``eon`` pins
+``fmt>=12`` (clashing with rgpot's C++ ``fmt<12``), so it carries no default
+feature and pulls ``eon``, ``ira``, ``jax``, and the dev ``chemparseplot`` /
+``rgpycrumbs`` (the published releases lack the embedded-metadata trajectory
+parser and ``plt-min``).
+
 ** Where to go next
 
 - Swap =potential="LJ"= for =CuH2=, =XTB=, =TBLite=, or =Metatomic:<model>= (the

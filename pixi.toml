@@ -17,6 +17,7 @@ export-plan = { cmd = "bash ci/gha/export-plan.sh" }
 
 [environments]
 rpctest = {features = ["rpc", "itests"]}
+eonviz = { features = ["eonviz"], no-default-feature = true }
 cigen = {features = ["cigen"]}
 devbld = { features = ["rpc", "cache"] }
 docs = { features = ["docs"]}
@@ -66,6 +67,36 @@ ase = ">=3.24"
 scipy = ">=1.13"
 maturin = ">=1.5,<2"
 
+# Dedicated environment for the eOn minimization landscape visualization. eon
+# pins fmt>=12, which conflicts with rgpot's C++ fmt<12, so this env carries no
+# default feature and shares nothing with the C++ build deps.
+[feature.eonviz]
+channels = ["https://repo.prefix.dev/rg-forge", "conda-forge"]
+platforms = ["linux-64"]
+
+[feature.eonviz.dependencies]
+python = ">=3.11,<3.13"
+eon = ">=2.12"
+ira = "*"
+ase = ">=3.24"
+numpy = ">=1.26"
+scipy = ">=1.13"
+matplotlib = ">=3.8"
+polars = "*"
+cmcrameri = "*"
+pint = ">=0.22"
+click = "*"
+rich = "*"
+pip = "*"
+
+[feature.eonviz.pypi-dependencies]
+# Dev branches carry the embedded-metadata minimization-trajectory parser and the
+# (s, d) optimization-landscape plotter (plt-min) the published releases lack.
+chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", branch = "fix/ira-kmax-default-14" }
+rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", branch = "fix/landscape-defaults-and-sp-marker" }
+readcon = ">=0.7"
+jax = "*"
+
 [feature.docs]
 # doxyrest only works on linux
 platforms = ["linux-64"]
@@ -111,6 +142,7 @@ uv = ">=0.6.0"
 [tasks]
 rust-test = { cmd = "cargo nextest run --manifest-path rgpot-core/Cargo.toml", description = "Run Rust core unit tests with nextest" }
 ase-anneal-compare = { cmd = "bash scripts/ase_anneal_compare.sh", description = "ASE local optimizer vs anneal SOTA portfolio on an rgpot LJ potential (run with -e rpctest)" }
+eon-min-landscape = { cmd = "python tests/eon_min_landscape.py", description = "Run an EON LJ minimization and render the (s,d) optimization landscape (run with -e eonviz)" }
 rust-test-all = { cmd = "cargo nextest run --manifest-path rgpot-core/Cargo.toml --all-features", description = "Run Rust core tests with all features enabled" }
 gen-header = { cmd = "cargo build --manifest-path rgpot-core/Cargo.toml --features gen-header", description = "Regenerate C header (include/rgpot.h) from Rust source" }
 towncrier-draft = { cmd = "uvx towncrier build --draft", description = "Preview release notes" }
