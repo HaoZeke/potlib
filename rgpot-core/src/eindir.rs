@@ -30,76 +30,21 @@ use crate::tensor::{
 use crate::types::{rgpot_force_input_t, rgpot_force_out_t};
 
 // ---------------------------------------------------------------------------
-// Local C-ABI mirror of eindir_objective_t
+// eindir C ABI types -- the real ones, from the shared eindir-core crate
 //
-// MUST match eindir-core's #[repr(C)] layout exactly.  Enforced by the C ABI
-// contract: both sides declare the same fields in the same order under
-// #[repr(C)], so the compiler guarantees identical byte layouts.
+// rgpot does NOT mirror eindir's #[repr(C)] types. It re-uses eindir-core's own
+// definitions, so `rgpot_potential_t` embeds the exact same `eindir_objective_t`
+// and the eval/grad entry points resolve through one compilation of eindir-core.
+// That is what lets a downstream Rust consumer (e.g. anneal-core) link both
+// crates without the duplicate-symbol / two-Rust-runtime conflict that a
+// separate prebuilt `libeindir_core.a` would cause.
 // ---------------------------------------------------------------------------
 
-/// Mirror of eindir's `EindirEvalFn`.
-pub type EindirEvalFn = unsafe extern "C" fn(
-    user_data: *mut c_void,
-    x: *const DLManagedTensorVersioned,
-    value_out: *mut f64,
-) -> eindir_status_t;
-
-/// Mirror of eindir's `EindirGradFn` (nullable).
-pub type EindirGradFn = Option<
-    unsafe extern "C" fn(
-        user_data: *mut c_void,
-        x: *const DLManagedTensorVersioned,
-        grad_out: *mut DLManagedTensorVersioned,
-    ) -> eindir_status_t,
->;
-
-/// Mirror of eindir's `EindirFreeFn` (nullable).
-pub type EindirFreeFn = Option<unsafe extern "C" fn(*mut c_void)>;
-
-/// Mirror of eindir's status codes.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum eindir_status_t {
-    EINDIR_SUCCESS = 0,
-    EINDIR_INVALID_PARAMETER = 1,
-    EINDIR_INTERNAL_ERROR = 2,
-}
-
-/// Local mirror of `eindir_objective_t`.
-///
-/// Field order and types are identical to eindir-core's definition; both are
-/// `#[repr(C)]`, so the byte layout matches by the C ABI contract.
-#[repr(C)]
-pub struct eindir_objective_t {
-    pub dim: usize,
-    pub low: *mut f64,
-    pub high: *mut f64,
-    pub eval_fn: EindirEvalFn,
-    pub grad_fn: EindirGradFn,
-    pub user_data: *mut c_void,
-    pub free_fn: EindirFreeFn,
-}
-
-// ---------------------------------------------------------------------------
-// extern "C" declarations -- resolved by linking libeindir_core (see build.rs)
-// ---------------------------------------------------------------------------
-
-#[allow(dead_code)]
-extern "C" {
-    fn eindir_objective_eval(
-        obj: *const eindir_objective_t,
-        x: *const DLManagedTensorVersioned,
-        value_out: *mut f64,
-    ) -> eindir_status_t;
-
-    fn eindir_objective_grad(
-        obj: *const eindir_objective_t,
-        x: *const DLManagedTensorVersioned,
-        grad_out: *mut DLManagedTensorVersioned,
-    ) -> eindir_status_t;
-
-    fn eindir_objective_has_grad(obj: *const eindir_objective_t) -> i32;
-}
+pub use eindir_core::ffi::eindir_status_t;
+pub use eindir_core::ffi::{
+    eindir_objective_eval, eindir_objective_grad, eindir_objective_has_grad,
+    eindir_objective_t, EindirEvalFn, EindirFreeFn, EindirGradFn,
+};
 
 // ---------------------------------------------------------------------------
 // rgpot_potential_t: rgpot_potential_t* IS-A eindir_objective_t*

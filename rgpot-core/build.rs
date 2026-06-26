@@ -3,23 +3,6 @@ use std::env;
 #[cfg(any(feature = "gen-header", feature = "rpc"))]
 use std::path::PathBuf;
 
-fn link_eindir_core() {
-    let lib_dir = env::var("EINDIR_LIB_DIR").unwrap_or_else(|_| {
-        // cargo cinstall on Debian/Ubuntu places the lib in a multiarch subdir.
-        // Prefer the multiarch path when both exist.
-        let multiarch = "/tmp/eindir-prefix/lib/x86_64-linux-gnu";
-        let base = "/tmp/eindir-prefix/lib";
-        if std::path::Path::new(multiarch).join("libeindir_core.a").exists() {
-            multiarch.to_string()
-        } else {
-            base.to_string()
-        }
-    });
-    println!("cargo:rustc-link-search=native={lib_dir}");
-    println!("cargo:rustc-link-lib=static=eindir_core");
-    println!("cargo:rerun-if-env-changed=EINDIR_LIB_DIR");
-}
-
 /// Generate C header via cbindgen (only when `gen-header` feature is active).
 /// Run `cargo build --features gen-header` or `pixi r gen-header` to regenerate.
 #[cfg(feature = "gen-header")]
@@ -64,7 +47,8 @@ fn main() {
     #[allow(unused_variables)]
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    link_eindir_core();
+    // eindir-core is a normal Cargo dependency now; its capi #[no_mangle] symbols
+    // resolve through the shared crate, so no prebuilt static lib link is needed.
 
     #[cfg(feature = "gen-header")]
     generate_c_header(&crate_dir);
