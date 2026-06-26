@@ -49,6 +49,7 @@ meson compile -C bbdir && meson test -C bbdir
    :caption: Tutorials
 
    tutorials/quickstart
+   tutorials/molecular-global-optimization
 
 .. toctree::
    :maxdepth: 2

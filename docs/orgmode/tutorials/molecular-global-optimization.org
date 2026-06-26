@@ -1,0 +1,157 @@
+#+TITLE: Find the Ground State of an EON Structure
+#+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil
+#+STARTUP: content
+
+* Find the Ground State of an EON Structure
+
+Atomistic workflows minimize. ASE relaxes structures with L-BFGS and FIRE;
+[[https://github.com/TheochemUI/eOn][eOn]] runs its own L-BFGS and conjugate-gradient
+minimizers at the end of every min-mode and nudged-elastic-band search, over
+structures stored as EON =.con= files and driven by a potential rgpot serves
+over RPC. The atomistic-cookbook example
+[[https://github.com/lab-cosmo/atomistic-cookbook][/Finding Reaction Paths with
+EON and a Metatomic Potential/]] runs exactly this stack: a PET-MAD model, a NEB
+path, eOn's saddle search.
+
+All of these minimizers are /local/: they walk downhill to the nearest minimum.
+The nearest minimum is often not the one you want. This tutorial finds the
+minimum a local search misses, and shows that =anneal= reaches it where ASE's
+optimizer and scipy's simulated annealing do not improve on it. The numbers you
+will reproduce, from one disordered start on a 7-atom Lennard-Jones cluster
+(reduced units, global minimum =-16.505384=):
+
+| Minimizer                       | Final energy | Evaluations |
+|---------------------------------+--------------+-------------|
+| local L-BFGS (ASE, eOn)         |        -3.13 | 500         |
+| scipy ~dual_annealing~ (global) |   -16.505384 | 17006       |
+| ~anneal~ portfolio (global)     |   -16.505384 | 14920       |
+
+Local L-BFGS stops at the nearest minimum. Both global methods reach the ground
+state; =anneal= reaches it in fewer evaluations than scipy.
+
+** What you will need
+
+- [[https://pixi.sh][pixi]] (manages the toolchain)
+- The =rgpot=, =anneal=, and =readcon-core= checkouts side by side
+- About 10 minutes
+
+One command builds everything and runs the comparison:
+
+#+begin_src bash
+cd rgpot
+pixi run -e rpctest ase-anneal-compare
+#+end_src
+
+It builds the =potserv= potential server, builds the =anneal= and =readcon=
+Python modules, and runs the two scripts below.
+
+** Step 1: drive an rgpot potential from Python
+
+rgpot exposes every potential through one ASE calculator, =RgpotCalculator=. It
+talks to the same =potserv= RPC server the eOn client connects to, so Python and
+eOn evaluate the same energies and forces. Point it at a potential and it
+launches the server:
+
+#+begin_src python
+import numpy as np
+from ase import Atoms
+from ase_calculator import RgpotCalculator   # CppCore/rgpot/rpc on sys.path
+
+calc = RgpotCalculator.spawn(server_bin="path/to/potserv", potential="LJ")
+
+start = np.random.RandomState(1).uniform(-2.3, 2.3, size=(7, 3))
+atoms = Atoms(numbers=[0] * 7, positions=start, cell=[40, 40, 40])
+atoms.calc = calc
+
+print("start energy:", atoms.get_potential_energy())   # about +20
+#+end_src
+
+Use =spawn= as a context manager (~with RgpotCalculator.spawn(...) as calc:~) to
+stop the managed server on exit.
+
+** Step 2: local relaxation stops at the nearest minimum
+
+#+begin_src python
+from ase.optimize import LBFGS
+
+LBFGS(atoms).run(fmax=1e-3)
+print("local L-BFGS energy:", atoms.get_potential_energy())   # about -3.13
+#+end_src
+
+L-BFGS converges to a minimum, just not the global one. The LJ7 global minimum,
+the pentagonal bipyramid at =-16.505384=, sits in a different basin; from a
+random start a local minimizer cannot cross into it. eOn's L-BFGS, run on the
+same surface, stops in the same place -- this is the wall a local search hits
+when a relaxation lands in a metastable basin instead of the product state.
+
+** Step 3: find the global minimum
+
+=AnnealOptimizer= wraps =anneal='s portfolio optimizer (the method of the INFORMS
+Journal on Computing paper: Thompson-allocated basin hopping, differential
+evolution, generalized simulated annealing, parallel tempering, GLE-Langevin)
+behind the same =run()=. It uses the rgpot forces as the gradient:
+
+#+begin_src python
+from ase_helpers import AnnealOptimizer
+
+atoms.set_positions(start)              # back to the disordered start
+opt = AnnealOptimizer(atoms, budget=15000, seed=11, pad=3.0)
+opt.run()
+print("anneal energy:", opt.get_potential_energy())   # -16.505384
+print("evaluations:", opt.nevals)
+#+end_src
+
+The geometry ends at the global minimum. =scipy.optimize.dual_annealing= reaches
+the same value on this surface; =anneal= reaches it in fewer evaluations, and
+both pass the value the local search returns. =tests/ase_vs_anneal.py= runs all
+three side by side.
+
+*** Which minimizer for which job
+
+- Local L-BFGS / FIRE / conjugate gradient (ASE or eOn): refine a structure
+  inside the basin you want -- an eOn saddle endpoint, a perturbed crystal, an
+  MD snapshot.
+- ~AnnealOptimizer~: find the minimum when the basin is unknown -- cluster
+  ground states, conformer search, potential-parameter fitting.
+
+Chain them: an =anneal= search to locate the basin, then a local polish.
+
+** Step 4: start from a =.con= file
+
+EON workflows start from a structure on disk. =atoms_from_con= reads an EON
+=.con= file into =ase.Atoms= through =readcon-core= -- the files eOn reads and
+writes:
+
+#+begin_src python
+from ase_helpers import atoms_from_con
+
+calc = RgpotCalculator.spawn(server_bin="path/to/potserv", potential="CuH2")
+atoms = atoms_from_con("tiny_cuh2.con", calc=calc)
+print(atoms.get_chemical_symbols())          # ['Cu', 'Cu', 'H', 'H']
+print("energy:", atoms.get_potential_energy())
+
+# The cell comes from the .con; override it with a larger box when needed.
+atoms = atoms_from_con("tiny_cuh2.con", cell=[15, 20, 30], pbc=False)
+#+end_src
+
+Relaxing it is the same =run()=: rattle the structure, then walk it back to the
+minimum the =.con= recorded:
+
+#+begin_src python
+atoms.calc = calc
+atoms.rattle(stdev=0.15, seed=1)
+LBFGS(atoms).run(fmax=0.02)
+print("relaxed energy:", atoms.get_potential_energy())   # back to -6.474708
+#+end_src
+
+=tests/con_relax_demo.py= runs this round-trip.
+
+** Where to go next
+
+- Swap =potential="LJ"= for =CuH2=, =XTB=, =TBLite=, or =Metatomic:<model>= (the
+  PET-MAD model the cookbook uses); the calculator stays the same, only the
+  server backend changes, and the same server serves eOn.
+- Read [[file:../howto/integration.org][External Integration Guide]] for how eOn links rgpot's RPC server
+  from C++.
+- Read [[file:../howto/eindir-anneal.org][rgpot potentials as eindir objectives]] for how an rgpot potential
+  becomes an =anneal= objective with no glue code.
