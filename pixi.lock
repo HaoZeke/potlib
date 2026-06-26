@@ -1426,7 +1426,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/wheel-0.47.0-pyhd8ed1ab_0.conda
       - conda: https://repo.prefix.dev/rg-forge/linux-64/ira-2.2.0-fc313f34_0.conda
       - pypi: git+https://github.com/HaoZeke/chemparseplot.git?branch=fix%2Fira-kmax-default-14#f71d79b9b9f913c717e4d97dd3ec9fd496f2c208
-      - pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a8ac9da12145c09157e7d0a7cefb57b3545fabcb
+      - pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a652605a61991d2fea86a9f63bfabfc926f6f03c
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3a/cb/28ce52eb94390dda42599c98ea0204d74799e4d8047a0eb559b6fd648056/ml_dtypes-0.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/48/17/38b718af2353dba7753300871e83fbb64a88a772e12727ae27373ab675ce/jaxlib-0.10.2-cp312-cp312-manylinux_2_27_x86_64.whl
@@ -18780,9 +18780,9 @@ packages:
   - scipy>=1.11 ; extra == 'test'
   - xyzrender>=0.1.2 ; extra == 'xyzrender'
   requires_python: '>=3.10'
-- pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a8ac9da12145c09157e7d0a7cefb57b3545fabcb
+- pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a652605a61991d2fea86a9f63bfabfc926f6f03c
   name: rgpycrumbs
-  version: 1.7.0
+  version: 1.7.1.dev53+ga652605a6
   requires_dist:
   - click>=8.1
   - numpy>=1.24

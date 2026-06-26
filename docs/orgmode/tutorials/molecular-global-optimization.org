@@ -150,14 +150,15 @@ print("relaxed energy:", atoms.get_potential_energy())   # back to -6.474708
 
 For an EON minimization, ``rgpycrumbs eon plt-min`` renders the trajectory on a
 gradient-enhanced 2D landscape: progress ``s`` toward the minimum against lateral
-deviation ``d``, with the energy surface fitted from the path. ``tests/eon_min_landscape.py``
-runs a real ``eonclient`` LJ minimization and produces it:
+deviation ``d``, with the energy surface fitted from the trajectory.
+``tests/eon_min_landscape.py`` runs several ``eonclient`` LJ7 minimizations and
+overlays two that fall into different basins:
 
 #+begin_src bash
 pixi run -e eonviz eon-min-landscape
 #+end_src
 
-#+CAPTION: EON LJ minimization on the (s, d) optimization landscape: the path runs from the perturbed start (Init) to the minimum (Min) with near-zero lateral deviation, as a clean descent should.
+#+CAPTION: EON LJ7 minimizations on the (s, d) landscape. The global run (teal) descends from the start to the global minimum at -16.505; a second run (coral) lands in a higher local minimum at -15.533. A single minimization is a near-1D descent, so two runs landing in different basins are what make the local-vs-global structure visible. Energies are capped (plt-min --energy-cap-window) so the colorbar resolves the well.
 [[file:../_static/eon_min_landscape.png]]
 
 The ``eonviz`` environment is separate from the C++ build env: ``eon`` pins
