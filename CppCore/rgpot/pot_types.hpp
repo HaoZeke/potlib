@@ -29,7 +29,9 @@ enum class PotType {
   LJ,          //!<  Standard 12-6 Lennard-Jones pairwise potential.
   XTB,         //!<  GFN tight-binding via xtb (GFNFF/GFN0/GFN1/GFN2).
   TBLite,      //!<  GFN tight-binding via tblite (GFN1/GFN2/IPEA1).
-  Metatomic    //!<  ML atomistic models via metatomic/PyTorch.
+  Metatomic,   //!<  ML atomistic models via metatomic/PyTorch.
+  NWChem,      //!<  QM via runtime-loaded NWChem C ABI engine.
+  CPMD         //!<  PW-DFT via runtime-loaded CPMD C ABI engine.
 };
 
 } // namespace rgpot

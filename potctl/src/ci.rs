@@ -949,7 +949,7 @@ pub fn bridge_client_cmake_configure_args(build_dir: &str) -> Vec<String> {
 /// Pure: default potserv path under meson server build dir.
 pub fn bridge_potserv_path(server_build_dir: &str) -> PathBuf {
     PathBuf::from(server_build_dir)
-        .join("CppCore/rgpot/rpc/potserv")
+        .join("CppCore/potserv")
 }
 
 /// `potctl ci bridge-server-build` — meson RPC server (no tests).

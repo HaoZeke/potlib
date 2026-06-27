@@ -3,7 +3,7 @@
 # Workflow modules should not hardcode action refs; compose builders from steps.ncl.
 {
   # --- toolchains / env managers ---
-  pixi_version = "v0.62.1",
+  pixi_version = "v0.70.2",
 
   # --- GitHub Actions (third-party / first-party) ---
   checkout = "actions/checkout@v6",

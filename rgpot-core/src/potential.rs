@@ -98,10 +98,10 @@ impl Drop for PotentialImpl {
     }
 }
 
-/// Opaque handle exposed to C as `rgpot_potential_t`.
-///
-/// This is a type alias used by cbindgen to generate a forward declaration.
-pub type rgpot_potential_t = PotentialImpl;
+// rgpot_potential_t is defined in the `eindir` module as a #[repr(C)] struct
+// with eindir_objective_t embedded as its first member.  Re-exported here so
+// existing import paths (e.g. rpc/server.rs) continue to work unchanged.
+pub use crate::eindir::rgpot_potential_t;
 
 #[cfg(test)]
 mod tests {

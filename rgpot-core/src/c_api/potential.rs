@@ -3,64 +3,67 @@
 
 //! C API for the potential handle lifecycle: create, calculate, free.
 //!
-//! These three functions form the core public interface for potential energy
-//! calculations. The typical usage pattern from C/C++ is:
+//! `rgpot_potential_t` is the superset struct defined in `crate::eindir`:
+//! it embeds `eindir_objective_t` as its first member so every
+//! `rgpot_potential_t*` IS-A `eindir_objective_t*` at the C ABI.
+//!
+//! The three lifecycle functions here use the direct callback path
+//! (`pot.callback`); the eindir evaluation path goes through
+//! `eindir_objective_eval` with the zero-cost cast.
 //!
 //! ```c
-//! // 1. Create a handle from a callback
+//! // Direct rgpot path:
 //! rgpot_potential_t *pot = rgpot_potential_new(my_callback, my_data, NULL);
-//!
-//! // 2. Prepare input/output
-//! rgpot_force_input_t  input  = rgpot_force_input_create(n, pos, types, box);
-//! rgpot_force_out_t    output = rgpot_force_out_create();
-//!
-//! // 3. Calculate
 //! rgpot_status_t s = rgpot_potential_calculate(pot, &input, &output);
-//! if (s != RGPOT_SUCCESS) { /* handle error */ }
-//! // output.forces is now a DLPack tensor — use it, then free:
-//! rgpot_tensor_free(output.forces);
-//!
-//! // 4. Clean up
-//! rgpot_force_input_free(&input);
 //! rgpot_potential_free(pot);
+//!
+//! // eindir path (IS-A cast, no conversion method):
+//! eindir_objective_t *obj = (eindir_objective_t*)pot;
+//! double val;
+//! eindir_objective_eval(obj, x_tensor, &val);
 //! ```
 
 use std::os::raw::c_void;
 
-use crate::potential::{PotentialCallback, PotentialImpl, rgpot_potential_t};
+use crate::eindir::rgpot_potential_t;
+use crate::potential::PotentialCallback;
 use crate::status::{catch_unwind, rgpot_status_t, set_last_error};
 use crate::types::{rgpot_force_input_t, rgpot_force_out_t};
 
 /// Create a new potential handle from a callback function pointer.
 ///
-/// - `callback`: the function that performs the force/energy calculation.
-/// - `user_data`: opaque pointer forwarded to every callback invocation
-///   (typically a pointer to the C++ potential object).
-/// - `free_fn`: optional destructor for `user_data`. Pass `NULL` if the
-///   caller manages the lifetime externally.
+/// Creates a `rgpot_potential_t` with no molecular context (n_atoms = 0) and
+/// no eindir bounds.  The potential evaluates through `callback` directly.
+/// Use `rgpot_potential_new_eindir` when the IS-A eindir embedding is needed.
 ///
 /// Returns a heap-allocated `rgpot_potential_t*`, or `NULL` on failure.
-/// The caller must eventually pass the returned pointer to
-/// `rgpot_potential_free`.
+/// The caller must eventually pass the returned pointer to `rgpot_potential_free`.
 #[no_mangle]
 pub unsafe extern "C" fn rgpot_potential_new(
     callback: PotentialCallback,
     user_data: *mut c_void,
     free_fn: Option<unsafe extern "C" fn(*mut c_void)>,
 ) -> *mut rgpot_potential_t {
-    let pot = PotentialImpl::new(callback, user_data, free_fn);
-    Box::into_raw(Box::new(pot))
+    use crate::eindir::rgpot_potential_new_eindir;
+    // Create a superset struct with no molecular context.
+    unsafe {
+        rgpot_potential_new_eindir(
+            callback,
+            user_data,
+            free_fn,
+            0,                   // n_atoms = 0
+            std::ptr::null(),    // atomic_numbers
+            std::ptr::null(),    // box_matrix
+            std::ptr::null(),    // bounds_low
+            std::ptr::null(),    // bounds_high
+        )
+    }
 }
 
 /// Perform a force/energy calculation using the potential handle.
 ///
-/// - `pot`: a valid handle obtained from `rgpot_potential_new`.
-/// - `input`: pointer to the input configuration (DLPack tensors).
-/// - `output`: pointer to the output struct. The callback sets `output->forces`
-///   to a callee-allocated DLPack tensor.
-///
-/// Returns `RGPOT_SUCCESS` on success, or an error status code.
-/// On error, call `rgpot_last_error()` for details.
+/// Routes through the direct rgpot callback (`pot.callback`), bypassing the
+/// eindir evaluation path.
 #[no_mangle]
 pub unsafe extern "C" fn rgpot_potential_calculate(
     pot: *const rgpot_potential_t,
@@ -80,21 +83,38 @@ pub unsafe extern "C" fn rgpot_potential_calculate(
             set_last_error("rgpot_potential_calculate: output is NULL");
             return rgpot_status_t::RGPOT_INVALID_PARAMETER;
         }
-
-        let pot_ref = unsafe { &*pot };
-        unsafe { pot_ref.calculate(input, output) }
+        let p = unsafe { &*pot };
+        unsafe { (p.callback)(p.pot_user_data, input, output) }
     }))
 }
 
-/// Free a potential handle previously obtained from `rgpot_potential_new`.
+/// Free a potential handle previously obtained from `rgpot_potential_new` or
+/// `rgpot_potential_new_eindir`.
 ///
-/// If `pot` is `NULL`, this function is a no-op.
-/// After this call, `pot` must not be used again.
+/// Calls `pot_free_fn(pot_user_data)` if provided, frees all owned arrays,
+/// then frees the struct.
 #[no_mangle]
 pub unsafe extern "C" fn rgpot_potential_free(pot: *mut rgpot_potential_t) {
-    if !pot.is_null() {
-        drop(unsafe { Box::from_raw(pot) });
+    if pot.is_null() {
+        return;
     }
+    let p = unsafe { &*pot };
+    if let Some(ff) = p.pot_free_fn {
+        if !p.pot_user_data.is_null() {
+            unsafe { ff(p.pot_user_data) };
+        }
+    }
+    let dim = p.base.dim;
+    if !p.base.low.is_null() {
+        unsafe { drop(Vec::from_raw_parts(p.base.low, dim, dim)) };
+    }
+    if !p.base.high.is_null() {
+        unsafe { drop(Vec::from_raw_parts(p.base.high, dim, dim)) };
+    }
+    if !p.atomic_numbers.is_null() {
+        unsafe { drop(Vec::from_raw_parts(p.atomic_numbers, p.n_atoms, p.n_atoms)) };
+    }
+    unsafe { drop(Box::from_raw(pot)) };
 }
 
 #[cfg(test)]
@@ -103,7 +123,6 @@ mod tests {
     use crate::tensor::{create_owned_f64_tensor, rgpot_tensor_free};
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-    /// A trivial callback that sets energy = n_atoms and returns success.
     unsafe extern "C" fn sum_callback(
         _ud: *mut c_void,
         input: *const rgpot_force_input_t,
@@ -118,7 +137,6 @@ mod tests {
         rgpot_status_t::RGPOT_SUCCESS
     }
 
-    /// A callback that always returns an error.
     unsafe extern "C" fn failing_callback(
         _ud: *mut c_void,
         _input: *const rgpot_force_input_t,
@@ -128,7 +146,6 @@ mod tests {
         rgpot_status_t::RGPOT_INTERNAL_ERROR
     }
 
-    /// A callback that reads user_data as a counter and increments it.
     unsafe extern "C" fn counting_callback(
         ud: *mut c_void,
         _input: *const rgpot_force_input_t,
@@ -169,8 +186,6 @@ mod tests {
         output.forces = std::ptr::null_mut();
     }
 
-    // --- rgpot_potential_new / rgpot_potential_free ---
-
     #[test]
     fn new_returns_non_null() {
         let pot = unsafe { rgpot_potential_new(sum_callback, std::ptr::null_mut(), None) };
@@ -183,8 +198,6 @@ mod tests {
         unsafe { rgpot_potential_free(std::ptr::null_mut()) };
     }
 
-    // --- rgpot_potential_calculate: null argument handling ---
-
     #[test]
     fn calculate_null_pot_returns_invalid_parameter() {
         let (_pos, _atmnrs, _box_, mut input) = make_test_input();
@@ -193,7 +206,6 @@ mod tests {
             energy: 0.0,
             variance: 0.0,
         };
-
         let status = unsafe {
             rgpot_potential_calculate(std::ptr::null(), &input, &mut output)
         };
@@ -209,7 +221,6 @@ mod tests {
             energy: 0.0,
             variance: 0.0,
         };
-
         let status = unsafe {
             rgpot_potential_calculate(pot, std::ptr::null(), &mut output)
         };
@@ -221,7 +232,6 @@ mod tests {
     fn calculate_null_output_returns_invalid_parameter() {
         let pot = unsafe { rgpot_potential_new(sum_callback, std::ptr::null_mut(), None) };
         let (_pos, _atmnrs, _box_, mut input) = make_test_input();
-
         let status = unsafe {
             rgpot_potential_calculate(pot, &input, std::ptr::null_mut())
         };
@@ -232,8 +242,6 @@ mod tests {
         }
     }
 
-    // --- rgpot_potential_calculate: success path ---
-
     #[test]
     fn full_lifecycle_new_calculate_free() {
         let pot = unsafe { rgpot_potential_new(sum_callback, std::ptr::null_mut(), None) };
@@ -243,19 +251,15 @@ mod tests {
             energy: 0.0,
             variance: 0.0,
         };
-
         let status = unsafe { rgpot_potential_calculate(pot, &input, &mut output) };
         assert_eq!(status, rgpot_status_t::RGPOT_SUCCESS);
-        assert_eq!(output.energy, 2.0); // n_atoms = 2
+        assert_eq!(output.energy, 2.0);
         assert!(!output.forces.is_null());
-
         unsafe {
             cleanup(&mut input, &mut output);
             rgpot_potential_free(pot as *mut _);
         }
     }
-
-    // --- Error propagation from callback ---
 
     #[test]
     fn callback_error_propagates() {
@@ -268,20 +272,15 @@ mod tests {
             energy: 0.0,
             variance: 0.0,
         };
-
         let status = unsafe { rgpot_potential_calculate(pot, &input, &mut output) };
         assert_eq!(status, rgpot_status_t::RGPOT_INTERNAL_ERROR);
-
         let msg = unsafe { std::ffi::CStr::from_ptr(crate::status::rgpot_last_error()) };
         assert_eq!(msg.to_str().unwrap(), "deliberately failed");
-
         unsafe {
             crate::c_api::types::rgpot_force_input_free(&mut input);
             rgpot_potential_free(pot as *mut _);
         }
     }
-
-    // --- user_data passthrough ---
 
     #[test]
     fn user_data_is_forwarded_to_callback() {
@@ -293,29 +292,23 @@ mod tests {
                 None,
             )
         };
-
         let (_pos, _atmnrs, _box_, mut input) = make_test_input();
         let mut output = rgpot_force_out_t {
             forces: std::ptr::null_mut(),
             energy: 0.0,
             variance: 0.0,
         };
-
         unsafe { rgpot_potential_calculate(pot, &input, &mut output) };
         assert_eq!(counter.load(Ordering::SeqCst), 1);
         assert_eq!(output.energy, 1.0);
-
         unsafe { rgpot_potential_calculate(pot, &input, &mut output) };
         assert_eq!(counter.load(Ordering::SeqCst), 2);
         assert_eq!(output.energy, 2.0);
-
         unsafe {
             crate::c_api::types::rgpot_force_input_free(&mut input);
             rgpot_potential_free(pot as *mut _);
         }
     }
-
-    // --- free_fn is called on drop ---
 
     static FREE_CALLED: AtomicBool = AtomicBool::new(false);
 
@@ -326,7 +319,6 @@ mod tests {
     #[test]
     fn free_fn_is_invoked_on_drop() {
         FREE_CALLED.store(false, Ordering::SeqCst);
-
         let mut dummy: u8 = 42;
         let pot = unsafe {
             rgpot_potential_new(
@@ -335,23 +327,18 @@ mod tests {
                 Some(track_free),
             )
         };
-
         assert!(!FREE_CALLED.load(Ordering::SeqCst));
         unsafe { rgpot_potential_free(pot) };
         assert!(FREE_CALLED.load(Ordering::SeqCst));
     }
 
-    // --- Multiple sequential calculations on the same handle ---
-
     #[test]
     fn multiple_calculations_same_handle() {
         let pot = unsafe { rgpot_potential_new(sum_callback, std::ptr::null_mut(), None) };
-
         for n in 1..=5_usize {
             let mut pos = vec![0.0_f64; n * 3];
             let mut atmnrs = vec![1_i32; n];
             let mut box_ = [10.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
-
             let mut input = unsafe {
                 crate::c_api::types::rgpot_force_input_create(
                     n,
@@ -365,14 +352,11 @@ mod tests {
                 energy: 0.0,
                 variance: 0.0,
             };
-
             let status = unsafe { rgpot_potential_calculate(pot, &input, &mut output) };
             assert_eq!(status, rgpot_status_t::RGPOT_SUCCESS);
             assert_eq!(output.energy, n as f64);
-
             unsafe { cleanup(&mut input, &mut output) };
         }
-
         unsafe { rgpot_potential_free(pot as *mut _) };
     }
 }

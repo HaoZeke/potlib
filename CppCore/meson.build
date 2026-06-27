@@ -10,6 +10,17 @@ endif
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
 
+# Cap'n Proto schema + NWChem/CPMD frontends need libcapnp (ptlrpc). Only pull
+# them in when RPC is on (server or client-only); lean -Dwith_rpc=false builds
+# (xtb/tblite/metatomic CI) must not require pkg-config 'capnp-rpc'.
+_rpc_stack = rpc_enabled or get_option('with_rpc_client_only')
+if _rpc_stack
+    subdir('rgpot/rpc')
+    # Pure dlopen consumers of split nwchemc / cpmdc; need generated schema only.
+    subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
+    subdir('rgpot/CPMDPot')    # 'cpmdpot' frontend + no-op ABI stub
+endif
+
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
     rgpot_core = static_library(
@@ -46,12 +57,21 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
+    if _rpc_stack
+        rgpotentials += [nwchempot]
+        rgpotentials += [cpmdpot]
+    endif
+
     _linkto += rgpotentials
 
     # Create library
+    rgpot_deps = _deps
+    if _rpc_stack
+        rgpot_deps += [ptlrpc_dep]
+    endif
     rgpot = library(
         'rgpot',
-        dependencies: _deps,
+        dependencies: rgpot_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_with: _linkto,
@@ -60,8 +80,17 @@ if not get_option('with_rpc_client_only')
 endif
 
 # ------------------------ Server
-if rpc_enabled
-    subdir('rgpot/rpc')
+if rpc_enabled and not get_option('with_rpc_client_only')
+    server = executable(
+        'potserv',
+        ['rgpot/rpc/server.cpp', gen_rpc],
+        link_with: [ptlrpc, _linkto],
+        dependencies: _deps + [capnp_rpc_dep],
+        cpp_args: _args,
+        include_directories: _incdirs,
+        link_language: 'cpp',
+        install: not meson.is_subproject(),
+    )
 endif
 
 # ------------------------ Examples
@@ -153,6 +182,129 @@ if get_option('with_tests')
                 '/CppCore/tests',
             ],
         ]
+    endif
+    # NWChem/CPMD frontend tests (need ptlrpc + frontends from _rpc_stack)
+    if _rpc_stack and not get_option('with_rpc_client_only')
+        nwchemc_fake_engine = shared_library(
+            'nwchemc_fake_engine',
+            sources: ['tests/nwchemc_fake_engine.c'],
+            include_directories: include_directories('rgpot/NWChemPot'),
+            install: false,
+        )
+        nwchemc_fake_env = environment()
+        nwchemc_fake_env.set(
+            'RGPOT_NWCHEM_ENGINE',
+            nwchemc_fake_engine.full_path(),
+        )
+        test(
+            'NWChemPotTest',
+            executable(
+                'nwchem_pot_test',
+                sources: ['tests/NWChemPotTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: nwchemc_fake_env,
+            depends: nwchemc_fake_engine,
+            workdir: meson.source_root(),
+            suite: 'nwchem',
+        )
+        test(
+            'NWChemPotMessageAbiTest',
+            executable(
+                'nwchem_pot_message_abi_test',
+                sources: ['tests/NWChemPotMessageAbiTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: nwchemc_fake_env,
+            depends: nwchemc_fake_engine,
+            workdir: meson.source_root(),
+            suite: 'nwchem',
+        )
+        test(
+            'test_nwchem_abi',
+            executable(
+                'test_nwchem_abi',
+                sources: ['tests/test_nwchem_abi_main.c'],
+                dependencies: [nwchem_abi_stub_dep],
+                include_directories: include_directories('rgpot/NWChemPot'),
+            ),
+            suite: 'nwchem',
+        )
+        cpmdc_fake_engine = shared_library(
+            'cpmdc_fake_engine',
+            sources: ['tests/cpmdc_fake_engine.cc'],
+            dependencies: [ptlrpc_dep],
+            include_directories: _incdirs + ['.'] + include_directories(
+                'rgpot/CPMDPot',
+            ),
+            install: false,
+        )
+        cpmdc_fake_env = environment()
+        cpmdc_fake_env.set(
+            'RGPOT_CPMD_ENGINE',
+            cpmdc_fake_engine.full_path(),
+        )
+        test(
+            'CPMDPotMessageAbiTest',
+            executable(
+                'cpmd_pot_message_abi_test',
+                sources: ['tests/CPMDPotMessageAbiTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: cpmdc_fake_env,
+            depends: cpmdc_fake_engine,
+            workdir: meson.source_root(),
+            suite: 'cpmd',
+        )
+        test(
+            'test_cpmd_abi',
+            executable(
+                'test_cpmd_abi',
+                sources: ['tests/test_cpmd_abi_main.c'],
+                dependencies: [cpmd_abi_stub_dep],
+                include_directories: include_directories('rgpot/CPMDPot'),
+            ),
+            suite: 'cpmd',
+        )
+        test(
+            'CPMDDlopenContract',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_cpmd_dlopen_contract.py',
+                meson.source_root(),
+            ],
+            suite: 'cpmd',
+        )
+        test(
+            'NWChemDlopenContract',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_nwchem_dlopen_contract.py',
+                meson.source_root(),
+            ],
+            suite: 'nwchem',
+        )
+        test(
+            'RPCSchemaSync',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_rpc_schema_sync.py',
+                meson.source_root(),
+            ],
+            suite: 'rpc',
+        )
     endif
     if rpc_enabled
         test_deps += dependency('capnp-rpc')

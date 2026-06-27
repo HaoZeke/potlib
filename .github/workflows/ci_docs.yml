@@ -1,4 +1,3 @@
----
 concurrency:
   cancel-in-progress: true
   group: pages
@@ -19,7 +18,7 @@ jobs:
         cache: true
         cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
         environments: docs
-        pixi-version: v0.62.1
+        pixi-version: v0.70.2
     - name: Generate Docs
       run: pixi r docbld
       shell: pixi run bash -e {0}

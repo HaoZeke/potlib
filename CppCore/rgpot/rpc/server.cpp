@@ -28,7 +28,9 @@
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #endif // RGPOT_HAS_METATOMIC
 
+#include "rgpot/CPMDPot/CPMDPot.hpp"
 #include "rgpot/LennardJones/LJPot.hpp"
+#include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/Potential.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 #include "rgpot/types/adapters/capnp/capnp_adapter.hpp"
@@ -45,6 +47,10 @@ class GenericPotImpl final : public Potential::Server {
 private:
   std::unique_ptr<rgpot::PotentialBase>
       m_potential; //!< The polymorphic potential engine.
+  /// Optional typed handle when backend is NWChem (for configure()).
+  rgpot::NWChemPot *m_nwchem = nullptr;
+  /// Optional typed handle when backend is CPMD (for configure()).
+  rgpot::CPMDPot *m_cpmd = nullptr;
 
 public:
   /**
@@ -53,6 +59,18 @@ public:
    */
   GenericPotImpl(std::unique_ptr<rgpot::PotentialBase> pot)
       : m_potential(std::move(pot)) {}
+
+  /**
+   * @brief Constructor retaining an NWChemPot pointer for configure().
+   * Members initialize in declaration order (m_potential then m_nwchem).
+   */
+  GenericPotImpl(std::unique_ptr<rgpot::NWChemPot> pot)
+      : m_potential(std::move(pot)),
+        m_nwchem(static_cast<rgpot::NWChemPot *>(m_potential.get())) {}
+
+  GenericPotImpl(std::unique_ptr<rgpot::CPMDPot> pot)
+      : m_potential(std::move(pot)),
+        m_cpmd(static_cast<rgpot::CPMDPot *>(m_potential.get())) {}
 
   /**
    * @details
@@ -122,6 +140,22 @@ public:
 
     return kj::READY_NOW;
   }
+
+  kj::Promise<void> configure(ConfigureContext context) override {
+    auto cfg = context.getParams().getConfig();
+    auto results = context.getResults();
+    if (!m_nwchem && !m_cpmd) {
+      results.setOk(false);
+      results.setMessage("configure() only supported for NWChem or CPMD backend");
+      return kj::READY_NOW;
+    }
+    std::string msg;
+    bool ok = m_nwchem ? m_nwchem->setPotentialConfig(cfg, &msg)
+                       : m_cpmd->setPotentialConfig(cfg, &msg);
+    results.setOk(ok);
+    results.setMessage(msg);
+    return kj::READY_NOW;
+  }
 };
 
 /**
@@ -150,6 +184,8 @@ int main(int argc, char *argv[]) {
 #ifdef RGPOT_HAS_METATOMIC
               << ", Metatomic:<model_path>"
 #endif
+              << ", NWChem"
+              << ", CPMD"
               << std::endl;
     return 1;
   }
@@ -218,9 +254,47 @@ int main(int argc, char *argv[]) {
               << std::endl;
     potential_to_use = std::make_unique<rgpot::MetatomicPot>(cfg);
 #endif // RGPOT_HAS_METATOMIC
+  } else if (pot_type == "NWChem") {
+    std::cout << "Loading NWChem potential (dlopen libnwchemc)..."
+              << std::endl;
+    auto nw = std::make_unique<rgpot::NWChemPot>();
+    if (!nw->available()) {
+      std::cerr << "Warning: libnwchemc not loaded; calculate() will fail "
+                   "until engine is available (configure() still accepted)."
+                << std::endl;
+    }
+    potential_to_use = nullptr; // use dedicated path below
+    capnp::EzRpcServer server(kj::heap<GenericPotImpl>(std::move(nw)),
+                              "localhost", port);
+    auto &waitScope = server.getWaitScope();
+    std::cout << "Server running on port " << port << " with " << pot_type
+              << " potential." << std::endl;
+    kj::NEVER_DONE.wait(waitScope);
+    return 0;
+  } else if (pot_type == "CPMD") {
+    std::cout << "Loading CPMD potential (dlopen libcpmdc)..." << std::endl;
+    auto cp = std::make_unique<rgpot::CPMDPot>();
+    if (!cp->available()) {
+      std::cerr << "Warning: libcpmdc not loaded; calculate() will fail "
+                   "until engine is available (configure() still accepted)."
+                << std::endl;
+    }
+    potential_to_use = nullptr;
+    capnp::EzRpcServer server(kj::heap<GenericPotImpl>(std::move(cp)),
+                              "localhost", port);
+    auto &waitScope = server.getWaitScope();
+    std::cout << "Server running on port " << port << " with " << pot_type
+              << " potential." << std::endl;
+    kj::NEVER_DONE.wait(waitScope);
+    return 0;
   } else {
     std::cerr << "Error: Unknown potential type '" << pot_type << "'"
               << std::endl;
+    return 1;
+  }
+
+  if (!potential_to_use) {
+    std::cerr << "Error: potential not initialized" << std::endl;
     return 1;
   }
 

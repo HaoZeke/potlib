@@ -30,16 +30,23 @@
 #+end_export
 
 * Overview
-~rgpot~ provides a unified schema for interfacing potential servers across
-languages using runtime interoperability.
-It combines a Rust core with C++ potentials exposed through a Cap'n Proto
-RPC layer, enabling language-agnostic access to potential energy surface
-calculations.
+~rgpot~ provides a unified Cap'n Proto schema and RPC server for potential
+energy calculations.
+Clients send ~ForceInput~ messages containing geometry and units,
+receive ~PotentialResult~ messages containing energy and forces, and use
+~PotentialConfig~ only for backend setup.
+
+The C++ server hosts built-in potentials such as Lennard-Jones and CuH2,
+optional xTB / tblite / metatomic backends, and runtime-loaded quantum engines.
+~NWChemPot~ loads ~libnwchemc~ from the split ~nwchemc~ project.
+~CPMDPot~ loads ~libcpmdc~ from the split ~cpmdc~ project.
+Both quantum frontends keep geometry on ~ForceInput~ and carry method options in
+the matching ~PotentialConfig~ arm.
 
 #+begin_src bash
 git clone https://github.com/OmniPotentRPC/rgpot.git
-cd rgpot && pixi shell
-meson setup bbdir -Dwith_tests=True --buildtype=debug
+cd rgpot && pixi shell -e rpctest
+meson setup bbdir -Dwith_tests=true -Dwith_rpc=true --buildtype=debug
 meson compile -C bbdir && meson test -C bbdir
 #+end_src
 
@@ -49,6 +56,7 @@ meson compile -C bbdir && meson test -C bbdir
    :caption: Tutorials
 
    tutorials/quickstart
+   tutorials/molecular-global-optimization
 
 .. toctree::
    :maxdepth: 2
@@ -56,6 +64,7 @@ meson compile -C bbdir && meson test -C bbdir
 
    howto/embedding
    howto/integration
+   howto/eindir-anneal
 
 .. toctree::
    :maxdepth: 2

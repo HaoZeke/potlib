@@ -7,16 +7,20 @@
 ** C/C++ Tests
 
 #+begin_src bash
-meson setup bbdir -Dwith_tests=True --buildtype="debug"
-meson test -C bbdir
+meson setup bbdir -Dwith_tests=true -Dwith_rpc=true --buildtype=debug
+meson compile -C bbdir
+meson test -C bbdir --print-errorlogs
 #+end_src
 
 =cmake= works as well:
 
 #+begin_src bash
-cmake -B build -DRGPOT_BUILD_TESTS=ON -DRGPOT_BUILD_EXAMPLES=ON
+cmake -B build \
+  -DRGPOT_BUILD_TESTS=ON \
+  -DRGPOT_BUILD_EXAMPLES=ON \
+  -DRGPOT_WITH_RPC=ON
 cmake --build build
-ctest --test-dir build
+ctest --test-dir build --output-on-failure
 #+end_src
 
 ** Rust Tests
@@ -39,8 +43,48 @@ The =rpctest= environment includes Python bindings via =pycapnp=:
 
 #+begin_src bash
 pixi shell -e rpctest
-# Start a server in one terminal
-./bbdir/CppCore/rgpot/rpc/potserv 12345 LJ
-# Run client tests in another
-ctest --test-dir build_client/ --output-on-failure
+python tests/rpc_integ.py --server-bin ./bbdir/CppCore/potserv
+python tests/rpc_integ.py \
+  --server-bin ./bbdir/CppCore/potserv \
+  --nwchem-smoke \
+  --cpmd-smoke
+python tests/test_cpmd_params.py
+python tests/test_rpc_integ_cpmd.py
 #+end_src
+
+** NWChem suite (=--suite nwchem=)
+
+Frontend + stub ABI tests always build with the main library
+(=with_tests=true=). Energy/grad tests =SKIP= unless an external =libnwchemc=
+is on the library path (=NWCHEMC_LIBRARY=, =RGPOT_NWCHEMC_ENGINE=, or
+=RGPOT_NWCHEM_ENGINE=). The message ABI test uses a fake =nwchemc_*= shared
+library and verifies rgpot passes serialized =NWChemParams= bytes through the
+=dlopen= boundary.
+
+#+begin_src bash
+meson setup bbdir -Dwith_tests=true -Dwith_rpc=true
+meson compile -C bbdir
+meson test -C bbdir --suite nwchem --print-errorlogs
+#+end_src
+
+See =CppCore/rgpot/NWChemPot/README.md=; the engine (=libnwchemc=) is built by
+the split [[https://github.com/OmniPotentRPC/nwchemc][nwchemc]] project, not
+by rgpot.
+
+** CPMD suite (=--suite cpmd=)
+
+Frontend + stub ABI tests always build with the main library
+(=with_tests=true=). The CPMD frontend loads a split =libcpmdc= engine at
+runtime via =CPMDC_LIBRARY=, =RGPOT_CPMDC_ENGINE=, or =RGPOT_CPMD_ENGINE=.
+Configure-only Python smokes use =PotentialConfig.cpmd= and do not require a
+live engine.
+
+#+begin_src bash
+meson setup bbdir -Dwith_tests=true -Dwith_rpc=true
+meson compile -C bbdir
+meson test -C bbdir --suite cpmd --print-errorlogs
+pixi run -e rpctest python tests/rpc_integ.py --server-bin ./bbdir/CppCore/potserv --cpmd-smoke
+#+end_src
+
+See =CppCore/rgpot/CPMDPot/README.md=; the engine (=libcpmdc=) is built by the
+split [[https://github.com/OmniPotentRPC/cpmdc][cpmdc]] project, not by rgpot.

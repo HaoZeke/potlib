@@ -1,4 +1,3 @@
----
 concurrency:
   cancel-in-progress: true
   group: cosmo-potctl-${{ github.ref }}

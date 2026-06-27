@@ -185,9 +185,9 @@ enum CiCmd {
         build_dir: String,
     },
     /// RPC integration (`tests/rpc_integ.py`).
-    /// Thin GHA: `potctl ci rpc-integ --server-bin bbdir/CppCore/rgpot/rpc/potserv`
+    /// Thin GHA: `potctl ci rpc-integ --server-bin bbdir/CppCore/potserv`
     RpcInteg {
-        #[arg(long, default_value = "bbdir/CppCore/rgpot/rpc/potserv")]
+        #[arg(long, default_value = "bbdir/CppCore/potserv")]
         server_bin: String,
     },
     /// Client bridge stress: meson RPC server build only.

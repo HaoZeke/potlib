@@ -1,5 +1,7 @@
+use std::env;
+
 #[cfg(any(feature = "gen-header", feature = "rpc"))]
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
 /// Generate C header via cbindgen (only when `gen-header` feature is active).
 /// Run `cargo build --features gen-header` or `pixi r gen-header` to regenerate.
@@ -42,8 +44,11 @@ fn generate_c_header(crate_dir: &str) {
 }
 
 fn main() {
-    #[cfg(any(feature = "gen-header", feature = "rpc"))]
+    #[allow(unused_variables)]
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    // eindir-core is a normal Cargo dependency now; its capi #[no_mangle] symbols
+    // resolve through the shared crate, so no prebuilt static lib link is needed.
 
     #[cfg(feature = "gen-header")]
     generate_c_header(&crate_dir);

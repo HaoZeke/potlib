@@ -1,7 +1,7 @@
 project(
     'rgpot',
     'cpp',
-    version: '1.2.0',
+    version: '2.0.0',
     default_options: ['warning_level=2', 'cpp_std=c++20'],
 )
 # IMPORTANT!! warning_level=3 passes -fimplicit-none
@@ -111,6 +111,10 @@ if get_option('with_xtb')
     _args += ['-DRGPOT_HAS_XTB=TRUE']
     has_xtb = true
 endif
+
+# NWChemPot frontend always builds and dlopens the split nwchemc engine
+# (libnwchemc.so) at runtime. rgpot carries no in-process NWChem embed.
+_args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
 
 has_tblite = false
 if get_option('with_tblite')

@@ -63,7 +63,7 @@ in
 let rpc_integration =
   S.run_pixi m%"
   pixi r -e rpctest \
-  python tests/rpc_integ.py --server-bin ${{ matrix.sys == 'meson' && 'bbdir/CppCore/rgpot/rpc/potserv' || 'build/potserv' }}
+  python tests/rpc_integ.py --server-bin ${{ matrix.sys == 'meson' && 'bbdir/CppCore/potserv' || 'build/potserv' }}
 "%
   & {
     name = "RPC Integration Test",
@@ -78,6 +78,8 @@ in
     group = "${{ github.workflow }}-${{ github.ref }}",
     "cancel-in-progress" = true,
   },
+  # build_and_test: no in-tree NWChem; dlopens libnwchemc. Frontend + stub always compile.
+  # Suite nwchem energy/grad needs external libnwchemc; stub probe always runs.
   jobs = {
     "ci-tools" = S.job_ci_tools_os_matrix [P.ubuntu, P.macos],
     build_and_test = {
@@ -160,7 +162,7 @@ in
         "%,
         S.run_pixi m%"
           echo "--- Starting Server ---"
-          ./bbdir_server/CppCore/rgpot/rpc/potserv 12345 LJ &
+          ./bbdir_server/CppCore/potserv 12345 LJ &
           SERVER_PID=$!
           sleep 2
           echo "--- Running Client Stress Tests ---"

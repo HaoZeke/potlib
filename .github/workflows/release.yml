@@ -1,4 +1,3 @@
----
 env:
   CI_TOOLS_ARTIFACT: ci-tools-${{ github.sha }}-Linux
 jobs:
@@ -13,7 +12,7 @@ jobs:
         activate-environment: true
         cache: true
         environments: devbld
-        pixi-version: v0.62.1
+        pixi-version: v0.70.2
     - name: C++ install smoke (meson, default features off)
       run: |-
         meson setup build-release-smoke \
@@ -145,7 +144,7 @@ jobs:
         activate-environment: true
         cache: true
         environments: devbld
-        pixi-version: v0.62.1
+        pixi-version: v0.70.2
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:

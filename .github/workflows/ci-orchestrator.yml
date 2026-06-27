@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  PIXi_VERSION: v0.62.1
+  PIXi_VERSION: v0.70.2
 
 jobs:
   # --- Stage 0: generate plan (and audit yml bundle) from Nickel ---
@@ -37,7 +37,7 @@ jobs:
 
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
           cache: true
           environments: cigen
           activate-environment: true
@@ -88,7 +88,7 @@ jobs:
           activate-environment: true
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
       - name: Install prek
         run: |
           if ! command -v prek >/dev/null 2>&1; then
@@ -256,7 +256,7 @@ jobs:
           artifact-prefix: ci-tools-${{ github.sha }}
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
           cache: true
           environments: devbld rpctest
           activate-environment: devbld
@@ -278,7 +278,7 @@ jobs:
       - if: matrix.rpc == 'true' && matrix.sys == 'meson' && matrix.os == 'ubuntu-latest'
         name: RPC Integration Test
         shell: pixi run -e rpctest bash -e {0}
-        run: potctl ci rpc-integ --server-bin bbdir/CppCore/rgpot/rpc/potserv
+        run: potctl ci rpc-integ --server-bin bbdir/CppCore/potserv
 
   # --- Stage 2b: rust ---
   rust_tests:
@@ -301,7 +301,7 @@ jobs:
           artifact-prefix: ci-tools-${{ github.sha }}
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
           cache: true
           environments: devbld
           activate-environment: devbld
@@ -340,7 +340,7 @@ jobs:
           artifact-prefix: ci-tools-${{ github.sha }}
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
           cache: true
           environments: devbld rpctest
           activate-environment: devbld
@@ -380,7 +380,7 @@ jobs:
           activate-environment: metatomicbld
           cache: true
           environments: metatomicbld
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
       - name: Restore Compiler Cache
         uses: actions/cache@v5
         with:
@@ -422,7 +422,7 @@ jobs:
           activate-environment: tbbld
           cache: true
           environments: tbbld
-          pixi-version: v0.62.1
+          pixi-version: v0.70.2
       - name: Restore Compiler Cache
         uses: actions/cache@v5
         with:

@@ -11,9 +11,9 @@
 
 # Usage (needs the environment setup):
 # 1. Start servers (e.g. in tmux)
-# ./bbdir/CppCore/rgpot/rpc/potserv 12345 LJ
-# ./bbdir/CppCore/rgpot/rpc/potserv 12346 LJ
-# ./bbdir/CppCore/rgpot/rpc/potserv 12347 LJ
+# ./bbdir/CppCore/potserv 12345 LJ
+# ./bbdir/CppCore/potserv 12346 LJ
+# ./bbdir/CppCore/potserv 12347 LJ
 # 2. Run client
 # uv run CppCore/rgpot/rpc/py_parclient.py \
 #        localhost:12345 \

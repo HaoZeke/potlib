@@ -1,0 +1,1 @@
+CPMDPot integrates the split cpmdc C ABI: always-built frontend, `dlopen` of `libcpmdc` (or CI `cpmdc_fake_engine`), Cap'n Proto `CPMDParams` / `PotentialConfig.cpmd` with structured input sections, and `potserv <port> CPMD`. Set `CPMDC_LIBRARY` or `RGPOT_CPMDC_ENGINE` / `RGPOT_CPMD_ENGINE` for the engine path.
