@@ -21,27 +21,7 @@ struct CPMDCSession {
 namespace {
 
 constexpr CPMDCFeatureEntry kFeatures[] = {
-    {"abi.cpmdc_set_params", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_energy_gradient", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_energy", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_energy_forces", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_create", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_set_params", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_destroy", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_energy_gradient", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_energy", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_energy_forces", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_calculate_forces", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_session_calculate_result", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_calculate_result", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_potential_result_size_for_force_input", CPMDC_FEATURE_ABI, 1,
-     1},
-    {"abi.cpmdc_version", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_available", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_finalize", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_feature_count", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_feature_table", CPMDC_FEATURE_ABI, 1, 1},
-    {"abi.cpmdc_feature_find", CPMDC_FEATURE_ABI, 1, 1},
+#include "cpmd_feature_table.inc"
 };
 
 bool has_flat_message(const void *msg, size_t msg_size_bytes) {

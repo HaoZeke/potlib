@@ -21,6 +21,10 @@ def has_feature_entry(text: str, symbol: str) -> bool:
     return f'"abi.{symbol}"' in text
 
 
+def has_literal_feature_entry(text: str, feature_id: str) -> bool:
+    return f'"{feature_id}"' in text
+
+
 def main() -> int:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
     cpmd_dir = root / "CppCore" / "rgpot" / "CPMDPot"
@@ -28,6 +32,9 @@ def main() -> int:
     frontend = (cpmd_dir / "CPMDPot.cc").read_text(encoding="utf-8")
     header = (cpmd_dir / "cpmd_c_abi.h").read_text(encoding="utf-8")
     stub = (cpmd_dir / "cpmd_c_abi_stub.c").read_text(encoding="utf-8")
+    feature_table = (cpmd_dir / "cpmd_feature_table.inc").read_text(
+        encoding="utf-8"
+    )
     fake = (root / "CppCore" / "tests" / "cpmdc_fake_engine.cc").read_text(
         encoding="utf-8"
     )
@@ -55,6 +62,14 @@ def main() -> int:
     require(
         "libcpmdc" in frontend,
         "CPMDPot.cc must dlopen the split cpmdc engine (libcpmdc)",
+    )
+    require(
+        '#include "cpmd_feature_table.inc"' in stub,
+        "cpmd_c_abi_stub.c must use the shared CPMD feature table",
+    )
+    require(
+        '#include "cpmd_feature_table.inc"' in fake,
+        "cpmdc_fake_engine.cc must use the shared CPMD feature table",
     )
     feature_symbols = [
         "cpmdc_feature_count",
@@ -93,12 +108,22 @@ def main() -> int:
         require(has_symbol(stub, symbol), f"cpmd_c_abi_stub.c missing {symbol}")
         require(has_symbol(fake, symbol), f"cpmdc_fake_engine.cc missing {symbol}")
         require(
-            has_feature_entry(stub, symbol),
-            f"cpmd_c_abi_stub.c feature table missing abi.{symbol}",
+            has_feature_entry(feature_table, symbol),
+            f"cpmd_feature_table.inc missing abi.{symbol}",
         )
+    non_abi_features = [
+        "section.system",
+        "section.raw",
+        "params.functional",
+        "params.inputSections",
+        "catalog.section.MOLSTATES",
+        "catalog.cpmd.MOLECULAR_DYNAMICS_CP",
+        "catalog.dft.FUNCTIONAL_PBE0",
+    ]
+    for feature_id in non_abi_features:
         require(
-            has_feature_entry(fake, symbol),
-            f"cpmdc_fake_engine.cc feature table missing abi.{symbol}",
+            has_literal_feature_entry(feature_table, feature_id),
+            f"cpmd_feature_table.inc missing {feature_id}",
         )
     return 0
 
