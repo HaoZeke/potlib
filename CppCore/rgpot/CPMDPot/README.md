@@ -1,41 +1,46 @@
-# CPMDPot - backend under rgpot `PotentialConfig` params
+# CPMDPot
 
-## User options = rgpot `PotentialConfig` (Cap'n Proto)
+`CPMDPot` is the rgpot frontend for CPMD calculations. It owns the C++ and RPC
+side of the integration, then loads a split `libcpmdc` engine at runtime and
+calls the stable C ABI declared in `cpmd_c_abi.h`.
 
-rgpot has one user-facing parameter carrier: `PotentialConfig` in
-`CppCore/rgpot/rpc/Potentials.capnp`. `CPMDParams` is the `cpmd` arm payload.
-Geometry stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
+Configuration and geometry stay separate:
 
-| arm | payload | backend |
+| Carrier | Owner | Role |
 | --- | --- | --- |
-| `none` | `Void` | no-op configure |
-| `nwchem` | `NWChemParams` | NWChemPot |
-| `cpmd` | `CPMDParams` | CPMDPot |
+| `PotentialConfig.cpmd` | rgpot RPC clients | selects the CPMD backend arm |
+| `CPMDParams` | rgpot clients, forwarded to `cpmdc` | method and backend setup |
+| `ForceInput` | every `calculate()` call | coordinates, atomic numbers, box, units |
+| `PotentialResult` | `cpmdc` session result ABI, returned by rgpot | energy and forces |
 
-## Runtime model
+`CPMDPot` does not render CPMD decks itself. It serializes `CPMDParams`, passes
+the flat Cap'n Proto bytes into `libcpmdc`, and lets the engine merge those
+params with each `ForceInput`.
 
-`CPMDPot.cc` is an always-built frontend that serializes `CPMDParams`, `dlopen`s
-the split `libcpmdc` engine, and calls the stable C ABI in `cpmd_c_abi.h`.
-rgpot is a pure consumer of the engine implementation.
-The local ABI header also mirrors `cpmdc_feature_count`,
-`cpmdc_feature_table`, and `cpmdc_feature_find` so frontends can discover
-engine/catalog support from the same C boundary.
+## Engine Loading
 
-Engine lookup order:
+`CPMDPot` probes engine paths in this order:
 
-| variable/path | role |
+| Source | Meaning |
 | --- | --- |
-| `CPMDParams.enginePath` | explicit frontend library path |
-| `CPMDC_LIBRARY` | explicit frontend library path |
-| `RGPOT_CPMDC_ENGINE` | explicit frontend library path |
-| `RGPOT_CPMD_ENGINE` | explicit frontend library path |
-| `libcpmdc.so`, `./libcpmdc.so`, `libcpmdc.dylib`, `./libcpmdc.dylib`, `cpmdc.dll` | probe names |
+| `CPMDParams.enginePath` | explicit path carried in the config message |
+| `CPMDC_LIBRARY` | process-level engine path |
+| `RGPOT_CPMDC_ENGINE` | rgpot-specific engine path |
+| `RGPOT_CPMD_ENGINE` | compatibility engine path |
+| `libcpmdc.so`, `./libcpmdc.so`, `libcpmdc.dylib`, `./libcpmdc.dylib`, `cpmdc.dll` | default probe names |
 
-`CPMDParams.cpmdRoot` is applied as `CPMD_ROOT` before the engine is loaded.
+`CPMDParams.cpmdRoot` is applied to `CPMD_ROOT` before the engine is loaded.
 
-## `CPMDParams` fields
+The frontend requires the feature-discovery ABI:
+`cpmdc_feature_count`, `cpmdc_feature_table`, and `cpmdc_feature_find`. It then
+uses the session-result ABI when available:
+`cpmdc_session_create`, `cpmdc_potential_result_size_for_force_input`, and
+`cpmdc_session_calculate_result`. Older engines can fall back to the one-shot
+energy-gradient ABI if they expose it.
 
-| field | default | role |
+## `CPMDParams` Fields
+
+| Field | Default | Role |
 | --- | --- | --- |
 | `functional` | `BLYP` | DFT functional default |
 | `cutOffRy` | `70.0` | plane-wave cutoff in Ry |
@@ -51,47 +56,74 @@ Engine lookup order:
 | `inputBlocks` | empty | raw CPMD input blocks |
 | `inputSections` | empty | typed or raw CPMD input sections |
 
-`inputSections` supports `generic`, `system`, `cpmd`, `dft`, `atoms`, `set`, and
-`raw` arms. `set` carries a `SECTION.KEYWORD` key plus optional value and maps to
-the CPMD `SET` directive path in the engine.
-For typed `atoms`, `pseudopotentials` are keyed by element symbol and are used by
-the engine to group `ForceInput` coordinates into `&ATOMS`; every atomic number
-in a geometry step must have a matching pseudopotential entry. If `atoms` is
-omitted, the engine provides built-in BLYP defaults only for H and O. The same
-section also accepts structured `directives` for ATOMS keywords that are not
-pseudopotential entries.
+`inputSections` supports `generic`, `system`, `cpmd`, `dft`, `atoms`, `set`,
+and `raw` arms. Prefer typed arms where they exist, then use `generic`, `set`,
+or `raw` for CPMD input that has no typed rgpot schema yet.
 
-## Python helpers and RPC smoke
+Typed `atoms` sections carry pseudopotential entries keyed by element symbol.
+The engine groups `ForceInput` coordinates into `&ATOMS`; every atomic number
+in a step must have a matching pseudopotential entry. When `atoms` is omitted,
+the engine's built-in BLYP defaults cover H and O only. The same section also
+accepts structured `directives` for non-coordinate `&ATOMS` keywords.
+
+## Python Client Helpers
 
 `tests/cpmd_params.py` builds `CPMDParams` and `PotentialConfig.cpmd` messages
-for pycapnp clients. Use `input_sections` for the full structured section
-surface; each item has a `kind` plus arm fields, for example:
+for pycapnp clients. It reads `CPMD_ROOT`, `CPMDC_LIBRARY`,
+`RGPOT_CPMDC_ENGINE`, and `RGPOT_CPMD_ENGINE` when explicit values are not
+provided.
 
 ```python
 params = make_cpmd_params(
     pot_capnp,
+    functional="PBE0",
+    cut_off_ry=88.0,
     input_sections=[
         {"kind": "generic", "name": "PIMD",
          "directives": [{"keyword": "TEMP", "args": ["300"]}]},
-        {"kind": "cpmd", "molecularDynamics": True, "maxStep": 8},
+        {"kind": "system",
+         "cell": [8.0, 8.0, 9.0, 90.0, 90.0, 120.0],
+         "charge": 1,
+         "multiplicity": 3,
+         "scale": 0.5},
+        {"kind": "cpmd",
+         "molecularDynamics": True,
+         "maxStep": 8,
+         "restartWavefunction": True,
+         "trajectory": True},
         {"kind": "dft", "functional": "PBE0", "lsd": True},
         {"kind": "atoms",
          "pseudopotentials": [
              {"element": "Si", "path": "Si_MT_PBE.psp", "lmax": 2},
          ],
          "directives": [{"keyword": "ISOLATED MOLECULE", "args": []}]},
+        {"kind": "set", "key": "CPMD.MAXSTEP", "value": "12"},
         {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
     ],
 )
 ```
 
+To configure a running RPC server:
+
+```python
+cfg = make_potential_config_cpmd(pot_capnp, functional="BLYP")
+result = await pot.configure(cfg)
+```
+
+`configure(cpmd)` returns `ok=false` when no usable `libcpmdc` engine can be
+loaded or when the engine rejects the params. `configure(none)` is a no-op and
+does not prove that CPMD evaluation is available.
+
+## Local Checks
+
 ```bash
 pixi run -e rpctest python tests/test_cpmd_params.py
 pixi run -e rpctest python tests/test_rpc_integ_cpmd.py
+pixi run -e rpctest meson test -C ./bbdir --suite cpmd --print-errorlogs
 pixi run -e rpctest python tests/rpc_integ.py \
   --server-bin ./bbdir/CppCore/potserv \
   --cpmd-smoke
 ```
 
-The smoke calls `configure(none)` and `configure(cpmd)`. `calculate()` requires
-an available `libcpmdc` engine.
+The `--cpmd-smoke` path exercises RPC `configure()` plumbing. `calculate()`
+requires an available `libcpmdc` engine.
