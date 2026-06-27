@@ -202,7 +202,7 @@ size_t cpmdc_potential_result_size_for_force_input(
                                          force_input_capnp_size_bytes, reader),
                         &force_count, &cell_zz))
       return 0;
-    return make_result(force_count, cell_zz).size() * sizeof(::capnp::word);
+    return make_result(force_count, cell_zz).size();
   } catch (const kj::Exception &) {
     return 0;
   }
@@ -259,13 +259,13 @@ CPMDCResult cpmdc_session_calculate_result(
                                          force_input_capnp_size_bytes, reader),
                         &force_count, &cell_zz))
       return fail_result("invalid fake ForceInput");
-    const auto result_words = make_result(force_count, cell_zz);
-    const size_t required = result_words.size() * sizeof(::capnp::word);
+    const auto result_bytes = make_result(force_count, cell_zz);
+    const size_t required = result_bytes.size();
     *potential_result_capnp_size_bytes = required;
     if (potential_result_capnp == nullptr ||
         potential_result_capnp_capacity_bytes < required)
       return fail_result("result buffer too small");
-    std::memcpy(potential_result_capnp, result_words.data(), required);
+    std::memcpy(potential_result_capnp, result_bytes.data(), required);
     return ok_result("session result ok");
   } catch (const kj::Exception &ex) {
     return fail_result(ex.getDescription().cStr());
