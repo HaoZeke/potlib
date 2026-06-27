@@ -5,10 +5,10 @@
 * Find the Ground State of an EON Structure
 
 Atomistic workflows minimize.
-ASE relaxes structures with L-BFGS and FIRE; [[https://github.com/TheochemUI/
-eOn][eOn]] runs its own L-BFGS and conjugate-gradient minimizers at the end of
-every min-mode and nudged-elastic-band search, over structures stored as EON
-=.con= files and driven by a potential rgpot serves over RPC.
+ASE relaxes structures with L-BFGS and FIRE; eOn (TheochemUI/eOn on GitHub) runs
+its own L-BFGS and conjugate-gradient minimizers at the end of every min-mode
+and nudged-elastic-band search, over structures stored as EON =.con= files and
+driven by a potential rgpot serves over RPC.
 The atomistic-cookbook example lab-cosmo/atomistic-cookbook runs exactly this
 stack: a PET-MAD model, a NEB path, eOn's saddle search.
 

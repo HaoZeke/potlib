@@ -135,9 +135,9 @@ CPMDCSession *cpmdc_session_create(const void *params_capnp,
   if (!has_flat_message(params_capnp, params_capnp_size_bytes))
     return nullptr;
   auto *session = new CPMDCSession;
-  const auto *words = static_cast<const ::capnp::word *>(params_capnp);
-  session->params.assign(words,
-                         words + params_capnp_size_bytes / sizeof(*words));
+  const size_t n_words = params_capnp_size_bytes / sizeof(::capnp::word);
+  session->params.resize(n_words);
+  std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
   return session;
 }
 
@@ -146,9 +146,9 @@ int cpmdc_session_set_params(CPMDCSession *session, const void *params_capnp,
   if (session == nullptr ||
       !has_flat_message(params_capnp, params_capnp_size_bytes))
     return -1;
-  const auto *words = static_cast<const ::capnp::word *>(params_capnp);
-  session->params.assign(words,
-                         words + params_capnp_size_bytes / sizeof(*words));
+  const size_t n_words = params_capnp_size_bytes / sizeof(::capnp::word);
+  session->params.resize(n_words);
+  std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
   return 0;
 }
 
