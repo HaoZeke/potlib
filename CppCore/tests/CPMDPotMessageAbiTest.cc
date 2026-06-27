@@ -34,15 +34,12 @@ TEST_CASE("CPMDPot passes serialized CPMDParams to cpmdc engine",
   positions(0, 2) = 0.0;
   std::vector<int> atmtypes{8};
   std::array<std::array<double, 3>, 3> box = {
-      {{20.0, 0.0, 0.0}, {0.0, 20.0, 0.0}, {0.0, 0.0, 20.0}}};
+      {{20.0, 0.0, 0.0}, {0.0, 21.0, 0.0}, {0.0, 0.0, 23.0}}};
 
   auto [energy, forces] = pot(positions, atmtypes, box);
 
-  REQUIRE_THAT(energy, WithinAbs(0.50 * rgpot::units::HARTREE_TO_EV, 1e-12));
-  REQUIRE_THAT(forces(0, 0),
-               WithinAbs(0.004 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
-  REQUIRE_THAT(forces(0, 1),
-               WithinAbs(0.005 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
-  REQUIRE_THAT(forces(0, 2),
-               WithinAbs(0.006 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
+  REQUIRE_THAT(energy, WithinAbs(0.773, 1e-12));
+  REQUIRE_THAT(forces(0, 0), WithinAbs(0.011, 1e-12));
+  REQUIRE_THAT(forces(0, 1), WithinAbs(0.012, 1e-12));
+  REQUIRE_THAT(forces(0, 2), WithinAbs(0.013, 1e-12));
 }
