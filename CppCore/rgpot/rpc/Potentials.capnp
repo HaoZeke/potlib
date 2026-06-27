@@ -312,7 +312,89 @@ struct NWChemParams {
   # NWChemInputStanza.raw, inputBlocks, NWChemSetDirective, or NWChemModuleStanza.custom.
 }
 
-# Future backend option structs (extend here, then add a PotentialConfig union arm):
+struct CPMDDirective {
+  keyword @0 :Text;
+  args    @1 :List(Text);
+}
+
+struct CPMDGenericSection {
+  name       @0 :Text;
+  directives @1 :List(CPMDDirective);
+}
+
+struct CPMDSetDirective {
+  key   @0 :Text;
+  value @1 :Text;
+}
+
+struct CPMDSystemSection {
+  symmetry        @0 :Int32 = 0;
+  angstrom        @1 :Bool = true;
+  cell            @2 :List(Float64);
+  cutOffRy        @3 :Float64 = 70.0;
+  scale           @4 :Float64 = 0.0;
+  charge          @5 :Int32 = 0;
+  multiplicity    @6 :Int32 = 1;
+  directives      @7 :List(CPMDDirective);
+}
+
+struct CPMDCpmdSection {
+  optimizeWavefunction @0 :Bool = true;
+  molecularDynamics    @1 :Bool = false;
+  convergenceOrbitals  @2 :Float64 = 1.0e-6;
+  maxStep              @3 :Int32 = 0;
+  timestep             @4 :Float64 = 0.0;
+  restartWavefunction  @5 :Bool = false;
+  trajectory           @6 :Bool = false;
+  directives           @7 :List(CPMDDirective);
+}
+
+struct CPMDDftSection {
+  functional @0 :Text = "BLYP";
+  lsd        @1 :Bool = false;
+  directives @2 :List(CPMDDirective);
+}
+
+struct CPMDAtomsPseudopotential {
+  element @0 :Text;
+  path    @1 :Text;
+  lmax    @2 :Int32 = -1;
+}
+
+struct CPMDAtomsSection {
+  pseudopotentials @0 :List(CPMDAtomsPseudopotential);
+  directives       @1 :List(CPMDDirective);
+}
+
+struct CPMDInputSection {
+  union {
+    generic @0 :CPMDGenericSection;
+    system  @1 :CPMDSystemSection;
+    cpmd    @2 :CPMDCpmdSection;
+    dft     @3 :CPMDDftSection;
+    atoms   @4 :CPMDAtomsSection;
+    set     @5 :CPMDSetDirective;
+    raw     @6 :Text;
+  }
+}
+
+struct CPMDParams {
+  functional    @0 :Text = "BLYP";
+  cutOffRy      @1 :Float64 = 70.0;
+  charge        @2 :Int32 = 0;
+  multiplicity  @3 :Int32 = 1;
+  task          @4 :Text = "gradient";
+  title         @5 :Text = "";
+  memoryMb      @6 :UInt32 = 0;
+  scratchDir    @7 :Text = "";
+  permanentDir  @8 :Text = "";
+  cpmdRoot      @9 :Text = "";
+  enginePath    @10 :Text = "";
+  inputBlocks   @11 :List(Text);
+  inputSections @12 :List(CPMDInputSection);
+}
+
+# Backend option structs extend here, then add a PotentialConfig union arm:
 #   struct XTBParams { method @0 :Text = "GFN2-xTB"; ... }
 #   struct TBLiteParams { method @0 :Text = "GFN2-xTB"; ... }
 #   struct MetatomicParams { modelPath @0 :Text; device @1 :Text = "cpu"; ... }
@@ -326,15 +408,16 @@ struct NWChemParams {
 # TOML/JSON/YAML option files for backends.
 #
 # Tagged union: exactly one backend's options (or none). Add new arms as new
-# potentials gain runtime knobs (e.g. metatomic @2 :MetatomicParams).
+# potentials gain runtime knobs (e.g. metatomic @3 :MetatomicParams).
 # `calculate` geometry stays on ForceInput; this struct is method/backend setup only.
 struct PotentialConfig {
   union {
     none      @0 :Void;         # No backend-specific options (or no-op configure).
     nwchem    @1 :NWChemParams; # NWChemPot / potserv ... NWChem
-    # metatomic @2 :MetatomicParams;  # reserved pattern for later
-    # xtb       @3 :XTBParams;
-    # tblite    @4 :TBLiteParams;
+    cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... CPMD
+    # metatomic @3 :MetatomicParams;
+    # xtb       @4 :XTBParams;
+    # tblite    @5 :TBLiteParams;
   }
 }
 

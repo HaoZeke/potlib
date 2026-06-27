@@ -17,6 +17,7 @@ subdir('rgpot/rpc')
 # potentials. Build it unconditionally and expose nwchempot_dep so consumers get
 # the in-process NWChem frontend even in lean (with_rpc_client_only) builds.
 subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
+subdir('rgpot/CPMDPot')  # 'cpmdpot' frontend + no-op ABI stub
 
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
@@ -56,6 +57,7 @@ if not get_option('with_rpc_client_only')
 
     # NWChemPot was built above (unconditionally); link it into the full lib.
     rgpotentials += [nwchempot]
+    rgpotentials += [cpmdpot]
 
     _linkto += rgpotentials
 
@@ -214,6 +216,7 @@ if get_option('with_tests')
                 link_language: 'cpp',
             ),
             env: nwchemc_fake_env,
+            depends: nwchemc_fake_engine,
             workdir: meson.source_root(),
             suite: 'nwchem',
         )
@@ -226,6 +229,52 @@ if get_option('with_tests')
                 include_directories: include_directories('rgpot/NWChemPot'),
             ),
             suite: 'nwchem',
+        )
+        cpmdc_fake_engine = shared_library(
+            'cpmdc_fake_engine',
+            sources: ['tests/cpmdc_fake_engine.c'],
+            include_directories: include_directories('rgpot/CPMDPot'),
+            install: false,
+        )
+        cpmdc_fake_env = environment()
+        cpmdc_fake_env.set(
+            'RGPOT_CPMD_ENGINE',
+            cpmdc_fake_engine.full_path(),
+        )
+        test(
+            'CPMDPotMessageAbiTest',
+            executable(
+                'cpmd_pot_message_abi_test',
+                sources: ['tests/CPMDPotMessageAbiTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: cpmdc_fake_env,
+            depends: cpmdc_fake_engine,
+            workdir: meson.source_root(),
+            suite: 'cpmd',
+        )
+        test(
+            'test_cpmd_abi',
+            executable(
+                'test_cpmd_abi',
+                sources: ['tests/test_cpmd_abi_main.c'],
+                dependencies: [cpmd_abi_stub_dep],
+                include_directories: include_directories('rgpot/CPMDPot'),
+            ),
+            suite: 'cpmd',
+        )
+        test(
+            'CPMDDlopenContract',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_cpmd_dlopen_contract.py',
+                meson.source_root(),
+            ],
+            suite: 'cpmd',
         )
         test(
             'NWChemDlopenContract',

@@ -1,0 +1,43 @@
+#include "cpmd_c_abi.h"
+
+#include <stddef.h>
+#include <stdio.h>
+
+static int has_flat_message(const void *params_capnp,
+                            size_t params_capnp_size_bytes) {
+  return params_capnp != NULL && params_capnp_size_bytes >= 8 &&
+         (params_capnp_size_bytes % 8) == 0;
+}
+
+int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes) {
+  return has_flat_message(params_capnp, params_capnp_size_bytes) ? 0 : -1;
+}
+
+CPMDCResult cpmdc_energy_gradient(
+    int n_atoms, const double *positions_ang, const int *atomic_numbers,
+    const void *params_capnp, size_t params_capnp_size_bytes,
+    double *grad_h_bohr) {
+  CPMDCResult r;
+  r.ok = 0;
+  r.energy_h = 0.0;
+  r.message[0] = '\0';
+
+  if (n_atoms <= 0 || positions_ang == NULL || atomic_numbers == NULL ||
+      grad_h_bohr == NULL ||
+      !has_flat_message(params_capnp, params_capnp_size_bytes)) {
+    snprintf(r.message, sizeof(r.message), "invalid fake-engine arguments");
+    return r;
+  }
+
+  for (int i = 0; i < n_atoms * 3; ++i) {
+    grad_h_bohr[i] = 0.004 + 0.001 * (double)i;
+  }
+  r.ok = 1;
+  r.energy_h = 0.50;
+  snprintf(r.message, sizeof(r.message), "ok");
+  return r;
+}
+
+const char *cpmdc_version(void) { return "cpmdc-fake/0.1"; }
+
+int cpmdc_available(void) { return 1; }
