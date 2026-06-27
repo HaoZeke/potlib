@@ -52,10 +52,9 @@ Enable only what the host project needs:
 =libnwchemc.so= from [[https://github.com/OmniPotentRPC/nwchemc][nwchemc]]
 (stable =nwchemc_*= C symbols). rgpot builds no in-process NWChem embed of its
 own and has no =-Dwith_nwchem= option.
-No =nwchem= CLI/subprocess path.
-Build =libnwchemc.so= from the =nwchemc= project, then set =NWCHEMC_LIBRARY= or
-=RGPOT_NWCHEMC_ENGINE=.
-See =CppCore/rgpot/NWChemPot/README.md=.
+No =nwchem= CLI/subprocess path. Build =libnwchemc.so= from the =nwchemc=
+project, then set =NWCHEMC_LIBRARY= or =RGPOT_NWCHEMC_ENGINE=. See =CppCore/
+rgpot/NWChemPot/README.md=.
 
 =CPMDPot= follows the same split-engine pattern: the frontend is always compiled
 and =dlopen=s =libcpmdc.so= from [[https://github.com/OmniPotentRPC/cpmdc]
