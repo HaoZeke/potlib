@@ -35,9 +35,16 @@ def test_configure_cpmd_smoke() -> None:
     pot = FakePotential()
     ok = asyncio.run(configure_cpmd_smoke(pot, pot_capnp))
     assert ok is True
-    assert [cfg.which() for cfg in pot.configs] == ["none", "cpmd"]
+    assert [cfg.which() for cfg in pot.configs] == ["none", "cpmd", "cpmd"]
     assert pot.configs[1].cpmd.functional == "BLYP"
     assert pot.configs[1].cpmd.task == "gradient"
+    assert pot.configs[2].cpmd.functional == "PBE0"
+    assert pot.configs[2].cpmd.task == "gradient"
+    cpmd_section = pot.configs[2].cpmd.inputSections[1].cpmd
+    assert cpmd_section.optimizeGeometry is True
+    assert cpmd_section.convergenceGeometry == 1.0e-4
+    assert cpmd_section.maxIter == 12
+    assert cpmd_section.electronMass == 450.0
 
 
 if __name__ == "__main__":

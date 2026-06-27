@@ -131,8 +131,12 @@ async def configure_cpmd_smoke(pot, pot_capnp):
             },
             {
                 "kind": "cpmd",
+                "optimizeGeometry": True,
                 "molecularDynamics": True,
+                "convergenceGeometry": 1.0e-4,
                 "maxStep": 8,
+                "maxIter": 12,
+                "electronMass": 450.0,
                 "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
             },
             {

@@ -117,14 +117,24 @@ def _set_cpmd_section(section: Any, spec: Any) -> None:
     cpmd.optimizeWavefunction = bool(
         _mapping_value(spec, ["optimizeWavefunction", "optimize_wavefunction"], True)
     )
+    cpmd.optimizeGeometry = bool(
+        _mapping_value(spec, ["optimizeGeometry", "optimize_geometry"], False)
+    )
     cpmd.molecularDynamics = bool(
         _mapping_value(spec, ["molecularDynamics", "molecular_dynamics"], False)
     )
     cpmd.convergenceOrbitals = float(
         _mapping_value(spec, ["convergenceOrbitals", "convergence_orbitals"], 1.0e-6)
     )
+    cpmd.convergenceGeometry = float(
+        _mapping_value(spec, ["convergenceGeometry", "convergence_geometry"], 0.0)
+    )
     cpmd.maxStep = int(_mapping_value(spec, ["maxStep", "max_step"], 0))
+    cpmd.maxIter = int(_mapping_value(spec, ["maxIter", "max_iter"], 0))
     cpmd.timestep = float(_mapping_value(spec, ["timestep"], 0.0))
+    cpmd.electronMass = float(
+        _mapping_value(spec, ["electronMass", "electron_mass"], 0.0)
+    )
     cpmd.restartWavefunction = bool(
         _mapping_value(spec, ["restartWavefunction", "restart_wavefunction"], False)
     )
