@@ -27,9 +27,9 @@ that takes =Objective<f64>= consumes one.
 
 ** rgpot side: =rgpot_potential_t= IS-A =eindir_objective_t=
 
-=rgpot_potential_t= embeds =eindir_objective_t= as its *first* member, so
-a =rgpot_potential_t*= is an =eindir_objective_t*= at zero cost (the C "is-
-a" idiom).
+=rgpot_potential_t= embeds =eindir_objective_t= as its *first* member, so a
+=rgpot_potential_t*= is an =eindir_objective_t*= at zero cost (the C "is- a"
+idiom).
 The embedded =eval_fn= / =grad_fn= call straight through to the rgpot force/
 energy callback, so there is one evaluation path and no conversion step
 (gradient = -force).
