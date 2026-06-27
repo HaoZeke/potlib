@@ -366,6 +366,16 @@ struct CPMDAtomsSection {
   directives       @1 :List(CPMDDirective);
 }
 
+enum CPMDSectionKind {
+  generic @0;
+  system  @1;
+  cpmd    @2;
+  dft     @3;
+  atoms   @4;
+  set     @5;
+  raw     @6;
+}
+
 struct CPMDInputSection {
   union {
     generic @0 :CPMDGenericSection;
