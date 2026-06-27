@@ -60,7 +60,7 @@ engine:
 
 #+begin_src bash
 pixi run -e rpctest python tests/rpc_integ.py \
-  --server-bin ./bbdir/CppCore/rgpot/rpc/potserv \
+  --server-bin ./bbdir/CppCore/potserv \
   --cpmd-smoke
 #+end_src
 

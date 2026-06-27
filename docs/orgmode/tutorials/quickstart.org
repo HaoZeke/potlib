@@ -28,7 +28,7 @@ meson compile -C bbdir
 Expected output (last few lines):
 
 #+begin_example
-[105/105] Linking target CppCore/rgpot/rpc/potserv
+[105/105] Linking target CppCore/potserv
 #+end_example
 
 ** Run the tests
@@ -52,7 +52,7 @@ Open a second terminal (or use =&=) and launch a Lennard-Jones server on port
 
 #+begin_src bash
 pixi shell   # if not already in the environment
-./bbdir/CppCore/rgpot/rpc/potserv 12345 LJ
+./bbdir/CppCore/potserv 12345 LJ
 #+end_src
 
 The server prints a line and then blocks, waiting for connections:

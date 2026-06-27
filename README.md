@@ -43,7 +43,7 @@ For building only the client, with CXX17 and CapnProto only:
     cmake --build build_client
     # needs a server instance, so in another terminal
     # say from the meson.build
-    ./bbdir/CppCore/rgpot/rpc/potserv 12345 LJ
+    ./bbdir/CppCore/potserv 12345 LJ
     # now test
     ctest --test-dir build_client/ --output-on-failure
 
@@ -110,7 +110,7 @@ matching pixi environments:
     meson compile -C bbdir && meson test -C bbdir
 
     # Serve a metatomic model over RPC (path after the colon)
-    ./bbdir/CppCore/rgpot/rpc/potserv 12345 Metatomic:CppCore/tests/data/lj38/lennard-jones.pt
+    ./bbdir/CppCore/potserv 12345 Metatomic:CppCore/tests/data/lj38/lennard-jones.pt
 
 Native units are **eV** / **Angstrom**. `rgpot/units.hpp` provides CODATA 2018
 constants and a runtime expression parser for compound units. RPC clients may

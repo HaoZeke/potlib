@@ -61,7 +61,7 @@ for pycapnp clients.
 pixi run -e rpctest python tests/test_cpmd_params.py
 pixi run -e rpctest python tests/test_rpc_integ_cpmd.py
 pixi run -e rpctest python tests/rpc_integ.py \
-  --server-bin ./bbdir/CppCore/rgpot/rpc/potserv \
+  --server-bin ./bbdir/CppCore/potserv \
   --cpmd-smoke
 ```
 
