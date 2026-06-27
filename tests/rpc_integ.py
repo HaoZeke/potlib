@@ -118,6 +118,33 @@ async def configure_cpmd_smoke(pot, pot_capnp):
 
     ok, msg = await configure_cpmd(pot, pot_capnp, functional="BLYP", task="gradient")
     print(f"CPMD configure(cpmd): ok={ok} msg={msg}")
+    ok_sections, msg_sections = await configure_cpmd(
+        pot,
+        pot_capnp,
+        functional="PBE0",
+        task="gradient",
+        input_sections=[
+            {
+                "kind": "generic",
+                "name": "PIMD",
+                "directives": [{"keyword": "TEMP", "args": ["300"]}],
+            },
+            {
+                "kind": "cpmd",
+                "molecularDynamics": True,
+                "maxStep": 8,
+                "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
+            },
+            {
+                "kind": "dft",
+                "functional": "PBE0",
+                "lsd": True,
+                "directives": [{"keyword": "HFX", "args": ["SCREENING"]}],
+            },
+            {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
+        ],
+    )
+    print(f"CPMD configure(cpmd sections): ok={ok_sections} msg={msg_sections}")
     print("CPMD smoke: configure RPC completed.")
     return True
 
