@@ -20,6 +20,15 @@ struct CPMDCSession {
 
 namespace {
 
+constexpr CPMDCFeatureEntry kFeatures[] = {
+    {"abi.cpmdc_set_params", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_energy_gradient", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_session_calculate_result", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_count", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_table", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_find", CPMDC_FEATURE_ABI, 1, 1},
+};
+
 bool has_flat_message(const void *msg, size_t msg_size_bytes) {
   return msg != nullptr && msg_size_bytes >= sizeof(::capnp::word) &&
          (msg_size_bytes % sizeof(::capnp::word)) == 0;
@@ -293,5 +302,21 @@ const char *cpmdc_version(void) { return "cpmdc-fake/0.2"; }
 int cpmdc_available(void) { return 1; }
 
 void cpmdc_finalize(void) {}
+
+size_t cpmdc_feature_count(void) {
+  return sizeof(kFeatures) / sizeof(kFeatures[0]);
+}
+
+const CPMDCFeatureEntry *cpmdc_feature_table(void) { return kFeatures; }
+
+const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
+  if (feature_id == nullptr)
+    return nullptr;
+  for (const auto &feature : kFeatures) {
+    if (std::strcmp(feature.feature_id, feature_id) == 0)
+      return &feature;
+  }
+  return nullptr;
+}
 
 } // extern "C"

@@ -34,6 +34,12 @@ int main(void) {
     fprintf(stderr, "cpmdc stub reported a result size\n");
     return 1;
   }
+  if (cpmdc_feature_count() == 0 ||
+      cpmdc_feature_table() == NULL ||
+      cpmdc_feature_find("abi.cpmdc_feature_find") == NULL) {
+    fprintf(stderr, "cpmdc stub feature discovery is unavailable\n");
+    return 1;
+  }
   size_t result_size = 123;
   result = cpmdc_session_calculate_result(NULL, NULL, 0, NULL, 0, &result_size);
   if (result.ok != 0 || strstr(result.message, "stub") == NULL) {

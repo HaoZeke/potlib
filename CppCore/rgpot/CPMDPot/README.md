@@ -17,6 +17,9 @@ Geometry stays on `ForceInput`; `PotentialConfig` is method/backend setup only.
 `CPMDPot.cc` is an always-built frontend that serializes `CPMDParams`, `dlopen`s
 the split `libcpmdc` engine, and calls the stable C ABI in `cpmd_c_abi.h`.
 rgpot is a pure consumer of the engine implementation.
+The local ABI header also mirrors `cpmdc_feature_count`,
+`cpmdc_feature_table`, and `cpmdc_feature_find` so frontends can discover
+engine/catalog support from the same C boundary.
 
 Engine lookup order:
 

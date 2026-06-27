@@ -1,6 +1,14 @@
 #include "cpmd_c_abi.h"
 
 #include <stdio.h>
+#include <string.h>
+
+static const CPMDCFeatureEntry g_features[] = {
+    {"abi.cpmdc_set_params", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_count", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_table", CPMDC_FEATURE_ABI, 1, 1},
+    {"abi.cpmdc_feature_find", CPMDC_FEATURE_ABI, 1, 1},
+};
 
 static CPMDCResult stub_fail(void) {
   CPMDCResult r;
@@ -161,4 +169,20 @@ size_t cpmdc_potential_result_size_for_force_input(
   (void)force_input_capnp;
   (void)force_input_capnp_size_bytes;
   return 0;
+}
+
+size_t cpmdc_feature_count(void) {
+  return sizeof(g_features) / sizeof(g_features[0]);
+}
+
+const CPMDCFeatureEntry *cpmdc_feature_table(void) { return g_features; }
+
+const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
+  if (feature_id == NULL)
+    return NULL;
+  for (size_t i = 0; i < cpmdc_feature_count(); ++i) {
+    if (strcmp(g_features[i].feature_id, feature_id) == 0)
+      return &g_features[i];
+  }
+  return NULL;
 }
