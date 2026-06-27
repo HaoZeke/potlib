@@ -131,8 +131,11 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "kind": "cpmd",
                 "optimizeWavefunction": False,
                 "molecularDynamics": True,
+                "convergenceOrbitals": 2.5e-7,
                 "maxStep": 8,
                 "timestep": 4.0,
+                "restartWavefunction": True,
+                "trajectory": True,
                 "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
             },
             {
@@ -170,8 +173,11 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[3].which() == "cpmd"
     assert sections[3].cpmd.optimizeWavefunction is False
     assert sections[3].cpmd.molecularDynamics is True
+    assert sections[3].cpmd.convergenceOrbitals == 2.5e-7
     assert sections[3].cpmd.maxStep == 8
     assert sections[3].cpmd.timestep == 4.0
+    assert sections[3].cpmd.restartWavefunction is True
+    assert sections[3].cpmd.trajectory is True
     assert sections[3].cpmd.directives[0].keyword == "PRINT"
     assert list(sections[3].cpmd.directives[0].args) == ["FORCES", "ON"]
     assert sections[4].which() == "dft"
