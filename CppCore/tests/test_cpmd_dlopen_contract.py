@@ -17,6 +17,11 @@ def main() -> int:
     cpmd_dir = root / "CppCore" / "rgpot" / "CPMDPot"
     meson = (cpmd_dir / "meson.build").read_text(encoding="utf-8")
     frontend = (cpmd_dir / "CPMDPot.cc").read_text(encoding="utf-8")
+    header = (cpmd_dir / "cpmd_c_abi.h").read_text(encoding="utf-8")
+    stub = (cpmd_dir / "cpmd_c_abi_stub.c").read_text(encoding="utf-8")
+    fake = (root / "CppCore" / "tests" / "cpmdc_fake_engine.cc").read_text(
+        encoding="utf-8"
+    )
 
     forbidden = [
         "RGPOT_CPMD_STATIC_EMBED",
@@ -42,6 +47,29 @@ def main() -> int:
         "libcpmdc" in frontend,
         "CPMDPot.cc must dlopen the split cpmdc engine (libcpmdc)",
     )
+    symbols = [
+        "cpmdc_set_params",
+        "cpmdc_energy_gradient",
+        "cpmdc_energy",
+        "cpmdc_energy_forces",
+        "cpmdc_session_create",
+        "cpmdc_session_set_params",
+        "cpmdc_session_destroy",
+        "cpmdc_session_energy_gradient",
+        "cpmdc_session_energy",
+        "cpmdc_session_energy_forces",
+        "cpmdc_session_calculate_forces",
+        "cpmdc_session_calculate_result",
+        "cpmdc_calculate_result",
+        "cpmdc_potential_result_size_for_force_input",
+        "cpmdc_version",
+        "cpmdc_available",
+        "cpmdc_finalize",
+    ]
+    for symbol in symbols:
+        require(symbol in header, f"cpmd_c_abi.h missing {symbol}")
+        require(symbol in stub, f"cpmd_c_abi_stub.c missing {symbol}")
+        require(symbol in fake, f"cpmdc_fake_engine.cc missing {symbol}")
     return 0
 
 
