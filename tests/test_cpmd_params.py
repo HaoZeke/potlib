@@ -146,6 +146,18 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "kind": "dft",
                 "functional": "PBE0",
                 "lsd": True,
+                "gcCutoff": 1.0e-8,
+                "xcDriver": "LIBXC",
+                "libxc": "GGA_X_PBE GGA_C_PBE",
+                "lrKernel": "PBE",
+                "refunct": "PBE",
+                "mtsHighFunc": "PBE0",
+                "mtsLowFunc": "PBE",
+                "hfx": True,
+                "hfxScreening": "0.2",
+                "hubbard": "U 1 4.0",
+                "alpha": 0.25,
+                "beta": 0.75,
                 "directives": [{"keyword": "HFX", "args": ["SCREENING"]}],
             },
             {"kind": "set", "key": "CPMD.MAXSTEP", "value": "12"},
@@ -192,6 +204,18 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[4].which() == "dft"
     assert sections[4].dft.functional == "PBE0"
     assert sections[4].dft.lsd is True
+    assert sections[4].dft.gcCutoff == 1.0e-8
+    assert sections[4].dft.xcDriver == "LIBXC"
+    assert sections[4].dft.libxc == "GGA_X_PBE GGA_C_PBE"
+    assert sections[4].dft.lrKernel == "PBE"
+    assert sections[4].dft.refunct == "PBE"
+    assert sections[4].dft.mtsHighFunc == "PBE0"
+    assert sections[4].dft.mtsLowFunc == "PBE"
+    assert sections[4].dft.hfx is True
+    assert sections[4].dft.hfxScreening == "0.2"
+    assert sections[4].dft.hubbard == "U 1 4.0"
+    assert sections[4].dft.alpha == 0.25
+    assert sections[4].dft.beta == 0.75
     assert sections[4].dft.directives[0].keyword == "HFX"
     assert list(sections[4].dft.directives[0].args) == ["SCREENING"]
     assert sections[5].which() == "set"

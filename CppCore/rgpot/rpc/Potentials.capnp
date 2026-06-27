@@ -354,9 +354,21 @@ struct CPMDCpmdSection {
 }
 
 struct CPMDDftSection {
-  functional @0 :Text = "BLYP";
-  lsd        @1 :Bool = false;
-  directives @2 :List(CPMDDirective);
+  functional    @0 :Text = "BLYP";
+  lsd           @1 :Bool = false;
+  directives    @2 :List(CPMDDirective);
+  gcCutoff      @3 :Float64 = 0.0;
+  xcDriver      @4 :Text;
+  libxc         @5 :Text;
+  lrKernel      @6 :Text;
+  refunct       @7 :Text;
+  mtsHighFunc   @8 :Text;
+  mtsLowFunc    @9 :Text;
+  hfx           @10 :Bool = false;
+  hfxScreening  @11 :Text;
+  hubbard       @12 :Text;
+  alpha         @13 :Float64 = 0.0;
+  beta          @14 :Float64 = 0.0;
 }
 
 struct CPMDAtomsPseudopotential {

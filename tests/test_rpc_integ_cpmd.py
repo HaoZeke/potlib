@@ -45,6 +45,19 @@ def test_configure_cpmd_smoke() -> None:
     assert cpmd_section.convergenceGeometry == 1.0e-4
     assert cpmd_section.maxIter == 12
     assert cpmd_section.electronMass == 450.0
+    dft_section = pot.configs[2].cpmd.inputSections[2].dft
+    assert dft_section.gcCutoff == 1.0e-8
+    assert dft_section.xcDriver == "LIBXC"
+    assert dft_section.libxc == "GGA_X_PBE GGA_C_PBE"
+    assert dft_section.lrKernel == "PBE"
+    assert dft_section.refunct == "PBE"
+    assert dft_section.mtsHighFunc == "PBE0"
+    assert dft_section.mtsLowFunc == "PBE"
+    assert dft_section.hfx is True
+    assert dft_section.hfxScreening == "0.2"
+    assert dft_section.hubbard == "U 1 4.0"
+    assert dft_section.alpha == 0.25
+    assert dft_section.beta == 0.75
 
 
 if __name__ == "__main__":

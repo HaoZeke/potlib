@@ -146,6 +146,22 @@ def _set_dft_section(section: Any, spec: Any) -> None:
     dft = section.init("dft")
     dft.functional = str(_mapping_value(spec, ["functional"], "BLYP"))
     dft.lsd = bool(_mapping_value(spec, ["lsd"], False))
+    dft.gcCutoff = float(_mapping_value(spec, ["gcCutoff", "gc_cutoff"], 0.0))
+    dft.xcDriver = str(_mapping_value(spec, ["xcDriver", "xc_driver"], ""))
+    dft.libxc = str(_mapping_value(spec, ["libxc"], ""))
+    dft.lrKernel = str(_mapping_value(spec, ["lrKernel", "lr_kernel"], ""))
+    dft.refunct = str(_mapping_value(spec, ["refunct"], ""))
+    dft.mtsHighFunc = str(
+        _mapping_value(spec, ["mtsHighFunc", "mts_high_func"], "")
+    )
+    dft.mtsLowFunc = str(_mapping_value(spec, ["mtsLowFunc", "mts_low_func"], ""))
+    dft.hfx = bool(_mapping_value(spec, ["hfx"], False))
+    dft.hfxScreening = str(
+        _mapping_value(spec, ["hfxScreening", "hfx_screening"], "")
+    )
+    dft.hubbard = str(_mapping_value(spec, ["hubbard"], ""))
+    dft.alpha = float(_mapping_value(spec, ["alpha"], 0.0))
+    dft.beta = float(_mapping_value(spec, ["beta"], 0.0))
     _set_directives(dft, _mapping_value(spec, ["directives"], ()))
 
 
