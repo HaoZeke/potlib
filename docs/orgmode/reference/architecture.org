@@ -185,15 +185,16 @@ controlled by Meson options.
 **** NWChemPot (=rgpot/NWChemPot/=)
 
 Always-built frontend (=NWChemPot.cc=) that serializes =NWChemParams= and
-=dlopen=s =libnwchemc= (via =DynLib.hpp=). Stable consumer C-ABI contract in
-=nwchem_c_abi.h= uses =nwchemc_*= symbols and flat Cap'n Proto message bytes;
-=nwchem_c_abi_stub.c= is a no-op ABI linked by the conformance test only. rgpot
-is a pure consumer: the engine implementation (NWChem embed + Fortran) lives in
-the split =https://github.com/OmniPotentRPC/nwchemc= project, not in rgpot.
+=dlopen=s =libnwchemc= (via =DynLib.hpp=).
+Stable consumer C-ABI contract in =nwchem_c_abi.h= uses =nwchemc_*= symbols and
+flat Cap'n Proto message bytes; =nwchem_c_abi_stub.c= is a no-op ABI linked by
+the conformance test only. rgpot is a pure consumer: the engine implementation
+(NWChem embed + Fortran) lives in the split =https://github.com/OmniPotentRPC/
+nwchemc= project, not in rgpot.
 RPC schema adds =NWChemParams=, =PotentialConfig=, and =configure @1= on
-=Potential=; =potserv <port> NWChem=. Runtime: =NWCHEMC_LIBRARY=,
-=RGPOT_NWCHEMC_ENGINE=, =NWCHEM_TOP=. Details:
-=CppCore/rgpot/NWChemPot/README.md=.
+=Potential=; =potserv <port> NWChem=.
+Runtime: =NWCHEMC_LIBRARY=, =RGPOT_NWCHEMC_ENGINE=, =NWCHEM_TOP=.
+Details: =CppCore/rgpot/NWChemPot/README.md=.
 
 **** Units (=rgpot/units.hpp=)
 

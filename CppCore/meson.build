@@ -234,9 +234,9 @@ if get_option('with_tests')
             'cpmdc_fake_engine',
             sources: ['tests/cpmdc_fake_engine.cc'],
             dependencies: [ptlrpc_dep],
-            include_directories: _incdirs
-                + ['.']
-                + include_directories('rgpot/CPMDPot'),
+            include_directories: _incdirs + ['.'] + include_directories(
+                'rgpot/CPMDPot',
+            ),
             install: false,
         )
         cpmdc_fake_env = environment()

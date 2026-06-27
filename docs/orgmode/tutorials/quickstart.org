@@ -59,7 +59,7 @@ python tests/rpc_integ.py \
 2. The Python client sent atomic positions in =ForceInput=.
 3. The server returned energy and forces in =PotentialResult=.
 4. The same wire protocol works from any language with a Cap'n Proto
-   implementation.
+implementation.
 
 ** Start a manual server
 

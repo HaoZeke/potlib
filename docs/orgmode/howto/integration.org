@@ -36,13 +36,15 @@ only.
 
 *** NWChem arm (=PotentialConfig.nwchem= / =NWChemParams=)
 
-With =potserv <port> NWChem=, pass =configure= with the =nwchem= arm set. Payload
-fields (=basis=, =theory=, =scfType=, =charge=, =multiplicity=, =enginePath=,
-=nwchemRoot=) are NWChem-specific; the outer message is still generic rgpot
-params so other backends can add arms without a new config language.
+With =potserv <port> NWChem=, pass =configure= with the =nwchem= arm set.
+Payload fields (=basis=, =theory=, =scfType=, =charge=, =multiplicity=,
+=enginePath=, =nwchemRoot=) are NWChem-specific; the outer message is still
+generic rgpot params so other backends can add arms without a new config
+language.
 
-Python: =tests/nwchem_params.py= builds =PotentialConfig= + =nwchem=. BLYP:
-=theory="dft"=, =scfType="blyp"=. Embed =.so= still required for =calculate=.
+Python: =tests/nwchem_params.py= builds =PotentialConfig= + =nwchem=.
+BLYP: =theory="dft"=, =scfType="blyp"=.
+Embed =.so= still required for =calculate=.
 
 *** CPMD arm (=PotentialConfig.cpmd= / =CPMDParams=)
 
@@ -59,24 +61,23 @@ Engine lookup checks =CPMDParams.enginePath=, =CPMDC_LIBRARY=,
 Payload fields include method-level defaults (=functional=, =cutOffRy=,
 =charge=, =multiplicity=, =task=), frontend hints (=enginePath=, =cpmdRoot=),
 runtime file placement (=scratchDir=, =permanentDir=), raw =inputBlocks=, and
-structured =inputSections= for =SYSTEM=, =CPMD=, =DFT=, =ATOMS=, =SET=, and raw
-sections.
+structured =inputSections= for =SYSTEM=, =CPMD=, =DFT=, =ATOMS=, =SET=, and
+raw sections.
 The typed =cpmd= section covers wavefunction and geometry optimization,
 molecular dynamics, orbital and geometry convergence thresholds, iteration
 limits, timestep, electron mass, CP/BO/EH/PT/classical MD variants, MD file,
 Nose/Berendsen/Langevin/annealing/quench thermostat controls, RATTLE/SHAKE,
-constraints, Trotter factor, restart, print/store, center molecule,
-DIIS/ODIIS/PCG/diagonalization, free-energy, interface, QMMM, bicanonical,
-CDFT, properties, and trajectory controls.
-The typed =dft= section covers functional, LSD, GC cutoff, XC driver, LIBXC,
-LR kernel, refunct, MTS high/low functionals, HFX, HFX screening, Hubbard,
-alpha, beta, old/new code selection, correlation, exchange, and Becke88
-controls.
+constraints, Trotter factor, restart, print/store, center molecule, DIIS/
+ODIIS/PCG/diagonalization, free-energy, interface, QMMM, bicanonical, CDFT,
+properties, and trajectory controls.
+The typed =dft= section covers functional, LSD, GC cutoff, XC driver, LIBXC, LR
+kernel, refunct, MTS high/low functionals, HFX, HFX screening, Hubbard, alpha,
+beta, old/new code selection, correlation, exchange, and Becke88 controls.
 
 Python: =tests/cpmd_params.py= builds =PotentialConfig= + =cpmd=.
 The helper uses =CPMD_ROOT= for =cpmdRoot= and =CPMDC_LIBRARY= /
-=RGPOT_CPMDC_ENGINE= / =RGPOT_CPMD_ENGINE= for =enginePath= when explicit
-values are not supplied.
+=RGPOT_CPMDC_ENGINE= / =RGPOT_CPMD_ENGINE= for =enginePath= when explicit values
+are not supplied.
 Use =input_sections= to build every structured =CPMDInputSection= arm
 (=generic=, =system=, =cpmd=, =dft=, =atoms=, =set=, and =raw=) without raw
 Cap'n Proto builder code in clients.
@@ -84,8 +85,8 @@ Cap'n Proto builder code in clients.
 Typed =atoms= sections carry pseudopotential entries keyed by element symbol.
 The engine groups =ForceInput= coordinates into =&ATOMS= and requires entries
 for every atomic number present in a step.
-Without an =atoms= section, built-in BLYP pseudopotential defaults cover H and O
-only.
+Without an =atoms= section, built-in BLYP pseudopotential defaults cover H and
+O only.
 The same =atoms= section also accepts structured =directives= for ATOMS keywords
 that are not pseudopotential entries.
 
