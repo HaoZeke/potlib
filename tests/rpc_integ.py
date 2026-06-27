@@ -13,9 +13,11 @@ SCHEMA_PATH = os.path.join(SCRIPT_DIR, "../CppCore/rgpot/rpc/Potentials.capnp")
 pot_capnp = capnp.load(SCHEMA_PATH)
 
 try:
+    from cpmd_params import configure_cpmd
     from nwchem_params import configure_nwchem, make_potential_config_none
 except ImportError:
     sys.path.insert(0, SCRIPT_DIR)
+    from cpmd_params import configure_cpmd
     from nwchem_params import configure_nwchem, make_potential_config_none
 
 
@@ -108,6 +110,37 @@ async def run_nwchem_smoke(port):
     return True
 
 
+async def configure_cpmd_smoke(pot, pot_capnp):
+    """Configure a CPMD backend over RPC; calculate may require an engine."""
+    cfg_none = make_potential_config_none(pot_capnp)
+    r0 = await pot.configure(cfg_none)
+    print(f"CPMD configure(none): ok={r0.ok} msg={r0.message}")
+
+    ok, msg = await configure_cpmd(pot, pot_capnp, functional="BLYP", task="gradient")
+    print(f"CPMD configure(cpmd): ok={ok} msg={msg}")
+    print("CPMD smoke: configure RPC completed.")
+    return True
+
+
+async def run_cpmd_smoke(port):
+    """Optional smoke: start CPMD server, configure(), skip calculate if no engine."""
+    for _ in range(10):
+        try:
+            connection = await capnp.AsyncIoStream.create_connection(
+                host="localhost", port=port
+            )
+            break
+        except OSError:
+            await asyncio.sleep(0.5)
+    else:
+        print("CPMD smoke: failed to connect to server.")
+        return False
+
+    client = capnp.TwoPartyClient(connection)
+    pot = client.bootstrap().cast_as(pot_capnp.Potential)
+    return await configure_cpmd_smoke(pot, pot_capnp)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -118,6 +151,11 @@ def main():
         "--nwchem-smoke",
         action="store_true",
         help="Also run NWChem configure() smoke on a second server port",
+    )
+    parser.add_argument(
+        "--cpmd-smoke",
+        action="store_true",
+        help="Also run CPMD configure() smoke on a separate server port",
     )
     args = parser.parse_args()
 
@@ -169,6 +207,28 @@ def main():
         if not nw_ok:
             sys.exit(1)
         print("NWChem smoke passed.")
+
+    if args.cpmd_smoke:
+        cp_port = args.port + 1 + int(args.nwchem_smoke)
+        print(f"Starting CPMD smoke server: {args.server_bin} {cp_port} CPMD")
+        cp_proc = subprocess.Popen(
+            [args.server_bin, str(cp_port), "CPMD"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            cp_ok = asyncio.run(capnp.run(run_cpmd_smoke(cp_port)))
+        except Exception as e:
+            print(f"CPMD smoke exception: {e}")
+            print("Server stderr:")
+            print(cp_proc.stderr.read().decode())
+            cp_ok = False
+        finally:
+            cp_proc.kill()
+            cp_proc.wait()
+        if not cp_ok:
+            sys.exit(1)
+        print("CPMD smoke passed.")
 
 
 if __name__ == "__main__":
