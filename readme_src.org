@@ -98,12 +98,26 @@ field mapping.
 
 The CPMD runtime path is:
 
-1. Build =libcpmdc.so= in the split =cpmdc= repository.
+1. Build =libcpmdc.so= in the split =cpmdc= repository (or use the in-tree
+   =libcpmdc_fake_engine.so= from a =-Dwith_tests=true= build for CI).
 2. Start =potserv <port> CPMD= with =CPMDC_LIBRARY=, =RGPOT_CPMDC_ENGINE=, or
    =RGPOT_CPMD_ENGINE= pointing at that shared library.
 3. Send =configure(PotentialConfig.cpmd)= once for method setup.
 4. Send =ForceInput= on each =calculate()= call for geometry and requested
    output units.
+
+For NWChem, =tests/nwchem_params.py= builds =NWChemParams= /
+=PotentialConfig.nwchem=. Engine lookup order is =NWCHEMC_LIBRARY=,
+=RGPOT_NWCHEMC_ENGINE=, =RGPOT_NWCHEM_ENGINE=, then =enginePath= on params.
+See =CppCore/rgpot/NWChemPot/README.md=. The NWChem runtime path mirrors CPMD:
+
+1. Build =libnwchemc.so= in the split =nwchemc= repository (or
+   =libnwchemc_fake_engine.so= from a tests build).
+2. Start =potserv <port> NWChem= with the library env vars above.
+3. =configure(PotentialConfig.nwchem)= once, then =calculate(ForceInput)=.
+
+=potctl= drives the same Potential Cap'n Proto RPC against =potserv= (bridge
+stress and CI legs pass the potential name such as =NWChem= or =CPMD=).
 
 ** Developer Tasks
 
@@ -115,6 +129,14 @@ pixi r prek-install
 pixi r prek
 pixi r rust-test
 pixi r -e rpctest python tests/test_cpmd_params.py
+pixi r -e rpctest python tests/test_nwchem_params.py
+pixi r -e rpctest python tests/test_rpc_integ_cpmd.py
+pixi r -e rpctest python tests/test_rpc_integ_nwchem.py
+# Full RPC + C ABI E2E (point env at built fake engines + potserv)
+export RGPOT_POTSERV=/path/to/bbdir/CppCore/potserv
+export NWCHEMC_LIBRARY=/path/to/bbdir/CppCore/libnwchemc_fake_engine.so
+export RGPOT_CPMD_ENGINE=/path/to/bbdir/CppCore/libcpmdc_fake_engine.so
+pixi r -e rpctest python tests/test_rpc_e2e_c_abi.py
 pixi r -e rpctest python tests/rpc_integ.py \
   --server-bin ./bbdir/CppCore/potserv \
   --nwchem-smoke \
