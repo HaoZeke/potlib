@@ -68,7 +68,11 @@ def _set_system_section(
     _set_directives(system, directives)
 
 
-def _set_atoms_section(section: Any, pseudopotentials: Iterable[Any]) -> None:
+def _set_atoms_section(
+    section: Any,
+    pseudopotentials: Iterable[Any],
+    directives: Iterable[Any] = (),
+) -> None:
     atoms = section.init("atoms")
     pseudo_specs = list(pseudopotentials)
     out = atoms.init("pseudopotentials", len(pseudo_specs))
@@ -76,6 +80,7 @@ def _set_atoms_section(section: Any, pseudopotentials: Iterable[Any]) -> None:
         out[idx].element = str(_mapping_or_sequence_value(spec, "element", 0, ""))
         out[idx].path = str(_mapping_or_sequence_value(spec, "path", 1, ""))
         out[idx].lmax = int(_mapping_or_sequence_value(spec, "lmax", 2, -1))
+    _set_directives(atoms, directives)
 
 
 def _set_directives(owner: Any, directives: Iterable[Any]) -> None:
@@ -159,7 +164,11 @@ def _set_input_section(section: Any, spec: Any) -> None:
     elif kind == "dft":
         _set_dft_section(section, spec)
     elif kind == "atoms":
-        _set_atoms_section(section, _mapping_value(spec, ["pseudopotentials"], ()))
+        _set_atoms_section(
+            section,
+            _mapping_value(spec, ["pseudopotentials"], ()),
+            _mapping_value(spec, ["directives"], ()),
+        )
     elif kind == "set":
         _set_set_section(section, spec)
     elif kind == "raw":

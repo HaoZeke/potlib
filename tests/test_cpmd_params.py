@@ -121,6 +121,13 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "directives": [{"keyword": "POISSON SOLVER", "args": ["HOCKNEY"]}],
             },
             {
+                "kind": "atoms",
+                "pseudopotentials": [
+                    {"element": "Si", "path": "Si_MT_PBE.psp", "lmax": 2}
+                ],
+                "directives": [{"keyword": "ISOLATED MOLECULE", "args": []}],
+            },
+            {
                 "kind": "cpmd",
                 "optimizeWavefunction": False,
                 "molecularDynamics": True,
@@ -139,7 +146,7 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     )
 
     sections = params.inputSections
-    assert len(sections) == 5
+    assert len(sections) == 6
     assert sections[0].which() == "generic"
     assert sections[0].generic.name == "PIMD"
     assert sections[0].generic.directives[0].keyword == "TEMP"
@@ -154,20 +161,26 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[1].system.scale == 0.5
     assert sections[1].system.directives[0].keyword == "POISSON SOLVER"
     assert list(sections[1].system.directives[0].args) == ["HOCKNEY"]
-    assert sections[2].which() == "cpmd"
-    assert sections[2].cpmd.optimizeWavefunction is False
-    assert sections[2].cpmd.molecularDynamics is True
-    assert sections[2].cpmd.maxStep == 8
-    assert sections[2].cpmd.timestep == 4.0
-    assert sections[2].cpmd.directives[0].keyword == "PRINT"
-    assert list(sections[2].cpmd.directives[0].args) == ["FORCES", "ON"]
-    assert sections[3].which() == "dft"
-    assert sections[3].dft.functional == "PBE0"
-    assert sections[3].dft.lsd is True
-    assert sections[3].dft.directives[0].keyword == "HFX"
-    assert list(sections[3].dft.directives[0].args) == ["SCREENING"]
-    assert sections[4].which() == "raw"
-    assert sections[4].raw == "&VDW\n  DISPERSION\n&END"
+    assert sections[2].which() == "atoms"
+    assert sections[2].atoms.pseudopotentials[0].element == "Si"
+    assert sections[2].atoms.pseudopotentials[0].path == "Si_MT_PBE.psp"
+    assert sections[2].atoms.pseudopotentials[0].lmax == 2
+    assert sections[2].atoms.directives[0].keyword == "ISOLATED MOLECULE"
+    assert list(sections[2].atoms.directives[0].args) == []
+    assert sections[3].which() == "cpmd"
+    assert sections[3].cpmd.optimizeWavefunction is False
+    assert sections[3].cpmd.molecularDynamics is True
+    assert sections[3].cpmd.maxStep == 8
+    assert sections[3].cpmd.timestep == 4.0
+    assert sections[3].cpmd.directives[0].keyword == "PRINT"
+    assert list(sections[3].cpmd.directives[0].args) == ["FORCES", "ON"]
+    assert sections[4].which() == "dft"
+    assert sections[4].dft.functional == "PBE0"
+    assert sections[4].dft.lsd is True
+    assert sections[4].dft.directives[0].keyword == "HFX"
+    assert list(sections[4].dft.directives[0].args) == ["SCREENING"]
+    assert sections[5].which() == "raw"
+    assert sections[5].raw == "&VDW\n  DISPERSION\n&END"
 
 
 def test_make_potential_config_cpmd() -> None:
