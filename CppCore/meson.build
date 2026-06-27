@@ -288,6 +288,15 @@ if get_option('with_tests')
             ],
             suite: 'nwchem',
         )
+        test(
+            'RPCSchemaSync',
+            find_program('python3'),
+            args: [
+                meson.current_source_dir() / 'tests/test_rpc_schema_sync.py',
+                meson.source_root(),
+            ],
+            suite: 'rpc',
+        )
     endif
     if rpc_enabled
         test_deps += dependency('capnp-rpc')
