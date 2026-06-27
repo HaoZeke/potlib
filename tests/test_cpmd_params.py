@@ -110,6 +110,17 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "directives": [{"keyword": "TEMP", "args": ["300"]}],
             },
             {
+                "kind": "system",
+                "symmetry": 1,
+                "angstrom": False,
+                "cell": [8.0, 8.0, 9.0, 90.0, 90.0, 120.0],
+                "cutOffRy": 88.0,
+                "charge": 1,
+                "multiplicity": 3,
+                "scale": 0.5,
+                "directives": [{"keyword": "POISSON SOLVER", "args": ["HOCKNEY"]}],
+            },
+            {
                 "kind": "cpmd",
                 "optimizeWavefunction": False,
                 "molecularDynamics": True,
@@ -128,25 +139,35 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     )
 
     sections = params.inputSections
-    assert len(sections) == 4
+    assert len(sections) == 5
     assert sections[0].which() == "generic"
     assert sections[0].generic.name == "PIMD"
     assert sections[0].generic.directives[0].keyword == "TEMP"
     assert list(sections[0].generic.directives[0].args) == ["300"]
-    assert sections[1].which() == "cpmd"
-    assert sections[1].cpmd.optimizeWavefunction is False
-    assert sections[1].cpmd.molecularDynamics is True
-    assert sections[1].cpmd.maxStep == 8
-    assert sections[1].cpmd.timestep == 4.0
-    assert sections[1].cpmd.directives[0].keyword == "PRINT"
-    assert list(sections[1].cpmd.directives[0].args) == ["FORCES", "ON"]
-    assert sections[2].which() == "dft"
-    assert sections[2].dft.functional == "PBE0"
-    assert sections[2].dft.lsd is True
-    assert sections[2].dft.directives[0].keyword == "HFX"
-    assert list(sections[2].dft.directives[0].args) == ["SCREENING"]
-    assert sections[3].which() == "raw"
-    assert sections[3].raw == "&VDW\n  DISPERSION\n&END"
+    assert sections[1].which() == "system"
+    assert sections[1].system.symmetry == 1
+    assert sections[1].system.angstrom is False
+    assert list(sections[1].system.cell) == [8.0, 8.0, 9.0, 90.0, 90.0, 120.0]
+    assert sections[1].system.cutOffRy == 88.0
+    assert sections[1].system.charge == 1
+    assert sections[1].system.multiplicity == 3
+    assert sections[1].system.scale == 0.5
+    assert sections[1].system.directives[0].keyword == "POISSON SOLVER"
+    assert list(sections[1].system.directives[0].args) == ["HOCKNEY"]
+    assert sections[2].which() == "cpmd"
+    assert sections[2].cpmd.optimizeWavefunction is False
+    assert sections[2].cpmd.molecularDynamics is True
+    assert sections[2].cpmd.maxStep == 8
+    assert sections[2].cpmd.timestep == 4.0
+    assert sections[2].cpmd.directives[0].keyword == "PRINT"
+    assert list(sections[2].cpmd.directives[0].args) == ["FORCES", "ON"]
+    assert sections[3].which() == "dft"
+    assert sections[3].dft.functional == "PBE0"
+    assert sections[3].dft.lsd is True
+    assert sections[3].dft.directives[0].keyword == "HFX"
+    assert list(sections[3].dft.directives[0].args) == ["SCREENING"]
+    assert sections[4].which() == "raw"
+    assert sections[4].raw == "&VDW\n  DISPERSION\n&END"
 
 
 def test_make_potential_config_cpmd() -> None:

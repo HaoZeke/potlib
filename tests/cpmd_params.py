@@ -43,15 +43,29 @@ def _add_input_blocks(params: Any, input_blocks: Iterable[str]) -> None:
         out[idx] = block
 
 
-def _set_system_section(section: Any, *, system_cell: Sequence[float], cut_off_ry: float, charge: int, multiplicity: int) -> None:
+def _set_system_section(
+    section: Any,
+    *,
+    system_cell: Sequence[float],
+    cut_off_ry: float,
+    charge: int,
+    multiplicity: int,
+    symmetry: int = 0,
+    angstrom: bool = True,
+    scale: float = 0.0,
+    directives: Iterable[Any] = (),
+) -> None:
     system = section.init("system")
-    system.angstrom = True
+    system.symmetry = int(symmetry)
+    system.angstrom = bool(angstrom)
     system.cutOffRy = float(cut_off_ry)
+    system.scale = float(scale)
     system.charge = int(charge)
     system.multiplicity = int(multiplicity)
     cell = system.init("cell", len(system_cell))
     for idx, value in enumerate(system_cell):
         cell[idx] = float(value)
+    _set_directives(system, directives)
 
 
 def _set_atoms_section(section: Any, pseudopotentials: Iterable[Any]) -> None:
@@ -135,6 +149,10 @@ def _set_input_section(section: Any, spec: Any) -> None:
             cut_off_ry=float(_mapping_value(spec, ["cutOffRy", "cut_off_ry"], 70.0)),
             charge=int(_mapping_value(spec, ["charge"], 0)),
             multiplicity=int(_mapping_value(spec, ["multiplicity"], 1)),
+            symmetry=int(_mapping_value(spec, ["symmetry"], 0)),
+            angstrom=bool(_mapping_value(spec, ["angstrom"], True)),
+            scale=float(_mapping_value(spec, ["scale"], 0.0)),
+            directives=_mapping_value(spec, ["directives"], ()),
         )
     elif kind == "cpmd":
         _set_cpmd_section(section, spec)
