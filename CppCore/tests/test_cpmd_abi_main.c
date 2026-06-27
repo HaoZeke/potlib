@@ -26,5 +26,20 @@ int main(void) {
     fprintf(stderr, "cpmdc stub accepted null params\n");
     return 1;
   }
+  if (cpmdc_session_create(NULL, 0) != NULL) {
+    fprintf(stderr, "cpmdc stub created a session\n");
+    return 1;
+  }
+  if (cpmdc_potential_result_size_for_force_input(NULL, 0) != 0) {
+    fprintf(stderr, "cpmdc stub reported a result size\n");
+    return 1;
+  }
+  size_t result_size = 123;
+  result = cpmdc_session_calculate_result(NULL, NULL, 0, NULL, 0, &result_size);
+  if (result.ok != 0 || strstr(result.message, "stub") == NULL) {
+    fprintf(stderr, "cpmdc stub session result did not fail as stub\n");
+    return 1;
+  }
+  cpmdc_session_destroy(NULL);
   return 0;
 }
