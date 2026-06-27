@@ -10,17 +10,16 @@ endif
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
 
-# Cap'n Proto schema/codegen (ptlrpc) is always required: NWChemPot/CPMDPot take
-# typed NWChemParams/CPMDParams from Potentials.capnp even when potserv is off
-# (with_rpc=false still builds frontends; potserv itself stays behind rpc_enabled).
-subdir('rgpot/rpc')
-
-# NWChemPot is a pure dlopen consumer of the split nwchemc engine: it needs only
-# the generated rpc schema (ptlrpc_dep) and libdl, not rgpot_core or the other
-# potentials. Build it unconditionally and expose nwchempot_dep so consumers get
-# the in-process NWChem frontend even in lean (with_rpc_client_only) builds.
-subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
-subdir('rgpot/CPMDPot')  # 'cpmdpot' frontend + no-op ABI stub
+# Cap'n Proto schema + NWChem/CPMD frontends need libcapnp (ptlrpc). Only pull
+# them in when RPC is on (server or client-only); lean -Dwith_rpc=false builds
+# (xtb/tblite/metatomic CI) must not require pkg-config 'capnp-rpc'.
+_rpc_stack = rpc_enabled or get_option('with_rpc_client_only')
+if _rpc_stack
+    subdir('rgpot/rpc')
+    # Pure dlopen consumers of split nwchemc / cpmdc; need generated schema only.
+    subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
+    subdir('rgpot/CPMDPot')  # 'cpmdpot' frontend + no-op ABI stub
+endif
 
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
@@ -58,14 +57,18 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [metatomicpot]
     endif
 
-    # NWChemPot was built above (unconditionally); link it into the full lib.
-    rgpotentials += [nwchempot]
-    rgpotentials += [cpmdpot]
+    if _rpc_stack
+        rgpotentials += [nwchempot]
+        rgpotentials += [cpmdpot]
+    endif
 
     _linkto += rgpotentials
 
     # Create library
-    rgpot_deps = _deps + [ptlrpc_dep]
+    rgpot_deps = _deps
+    if _rpc_stack
+        rgpot_deps += [ptlrpc_dep]
+    endif
     rgpot = library(
         'rgpot',
         dependencies: rgpot_deps,
@@ -180,8 +183,8 @@ if get_option('with_tests')
             ],
         ]
     endif
-    # NWChem frontend tests (main lib build only; fake engine for energy/forces)
-    if not get_option('with_rpc_client_only')
+    # NWChem/CPMD frontend tests (need ptlrpc + frontends from _rpc_stack)
+    if _rpc_stack and not get_option('with_rpc_client_only')
         nwchemc_fake_engine = shared_library(
             'nwchemc_fake_engine',
             sources: ['tests/nwchemc_fake_engine.c'],
