@@ -58,6 +58,10 @@ uses =CPMD_ROOT= for =cpmdRoot= and =CPMDC_LIBRARY= / =RGPOT_CPMDC_ENGINE= /
 Use =input_sections= to build every structured =CPMDInputSection= arm
 (=generic=, =system=, =cpmd=, =dft=, =atoms=, =set=, and =raw=) without raw
 Cap'n Proto builder code in clients.
+Typed =atoms= sections carry pseudopotential entries keyed by element symbol;
+the engine groups =ForceInput= coordinates into =&ATOMS= and requires entries
+for every atomic number present in a step. Without an =atoms= section, built-in
+BLYP pseudopotential defaults cover H and O only.
 The integration script can exercise configure-only RPC plumbing without a CPMD
 engine:
 

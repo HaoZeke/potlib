@@ -54,6 +54,10 @@ Engine lookup order:
 `inputSections` supports `generic`, `system`, `cpmd`, `dft`, `atoms`, `set`, and
 `raw` arms. `set` carries a `SECTION.KEYWORD` key plus optional value and maps to
 the CPMD `SET` directive path in the engine.
+For typed `atoms`, `pseudopotentials` are keyed by element symbol and are used by
+the engine to group `ForceInput` coordinates into `&ATOMS`; every atomic number
+in a geometry step must have a matching pseudopotential entry. If `atoms` is
+omitted, the engine provides built-in BLYP defaults only for H and O.
 
 ## Python helpers and RPC smoke
 
@@ -69,6 +73,10 @@ params = make_cpmd_params(
          "directives": [{"keyword": "TEMP", "args": ["300"]}]},
         {"kind": "cpmd", "molecularDynamics": True, "maxStep": 8},
         {"kind": "dft", "functional": "PBE0", "lsd": True},
+        {"kind": "atoms",
+         "pseudopotentials": [
+             {"element": "Si", "path": "Si_MT_PBE.psp", "lmax": 2},
+         ]},
         {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
     ],
 )
