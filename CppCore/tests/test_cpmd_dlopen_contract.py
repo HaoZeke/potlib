@@ -70,6 +70,9 @@ def main() -> int:
         "cpmdc_version",
         "cpmdc_available",
         "cpmdc_finalize",
+        "cpmdc_feature_count",
+        "cpmdc_feature_table",
+        "cpmdc_feature_find",
     ]
     for symbol in symbols:
         require(has_symbol(header, symbol), f"cpmd_c_abi.h missing {symbol}")
