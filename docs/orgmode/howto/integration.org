@@ -65,7 +65,9 @@ The typed =cpmd= section covers wavefunction and geometry optimization,
 molecular dynamics, orbital and geometry convergence thresholds, iteration
 limits, timestep, electron mass, CP/BO/EH/PT/classical MD variants, MD file,
 Nose/Berendsen/Langevin/annealing/quench thermostat controls, RATTLE/SHAKE,
-constraints, Trotter factor, restart, and trajectory controls.
+constraints, Trotter factor, restart, print/store, center molecule,
+DIIS/ODIIS/PCG/diagonalization, free-energy, interface, QMMM, bicanonical,
+CDFT, properties, and trajectory controls.
 The typed =dft= section covers functional, LSD, GC cutoff, XC driver, LIBXC,
 LR kernel, refunct, MTS high/low functionals, HFX, HFX screening, Hubbard,
 alpha, beta, old/new code selection, correlation, exchange, and Becke88

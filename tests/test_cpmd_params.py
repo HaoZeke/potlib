@@ -156,6 +156,20 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "constraint": "FIX COM",
                 "trotter": "8",
                 "restart": True,
+                "printOptions": "FORCES ON",
+                "storeOptions": "WAVEFUNCTION",
+                "centerMoleculeOff": True,
+                "centerMoleculeOn": True,
+                "diis": True,
+                "odiis": True,
+                "pcg": True,
+                "diagonalization": True,
+                "freeEnergy": True,
+                "interface": True,
+                "qmmm": True,
+                "bicanonicalEnsemble": True,
+                "cdft": True,
+                "properties": True,
                 "restartWavefunction": True,
                 "trajectory": True,
                 "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
@@ -238,6 +252,20 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[3].cpmd.constraint == "FIX COM"
     assert sections[3].cpmd.trotter == "8"
     assert sections[3].cpmd.restart is True
+    assert sections[3].cpmd.printOptions == "FORCES ON"
+    assert sections[3].cpmd.storeOptions == "WAVEFUNCTION"
+    assert sections[3].cpmd.centerMoleculeOff is True
+    assert sections[3].cpmd.centerMoleculeOn is True
+    assert sections[3].cpmd.diis is True
+    assert sections[3].cpmd.odiis is True
+    assert sections[3].cpmd.pcg is True
+    assert sections[3].cpmd.diagonalization is True
+    assert sections[3].cpmd.freeEnergy is True
+    assert sections[3].cpmd.interface is True
+    assert sections[3].cpmd.qmmm is True
+    assert sections[3].cpmd.bicanonicalEnsemble is True
+    assert sections[3].cpmd.cdft is True
+    assert sections[3].cpmd.properties is True
     assert sections[3].cpmd.restartWavefunction is True
     assert sections[3].cpmd.trajectory is True
     assert sections[3].cpmd.directives[0].keyword == "PRINT"

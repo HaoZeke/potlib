@@ -63,6 +63,20 @@ def test_configure_cpmd_smoke() -> None:
     assert cpmd_section.constraint == "FIX COM"
     assert cpmd_section.trotter == "8"
     assert cpmd_section.restart is True
+    assert cpmd_section.printOptions == "FORCES ON"
+    assert cpmd_section.storeOptions == "WAVEFUNCTION"
+    assert cpmd_section.centerMoleculeOff is True
+    assert cpmd_section.centerMoleculeOn is True
+    assert cpmd_section.diis is True
+    assert cpmd_section.odiis is True
+    assert cpmd_section.pcg is True
+    assert cpmd_section.diagonalization is True
+    assert cpmd_section.freeEnergy is True
+    assert cpmd_section.interface is True
+    assert cpmd_section.qmmm is True
+    assert cpmd_section.bicanonicalEnsemble is True
+    assert cpmd_section.cdft is True
+    assert cpmd_section.properties is True
     dft_section = pot.configs[2].cpmd.inputSections[2].dft
     assert dft_section.gcCutoff == 1.0e-8
     assert dft_section.xcDriver == "LIBXC"

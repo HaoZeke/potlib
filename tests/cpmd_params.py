@@ -171,6 +171,28 @@ def _set_cpmd_section(section: Any, spec: Any) -> None:
     cpmd.constraint = str(_mapping_value(spec, ["constraint"], ""))
     cpmd.trotter = str(_mapping_value(spec, ["trotter"], ""))
     cpmd.restart = bool(_mapping_value(spec, ["restart"], False))
+    cpmd.printOptions = str(_mapping_value(spec, ["printOptions", "print_options"], ""))
+    cpmd.storeOptions = str(_mapping_value(spec, ["storeOptions", "store_options"], ""))
+    cpmd.centerMoleculeOff = bool(
+        _mapping_value(spec, ["centerMoleculeOff", "center_molecule_off"], False)
+    )
+    cpmd.centerMoleculeOn = bool(
+        _mapping_value(spec, ["centerMoleculeOn", "center_molecule_on"], False)
+    )
+    cpmd.diis = bool(_mapping_value(spec, ["diis"], False))
+    cpmd.odiis = bool(_mapping_value(spec, ["odiis"], False))
+    cpmd.pcg = bool(_mapping_value(spec, ["pcg"], False))
+    cpmd.diagonalization = bool(_mapping_value(spec, ["diagonalization"], False))
+    cpmd.freeEnergy = bool(_mapping_value(spec, ["freeEnergy", "free_energy"], False))
+    cpmd.interface = bool(_mapping_value(spec, ["interface"], False))
+    cpmd.qmmm = bool(_mapping_value(spec, ["qmmm"], False))
+    cpmd.bicanonicalEnsemble = bool(
+        _mapping_value(
+            spec, ["bicanonicalEnsemble", "bicanonical_ensemble"], False
+        )
+    )
+    cpmd.cdft = bool(_mapping_value(spec, ["cdft"], False))
+    cpmd.properties = bool(_mapping_value(spec, ["properties"], False))
     cpmd.restartWavefunction = bool(
         _mapping_value(spec, ["restartWavefunction", "restart_wavefunction"], False)
     )
