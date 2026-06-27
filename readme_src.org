@@ -96,6 +96,15 @@ The helper covers scalar fields, raw =inputBlocks=, and every structured
 See =CppCore/rgpot/CPMDPot/README.md= for the engine lookup order and schema
 field mapping.
 
+The CPMD runtime path is:
+
+1. Build =libcpmdc.so= in the split =cpmdc= repository.
+2. Start =potserv <port> CPMD= with =CPMDC_LIBRARY=, =RGPOT_CPMDC_ENGINE=, or
+   =RGPOT_CPMD_ENGINE= pointing at that shared library.
+3. Send =configure(PotentialConfig.cpmd)= once for method setup.
+4. Send =ForceInput= on each =calculate()= call for geometry and requested
+   output units.
+
 ** Developer Tasks
 
 Hooks use [[https://prek.j178.dev][prek]] through =prek.toml=.

@@ -17,6 +17,33 @@ Configuration and geometry stay separate:
 the flat Cap'n Proto bytes into `libcpmdc`, and lets the engine merge those
 params with each `ForceInput`.
 
+## Minimal RPC Path
+
+Build `libcpmdc` in the split engine repository:
+
+```bash
+git clone https://github.com/OmniPotentRPC/cpmdc.git
+cd cpmdc
+meson setup build -Dwith_tests=true
+meson compile -C build
+```
+
+Build rgpot and run the CPMD configure smoke with that engine on the loader
+path:
+
+```bash
+pixi run -e rpctest meson setup bbdir -Dwith_tests=true -Dwith_rpc=true
+pixi run -e rpctest meson compile -C bbdir
+CPMDC_LIBRARY=/path/to/cpmdc/build/libcpmdc.so \
+  pixi run -e rpctest python tests/rpc_integ.py \
+    --server-bin ./bbdir/CppCore/potserv \
+    --cpmd-smoke
+```
+
+That smoke covers RPC startup and `configure(PotentialConfig.cpmd)`. A real
+calculation still sends geometry through `calculate(ForceInput)`; coordinates do
+not belong in `CPMDParams`.
+
 ## Engine Loading
 
 `CPMDPot` probes engine paths in this order:
