@@ -78,12 +78,11 @@ in
     group = "${{ github.workflow }}-${{ github.ref }}",
     "cancel-in-progress" = true,
   },
+  # build_and_test: no in-tree NWChem; dlopens libnwchemc. Frontend + stub always compile.
+  # Suite nwchem energy/grad needs external libnwchemc; stub probe always runs.
   jobs = {
     "ci-tools" = S.job_ci_tools_os_matrix [P.ubuntu, P.macos],
-    // build_and_test: rgpot has no in-tree NWChem engine; it dlopens libnwchemc.
-// NWChemPot frontend + nwchem_abi_stub always compile (pure consumer).
-// Suite `nwchem` energy/grad SKIP without an external libnwchemc; stub probe always runs.
-  build_and_test = {
+    build_and_test = {
       needs = ["ci-tools"],
       name = "${{ matrix.sys }} / ${{ matrix.os }} [RPC:${{ matrix.rpc }} CACHE:${{ matrix.cache }}]",
       "runs-on" = "${{ matrix.os }}",
