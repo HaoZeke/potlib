@@ -45,7 +45,7 @@ class FakePotential:
 
 def test_make_cpmd_params() -> None:
     os.environ["CPMD_ROOT"] = "/env/cpmd"
-    os.environ["RGPOT_CPMD_ENGINE"] = "/env/libcpmdc.so"
+    # Explicit engine_path wins over any ambient RGPOT_CPMD_* from the runner.
     params = make_cpmd_params(
         pot_capnp,
         functional="PBE",
@@ -57,6 +57,7 @@ def test_make_cpmd_params() -> None:
         memory_mb=512,
         scratch_dir="/tmp/cpmd-scratch",
         permanent_dir="/tmp/cpmd-perm",
+        engine_path="/env/libcpmdc.so",
         input_blocks=["&CPMD\n  OPTIMIZE WAVEFUNCTION\n&END"],
         system_cell=[9.0, 0.0, 0.0, 0.0, 9.5, 0.0, 0.0, 0.0, 10.0],
         pseudopotentials=[{"element": "O", "path": "O_BLYP.psp", "lmax": 2}],
