@@ -1,4 +1,3 @@
----
 concurrency:
   cancel-in-progress: true
   group: release-prepare-${{ github.ref }}
@@ -22,7 +21,7 @@ jobs:
         activate-environment: true
         cache: true
         environments: devbld
-        pixi-version: v0.62.1
+        pixi-version: v0.70.2
     - name: Assert lockstep surfaces agree
       run: potctl ci release-assert
     - name: Towncrier draft (fragments must build cleanly)
