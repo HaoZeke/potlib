@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
+
+
+def has_symbol(text: str, symbol: str) -> bool:
+    return re.search(rf"\b{re.escape(symbol)}\s*\(", text) is not None
 
 
 def main() -> int:
@@ -67,9 +72,9 @@ def main() -> int:
         "cpmdc_finalize",
     ]
     for symbol in symbols:
-        require(symbol in header, f"cpmd_c_abi.h missing {symbol}")
-        require(symbol in stub, f"cpmd_c_abi_stub.c missing {symbol}")
-        require(symbol in fake, f"cpmdc_fake_engine.cc missing {symbol}")
+        require(has_symbol(header, symbol), f"cpmd_c_abi.h missing {symbol}")
+        require(has_symbol(stub, symbol), f"cpmd_c_abi_stub.c missing {symbol}")
+        require(has_symbol(fake, symbol), f"cpmdc_fake_engine.cc missing {symbol}")
     return 0
 
 
