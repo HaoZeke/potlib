@@ -17,6 +17,10 @@ def has_symbol(text: str, symbol: str) -> bool:
     return re.search(rf"\b{re.escape(symbol)}\s*\(", text) is not None
 
 
+def has_feature_entry(text: str, symbol: str) -> bool:
+    return f'"abi.{symbol}"' in text
+
+
 def main() -> int:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
     cpmd_dir = root / "CppCore" / "rgpot" / "CPMDPot"
@@ -78,6 +82,14 @@ def main() -> int:
         require(has_symbol(header, symbol), f"cpmd_c_abi.h missing {symbol}")
         require(has_symbol(stub, symbol), f"cpmd_c_abi_stub.c missing {symbol}")
         require(has_symbol(fake, symbol), f"cpmdc_fake_engine.cc missing {symbol}")
+        require(
+            has_feature_entry(stub, symbol),
+            f"cpmd_c_abi_stub.c feature table missing abi.{symbol}",
+        )
+        require(
+            has_feature_entry(fake, symbol),
+            f"cpmdc_fake_engine.cc feature table missing abi.{symbol}",
+        )
     return 0
 
 
