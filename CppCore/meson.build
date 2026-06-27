@@ -18,7 +18,7 @@ if _rpc_stack
     subdir('rgpot/rpc')
     # Pure dlopen consumers of split nwchemc / cpmdc; need generated schema only.
     subdir('rgpot/NWChemPot')  # 'nwchempot' frontend + no-op ABI stub
-    subdir('rgpot/CPMDPot')  # 'cpmdpot' frontend + no-op ABI stub
+    subdir('rgpot/CPMDPot')    # 'cpmdpot' frontend + no-op ABI stub
 endif
 
 # ------------------------ Main library
