@@ -177,8 +177,19 @@ if get_option('with_tests')
             ],
         ]
     endif
-    # NWChem frontend tests (main lib build only; skip at runtime if engine missing)
+    # NWChem frontend tests (main lib build only; fake engine for energy/forces)
     if not get_option('with_rpc_client_only')
+        nwchemc_fake_engine = shared_library(
+            'nwchemc_fake_engine',
+            sources: ['tests/nwchemc_fake_engine.c'],
+            include_directories: include_directories('rgpot/NWChemPot'),
+            install: false,
+        )
+        nwchemc_fake_env = environment()
+        nwchemc_fake_env.set(
+            'RGPOT_NWCHEM_ENGINE',
+            nwchemc_fake_engine.full_path(),
+        )
         test(
             'NWChemPotTest',
             executable(
@@ -190,19 +201,10 @@ if get_option('with_tests')
                 link_with: _linkto,
                 link_language: 'cpp',
             ),
+            env: nwchemc_fake_env,
+            depends: nwchemc_fake_engine,
             workdir: meson.source_root(),
             suite: 'nwchem',
-        )
-        nwchemc_fake_engine = shared_library(
-            'nwchemc_fake_engine',
-            sources: ['tests/nwchemc_fake_engine.c'],
-            include_directories: include_directories('rgpot/NWChemPot'),
-            install: false,
-        )
-        nwchemc_fake_env = environment()
-        nwchemc_fake_env.set(
-            'RGPOT_NWCHEM_ENGINE',
-            nwchemc_fake_engine.full_path(),
         )
         test(
             'NWChemPotMessageAbiTest',
