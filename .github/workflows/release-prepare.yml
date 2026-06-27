@@ -26,8 +26,8 @@ jobs:
       run: potctl ci release-assert
     - name: Towncrier draft (fragments must build cleanly)
       run: potctl ci towncrier-draft
-    - name: Cargo publish dry-run (rgpot-core, locked)
-      run: cargo publish -p rgpot-core --locked --dry-run
+    - name: Cargo check rgpot-core (locked)
+      run: cargo check -p rgpot-core --locked
       shell: pixi run bash -e {0}
     - name: Cog bump dry-run (PR tip version)
       run: potctl ci cog-bump-dry-run

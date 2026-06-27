@@ -54,10 +54,12 @@ in
         # potctl owns step bodies; nickel owns job/matrix/needs only
         { name = "Assert lockstep surfaces agree", run = "potctl ci release-assert" },
         { name = "Towncrier draft (fragments must build cleanly)", run = "potctl ci towncrier-draft" },
+        # rgpot-core uses git deps (dlpk, eindir-core) not on crates.io; publish is
+        # off (publish = false). Validate the locked graph builds instead.
         S.run_pixi m%"
-          cargo publish -p rgpot-core --locked --dry-run
+          cargo check -p rgpot-core --locked
         "%
-        & { name = "Cargo publish dry-run (rgpot-core, locked)" },
+        & { name = "Cargo check rgpot-core (locked)" },
         { name = "Cog bump dry-run (PR tip version)", run = "potctl ci cog-bump-dry-run" },
         {
           name = "Cog bump dry-run (workflow_dispatch)",

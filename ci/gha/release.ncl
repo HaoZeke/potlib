@@ -130,7 +130,16 @@ let P = S.pins in
         },
         {
           name = "Cargo publish (rgpot-core, locked only)",
-          run = "cargo publish -p rgpot-core --locked",
+          # Skip when package.publish = false (git deps not on crates.io yet).
+          run = m%"
+            set -euo pipefail
+            if grep -qE '^publish\s*=\s*false' rgpot-core/Cargo.toml; then
+              echo "rgpot-core has publish = false; skipping crates.io upload."
+              echo "Re-enable publish and switch git deps to registry versions first."
+              exit 0
+            fi
+            cargo publish -p rgpot-core --locked
+          "%,
           env = { CARGO_REGISTRY_TOKEN = "${{ secrets.CARGO_REGISTRY_TOKEN }}" },
         },
       ],
