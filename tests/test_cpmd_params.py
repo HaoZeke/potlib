@@ -100,6 +100,55 @@ def test_make_cpmd_params() -> None:
     assert sections[2].set.value == "HOCKNEY"
 
 
+def test_make_cpmd_params_accepts_all_section_arms() -> None:
+    params = make_cpmd_params(
+        pot_capnp,
+        input_sections=[
+            {
+                "kind": "generic",
+                "name": "PIMD",
+                "directives": [{"keyword": "TEMP", "args": ["300"]}],
+            },
+            {
+                "kind": "cpmd",
+                "optimizeWavefunction": False,
+                "molecularDynamics": True,
+                "maxStep": 8,
+                "timestep": 4.0,
+                "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
+            },
+            {
+                "kind": "dft",
+                "functional": "PBE0",
+                "lsd": True,
+                "directives": [{"keyword": "HFX", "args": ["SCREENING"]}],
+            },
+            {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
+        ],
+    )
+
+    sections = params.inputSections
+    assert len(sections) == 4
+    assert sections[0].which() == "generic"
+    assert sections[0].generic.name == "PIMD"
+    assert sections[0].generic.directives[0].keyword == "TEMP"
+    assert list(sections[0].generic.directives[0].args) == ["300"]
+    assert sections[1].which() == "cpmd"
+    assert sections[1].cpmd.optimizeWavefunction is False
+    assert sections[1].cpmd.molecularDynamics is True
+    assert sections[1].cpmd.maxStep == 8
+    assert sections[1].cpmd.timestep == 4.0
+    assert sections[1].cpmd.directives[0].keyword == "PRINT"
+    assert list(sections[1].cpmd.directives[0].args) == ["FORCES", "ON"]
+    assert sections[2].which() == "dft"
+    assert sections[2].dft.functional == "PBE0"
+    assert sections[2].dft.lsd is True
+    assert sections[2].dft.directives[0].keyword == "HFX"
+    assert list(sections[2].dft.directives[0].args) == ["SCREENING"]
+    assert sections[3].which() == "raw"
+    assert sections[3].raw == "&VDW\n  DISPERSION\n&END"
+
+
 def test_make_potential_config_cpmd() -> None:
     cfg = make_potential_config_cpmd(pot_capnp, functional="BLYP")
     assert cfg.which() == "cpmd"
@@ -117,5 +166,6 @@ def test_configure_cpmd() -> None:
 
 if __name__ == "__main__":
     test_make_cpmd_params()
+    test_make_cpmd_params_accepts_all_section_arms()
     test_make_potential_config_cpmd()
     test_configure_cpmd()

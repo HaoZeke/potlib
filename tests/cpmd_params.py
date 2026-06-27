@@ -28,6 +28,14 @@ def _mapping_or_sequence_value(item: Any, key: str, index: int, default: Any = N
     return default
 
 
+def _mapping_value(item: Any, keys: Sequence[str], default: Any = None) -> Any:
+    if isinstance(item, Mapping):
+        for key in keys:
+            if key in item:
+                return item[key]
+    return default
+
+
 def _add_input_blocks(params: Any, input_blocks: Iterable[str]) -> None:
     blocks = [str(block) for block in input_blocks]
     out = params.init("inputBlocks", len(blocks))
@@ -56,10 +64,90 @@ def _set_atoms_section(section: Any, pseudopotentials: Iterable[Any]) -> None:
         out[idx].lmax = int(_mapping_or_sequence_value(spec, "lmax", 2, -1))
 
 
+def _set_directives(owner: Any, directives: Iterable[Any]) -> None:
+    specs = list(directives)
+    if not specs:
+        return
+    out = owner.init("directives", len(specs))
+    for idx, spec in enumerate(specs):
+        out[idx].keyword = str(_mapping_or_sequence_value(spec, "keyword", 0, ""))
+        args = _mapping_or_sequence_value(spec, "args", 1, ())
+        if isinstance(args, (str, bytes)):
+            arg_values = [args]
+        else:
+            arg_values = list(args)
+        arg_out = out[idx].init("args", len(arg_values))
+        for arg_idx, value in enumerate(arg_values):
+            arg_out[arg_idx] = str(value)
+
+
 def _set_set_section(section: Any, directive: Any) -> None:
     set_directive = section.init("set")
     set_directive.key = str(_mapping_or_sequence_value(directive, "key", 0, ""))
     set_directive.value = str(_mapping_or_sequence_value(directive, "value", 1, ""))
+
+
+def _set_generic_section(section: Any, spec: Any) -> None:
+    generic = section.init("generic")
+    generic.name = str(_mapping_or_sequence_value(spec, "name", 0, ""))
+    _set_directives(generic, _mapping_value(spec, ["directives"], ()))
+
+
+def _set_cpmd_section(section: Any, spec: Any) -> None:
+    cpmd = section.init("cpmd")
+    cpmd.optimizeWavefunction = bool(
+        _mapping_value(spec, ["optimizeWavefunction", "optimize_wavefunction"], True)
+    )
+    cpmd.molecularDynamics = bool(
+        _mapping_value(spec, ["molecularDynamics", "molecular_dynamics"], False)
+    )
+    cpmd.convergenceOrbitals = float(
+        _mapping_value(spec, ["convergenceOrbitals", "convergence_orbitals"], 1.0e-6)
+    )
+    cpmd.maxStep = int(_mapping_value(spec, ["maxStep", "max_step"], 0))
+    cpmd.timestep = float(_mapping_value(spec, ["timestep"], 0.0))
+    cpmd.restartWavefunction = bool(
+        _mapping_value(spec, ["restartWavefunction", "restart_wavefunction"], False)
+    )
+    cpmd.trajectory = bool(_mapping_value(spec, ["trajectory"], False))
+    _set_directives(cpmd, _mapping_value(spec, ["directives"], ()))
+
+
+def _set_dft_section(section: Any, spec: Any) -> None:
+    dft = section.init("dft")
+    dft.functional = str(_mapping_value(spec, ["functional"], "BLYP"))
+    dft.lsd = bool(_mapping_value(spec, ["lsd"], False))
+    _set_directives(dft, _mapping_value(spec, ["directives"], ()))
+
+
+def _set_raw_section(section: Any, spec: Any) -> None:
+    section.raw = str(_mapping_value(spec, ["text", "raw"], ""))
+
+
+def _set_input_section(section: Any, spec: Any) -> None:
+    kind = str(_mapping_or_sequence_value(spec, "kind", 0, "")).lower()
+    if kind == "generic":
+        _set_generic_section(section, spec)
+    elif kind == "system":
+        _set_system_section(
+            section,
+            system_cell=_mapping_value(spec, ["cell", "system_cell"], ()),
+            cut_off_ry=float(_mapping_value(spec, ["cutOffRy", "cut_off_ry"], 70.0)),
+            charge=int(_mapping_value(spec, ["charge"], 0)),
+            multiplicity=int(_mapping_value(spec, ["multiplicity"], 1)),
+        )
+    elif kind == "cpmd":
+        _set_cpmd_section(section, spec)
+    elif kind == "dft":
+        _set_dft_section(section, spec)
+    elif kind == "atoms":
+        _set_atoms_section(section, _mapping_value(spec, ["pseudopotentials"], ()))
+    elif kind == "set":
+        _set_set_section(section, spec)
+    elif kind == "raw":
+        _set_raw_section(section, spec)
+    else:
+        raise ValueError(f"unknown CPMD input section kind: {kind}")
 
 
 def make_cpmd_params(
@@ -80,6 +168,7 @@ def make_cpmd_params(
     system_cell: Sequence[float] | None = None,
     pseudopotentials: Iterable[Any] = (),
     set_directives: Iterable[Any] = (),
+    input_sections: Iterable[Any] = (),
 ):
     """Build CPMDParams for the cpmd PotentialConfig arm."""
     params = pot_capnp.CPMDParams.new_message()
@@ -101,7 +190,13 @@ def make_cpmd_params(
 
     pseudo_specs = list(pseudopotentials)
     set_specs = list(set_directives)
-    section_count = int(system_cell is not None) + int(bool(pseudo_specs)) + len(set_specs)
+    input_section_specs = list(input_sections)
+    section_count = (
+        int(system_cell is not None)
+        + int(bool(pseudo_specs))
+        + len(set_specs)
+        + len(input_section_specs)
+    )
     if section_count:
         sections = params.init("inputSections", section_count)
         idx = 0
@@ -119,6 +214,9 @@ def make_cpmd_params(
             idx += 1
         for directive in set_specs:
             _set_set_section(sections[idx], directive)
+            idx += 1
+        for section_spec in input_section_specs:
+            _set_input_section(sections[idx], section_spec)
             idx += 1
 
     return params
