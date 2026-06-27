@@ -61,7 +61,9 @@ Cap'n Proto builder code in clients.
 Typed =atoms= sections carry pseudopotential entries keyed by element symbol;
 the engine groups =ForceInput= coordinates into =&ATOMS= and requires entries
 for every atomic number present in a step. Without an =atoms= section, built-in
-BLYP pseudopotential defaults cover H and O only.
+BLYP pseudopotential defaults cover H and O only. The same =atoms= section also
+accepts structured =directives= for ATOMS keywords that are not
+pseudopotential entries.
 The integration script can exercise configure-only RPC plumbing without a CPMD
 engine:
 
