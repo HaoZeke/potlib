@@ -56,6 +56,16 @@ def main() -> int:
         "libcpmdc" in frontend,
         "CPMDPot.cc must dlopen the split cpmdc engine (libcpmdc)",
     )
+    feature_symbols = [
+        "cpmdc_feature_count",
+        "cpmdc_feature_table",
+        "cpmdc_feature_find",
+    ]
+    for symbol in feature_symbols:
+        require(
+            f'"{symbol}"' in frontend,
+            f"CPMDPot.cc does not load feature discovery symbol {symbol}",
+        )
     symbols = [
         "cpmdc_set_params",
         "cpmdc_energy_gradient",

@@ -34,6 +34,9 @@ using SessionCalculateResultFn = CPMDCResult (*)(
     CPMDCSession *, const void *, size_t, void *, size_t, size_t *);
 using VersionFn = const char *(*)(void);
 using AvailableFn = int (*)(void);
+using FeatureCountFn = size_t (*)(void);
+using FeatureTableFn = const CPMDCFeatureEntry *(*)(void);
+using FeatureFindFn = const CPMDCFeatureEntry *(*)(const char *);
 
 struct ParamsView {
   const void *data = nullptr;
@@ -76,6 +79,9 @@ struct EngineBundle {
   SessionCalculateResultFn session_calculate_result = nullptr;
   VersionFn version = nullptr;
   AvailableFn available = nullptr;
+  FeatureCountFn feature_count = nullptr;
+  FeatureTableFn feature_table = nullptr;
+  FeatureFindFn feature_find = nullptr;
   std::string load_error;
   bool loaded = false;
 };
@@ -91,6 +97,9 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.session_calculate_result = nullptr;
   b.version = nullptr;
   b.available = nullptr;
+  b.feature_count = nullptr;
+  b.feature_table = nullptr;
+  b.feature_find = nullptr;
 
   bool eng_ok = false;
   std::string eng_err;
@@ -123,11 +132,23 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
           "cpmdc_session_calculate_result");
   b.version = b.engine_lib.sym_optional<VersionFn>("cpmdc_version");
   b.available = b.engine_lib.sym_optional<AvailableFn>("cpmdc_available");
+  b.feature_count =
+      b.engine_lib.sym_optional<FeatureCountFn>("cpmdc_feature_count");
+  b.feature_table =
+      b.engine_lib.sym_optional<FeatureTableFn>("cpmdc_feature_table");
+  b.feature_find =
+      b.engine_lib.sym_optional<FeatureFindFn>("cpmdc_feature_find");
 
   const bool has_one_shot = b.energy_gradient && b.set_params;
   const bool has_session_result =
       b.session_create && b.session_destroy &&
       b.potential_result_size_for_force_input && b.session_calculate_result;
+  const bool has_feature_discovery =
+      b.feature_count && b.feature_table && b.feature_find;
+  if (!has_feature_discovery) {
+    b.load_error = "engine missing cpmdc feature discovery ABI";
+    return false;
+  }
   if (!has_one_shot && !has_session_result) {
     b.load_error =
         "engine missing cpmdc session result ABI or one-shot gradient ABI";
