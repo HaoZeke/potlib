@@ -144,12 +144,13 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "lsd": True,
                 "directives": [{"keyword": "HFX", "args": ["SCREENING"]}],
             },
+            {"kind": "set", "key": "CPMD.MAXSTEP", "value": "12"},
             {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
         ],
     )
 
     sections = params.inputSections
-    assert len(sections) == 6
+    assert len(sections) == 7
     assert sections[0].which() == "generic"
     assert sections[0].generic.name == "PIMD"
     assert sections[0].generic.directives[0].keyword == "TEMP"
@@ -185,8 +186,11 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[4].dft.lsd is True
     assert sections[4].dft.directives[0].keyword == "HFX"
     assert list(sections[4].dft.directives[0].args) == ["SCREENING"]
-    assert sections[5].which() == "raw"
-    assert sections[5].raw == "&VDW\n  DISPERSION\n&END"
+    assert sections[5].which() == "set"
+    assert sections[5].set.key == "CPMD.MAXSTEP"
+    assert sections[5].set.value == "12"
+    assert sections[6].which() == "raw"
+    assert sections[6].raw == "&VDW\n  DISPERSION\n&END"
 
 
 def test_make_potential_config_cpmd() -> None:
