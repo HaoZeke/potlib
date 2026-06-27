@@ -66,7 +66,8 @@ molecular dynamics, orbital and geometry convergence thresholds, iteration
 limits, timestep, electron mass, restart, and trajectory controls.
 The typed =dft= section covers functional, LSD, GC cutoff, XC driver, LIBXC,
 LR kernel, refunct, MTS high/low functionals, HFX, HFX screening, Hubbard,
-alpha, and beta controls.
+alpha, beta, old/new code selection, correlation, exchange, and Becke88
+controls.
 
 Python: =tests/cpmd_params.py= builds =PotentialConfig= + =cpmd=.
 The helper uses =CPMD_ROOT= for =cpmdRoot= and =CPMDC_LIBRARY= /

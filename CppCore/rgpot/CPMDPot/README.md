@@ -109,7 +109,12 @@ params = make_cpmd_params(
          "hfxScreening": "0.2",
          "hubbard": "U 1 4.0",
          "alpha": 0.25,
-         "beta": 0.75},
+         "beta": 0.75,
+         "oldCode": True,
+         "newCode": True,
+         "correlation": "LYP",
+         "exchange": "B88",
+         "becke88": True},
         {"kind": "atoms",
          "pseudopotentials": [
              {"element": "Si", "path": "Si_MT_PBE.psp", "lmax": 2},

@@ -162,6 +162,11 @@ def _set_dft_section(section: Any, spec: Any) -> None:
     dft.hubbard = str(_mapping_value(spec, ["hubbard"], ""))
     dft.alpha = float(_mapping_value(spec, ["alpha"], 0.0))
     dft.beta = float(_mapping_value(spec, ["beta"], 0.0))
+    dft.oldCode = bool(_mapping_value(spec, ["oldCode", "old_code"], False))
+    dft.newCode = bool(_mapping_value(spec, ["newCode", "new_code"], False))
+    dft.correlation = str(_mapping_value(spec, ["correlation"], ""))
+    dft.exchange = str(_mapping_value(spec, ["exchange"], ""))
+    dft.becke88 = bool(_mapping_value(spec, ["becke88"], False))
     _set_directives(dft, _mapping_value(spec, ["directives"], ()))
 
 

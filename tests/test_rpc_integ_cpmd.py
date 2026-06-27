@@ -58,6 +58,11 @@ def test_configure_cpmd_smoke() -> None:
     assert dft_section.hubbard == "U 1 4.0"
     assert dft_section.alpha == 0.25
     assert dft_section.beta == 0.75
+    assert dft_section.oldCode is True
+    assert dft_section.newCode is True
+    assert dft_section.correlation == "LYP"
+    assert dft_section.exchange == "B88"
+    assert dft_section.becke88 is True
 
 
 if __name__ == "__main__":

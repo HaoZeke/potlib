@@ -158,6 +158,11 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "hubbard": "U 1 4.0",
                 "alpha": 0.25,
                 "beta": 0.75,
+                "oldCode": True,
+                "newCode": True,
+                "correlation": "LYP",
+                "exchange": "B88",
+                "becke88": True,
                 "directives": [{"keyword": "HFX", "args": ["SCREENING"]}],
             },
             {"kind": "set", "key": "CPMD.MAXSTEP", "value": "12"},
@@ -216,6 +221,11 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[4].dft.hubbard == "U 1 4.0"
     assert sections[4].dft.alpha == 0.25
     assert sections[4].dft.beta == 0.75
+    assert sections[4].dft.oldCode is True
+    assert sections[4].dft.newCode is True
+    assert sections[4].dft.correlation == "LYP"
+    assert sections[4].dft.exchange == "B88"
+    assert sections[4].dft.becke88 is True
     assert sections[4].dft.directives[0].keyword == "HFX"
     assert list(sections[4].dft.directives[0].args) == ["SCREENING"]
     assert sections[5].which() == "set"

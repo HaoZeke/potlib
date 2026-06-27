@@ -369,6 +369,11 @@ struct CPMDDftSection {
   hubbard       @12 :Text;
   alpha         @13 :Float64 = 0.0;
   beta          @14 :Float64 = 0.0;
+  oldCode       @15 :Bool = false;
+  newCode       @16 :Bool = false;
+  correlation   @17 :Text;
+  exchange      @18 :Text;
+  becke88       @19 :Bool = false;
 }
 
 struct CPMDAtomsPseudopotential {
