@@ -132,12 +132,30 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
                 "optimizeWavefunction": False,
                 "optimizeGeometry": True,
                 "molecularDynamics": True,
+                "molecularDynamicsCp": True,
+                "molecularDynamicsBo": True,
+                "molecularDynamicsEh": True,
+                "molecularDynamicsPt": True,
+                "molecularDynamicsClassical": True,
+                "molecularDynamicsFile": "TRAJECTORY.in",
                 "convergenceOrbitals": 2.5e-7,
                 "convergenceGeometry": 1.0e-4,
                 "maxStep": 8,
                 "maxIter": 12,
                 "timestep": 4.0,
                 "electronMass": 450.0,
+                "nose": True,
+                "noseIons": True,
+                "noseElectrons": True,
+                "berendsen": "300 100",
+                "langevin": True,
+                "annealing": "IONS 300 50",
+                "quench": True,
+                "rattle": True,
+                "shake": True,
+                "constraint": "FIX COM",
+                "trotter": "8",
+                "restart": True,
                 "restartWavefunction": True,
                 "trajectory": True,
                 "directives": [{"keyword": "PRINT", "args": ["FORCES", "ON"]}],
@@ -196,12 +214,30 @@ def test_make_cpmd_params_accepts_all_section_arms() -> None:
     assert sections[3].cpmd.optimizeWavefunction is False
     assert sections[3].cpmd.optimizeGeometry is True
     assert sections[3].cpmd.molecularDynamics is True
+    assert sections[3].cpmd.molecularDynamicsCp is True
+    assert sections[3].cpmd.molecularDynamicsBo is True
+    assert sections[3].cpmd.molecularDynamicsEh is True
+    assert sections[3].cpmd.molecularDynamicsPt is True
+    assert sections[3].cpmd.molecularDynamicsClassical is True
+    assert sections[3].cpmd.molecularDynamicsFile == "TRAJECTORY.in"
     assert sections[3].cpmd.convergenceOrbitals == 2.5e-7
     assert sections[3].cpmd.convergenceGeometry == 1.0e-4
     assert sections[3].cpmd.maxStep == 8
     assert sections[3].cpmd.maxIter == 12
     assert sections[3].cpmd.timestep == 4.0
     assert sections[3].cpmd.electronMass == 450.0
+    assert sections[3].cpmd.nose is True
+    assert sections[3].cpmd.noseIons is True
+    assert sections[3].cpmd.noseElectrons is True
+    assert sections[3].cpmd.berendsen == "300 100"
+    assert sections[3].cpmd.langevin is True
+    assert sections[3].cpmd.annealing == "IONS 300 50"
+    assert sections[3].cpmd.quench is True
+    assert sections[3].cpmd.rattle is True
+    assert sections[3].cpmd.shake is True
+    assert sections[3].cpmd.constraint == "FIX COM"
+    assert sections[3].cpmd.trotter == "8"
+    assert sections[3].cpmd.restart is True
     assert sections[3].cpmd.restartWavefunction is True
     assert sections[3].cpmd.trajectory is True
     assert sections[3].cpmd.directives[0].keyword == "PRINT"

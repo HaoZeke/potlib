@@ -123,6 +123,28 @@ def _set_cpmd_section(section: Any, spec: Any) -> None:
     cpmd.molecularDynamics = bool(
         _mapping_value(spec, ["molecularDynamics", "molecular_dynamics"], False)
     )
+    cpmd.molecularDynamicsCp = bool(
+        _mapping_value(spec, ["molecularDynamicsCp", "molecular_dynamics_cp"], False)
+    )
+    cpmd.molecularDynamicsBo = bool(
+        _mapping_value(spec, ["molecularDynamicsBo", "molecular_dynamics_bo"], False)
+    )
+    cpmd.molecularDynamicsEh = bool(
+        _mapping_value(spec, ["molecularDynamicsEh", "molecular_dynamics_eh"], False)
+    )
+    cpmd.molecularDynamicsPt = bool(
+        _mapping_value(spec, ["molecularDynamicsPt", "molecular_dynamics_pt"], False)
+    )
+    cpmd.molecularDynamicsClassical = bool(
+        _mapping_value(
+            spec,
+            ["molecularDynamicsClassical", "molecular_dynamics_classical"],
+            False,
+        )
+    )
+    cpmd.molecularDynamicsFile = str(
+        _mapping_value(spec, ["molecularDynamicsFile", "molecular_dynamics_file"], "")
+    )
     cpmd.convergenceOrbitals = float(
         _mapping_value(spec, ["convergenceOrbitals", "convergence_orbitals"], 1.0e-6)
     )
@@ -135,6 +157,20 @@ def _set_cpmd_section(section: Any, spec: Any) -> None:
     cpmd.electronMass = float(
         _mapping_value(spec, ["electronMass", "electron_mass"], 0.0)
     )
+    cpmd.nose = bool(_mapping_value(spec, ["nose"], False))
+    cpmd.noseIons = bool(_mapping_value(spec, ["noseIons", "nose_ions"], False))
+    cpmd.noseElectrons = bool(
+        _mapping_value(spec, ["noseElectrons", "nose_electrons"], False)
+    )
+    cpmd.berendsen = str(_mapping_value(spec, ["berendsen"], ""))
+    cpmd.langevin = bool(_mapping_value(spec, ["langevin"], False))
+    cpmd.annealing = str(_mapping_value(spec, ["annealing"], ""))
+    cpmd.quench = bool(_mapping_value(spec, ["quench"], False))
+    cpmd.rattle = bool(_mapping_value(spec, ["rattle"], False))
+    cpmd.shake = bool(_mapping_value(spec, ["shake"], False))
+    cpmd.constraint = str(_mapping_value(spec, ["constraint"], ""))
+    cpmd.trotter = str(_mapping_value(spec, ["trotter"], ""))
+    cpmd.restart = bool(_mapping_value(spec, ["restart"], False))
     cpmd.restartWavefunction = bool(
         _mapping_value(spec, ["restartWavefunction", "restart_wavefunction"], False)
     )

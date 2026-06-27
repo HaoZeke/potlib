@@ -42,9 +42,27 @@ def test_configure_cpmd_smoke() -> None:
     assert pot.configs[2].cpmd.task == "gradient"
     cpmd_section = pot.configs[2].cpmd.inputSections[1].cpmd
     assert cpmd_section.optimizeGeometry is True
+    assert cpmd_section.molecularDynamicsCp is True
+    assert cpmd_section.molecularDynamicsBo is True
+    assert cpmd_section.molecularDynamicsEh is True
+    assert cpmd_section.molecularDynamicsPt is True
+    assert cpmd_section.molecularDynamicsClassical is True
+    assert cpmd_section.molecularDynamicsFile == "TRAJECTORY.in"
     assert cpmd_section.convergenceGeometry == 1.0e-4
     assert cpmd_section.maxIter == 12
     assert cpmd_section.electronMass == 450.0
+    assert cpmd_section.nose is True
+    assert cpmd_section.noseIons is True
+    assert cpmd_section.noseElectrons is True
+    assert cpmd_section.berendsen == "300 100"
+    assert cpmd_section.langevin is True
+    assert cpmd_section.annealing == "IONS 300 50"
+    assert cpmd_section.quench is True
+    assert cpmd_section.rattle is True
+    assert cpmd_section.shake is True
+    assert cpmd_section.constraint == "FIX COM"
+    assert cpmd_section.trotter == "8"
+    assert cpmd_section.restart is True
     dft_section = pot.configs[2].cpmd.inputSections[2].dft
     assert dft_section.gcCutoff == 1.0e-8
     assert dft_section.xcDriver == "LIBXC"
