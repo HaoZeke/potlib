@@ -15,7 +15,9 @@
 #include <vector>
 
 struct CPMDCSession {
-  std::vector<::capnp::word> params;
+  // Use bytes, not vector<capnp::word>: word is not default-constructible on
+  // Apple libc++ (resize/assign fail in CI Xcode 16).
+  std::vector<unsigned char> params;
 };
 
 namespace {
@@ -55,7 +57,7 @@ bool force_input_ok(const ::ForceInput::Reader &input, size_t *force_count,
   return std::isfinite(*cell_zz) && *cell_zz > 0.0;
 }
 
-std::vector<::capnp::word> make_result(size_t force_count, double cell_zz) {
+std::vector<unsigned char> make_result(size_t force_count, double cell_zz) {
   ::capnp::MallocMessageBuilder msg;
   auto result = msg.initRoot<::PotentialResult>();
   result.setEnergy(0.75 + 0.001 * cell_zz);
@@ -63,9 +65,8 @@ std::vector<::capnp::word> make_result(size_t force_count, double cell_zz) {
   for (unsigned int i = 0; i < forces.size(); ++i)
     forces.set(i, 0.011 + 0.001 * static_cast<double>(i));
   auto words = ::capnp::messageToFlatArray(msg);
-  std::vector<::capnp::word> out(words.size());
-  std::memcpy(out.data(), words.begin(), words.asBytes().size());
-  return out;
+  const auto bytes = words.asBytes();
+  return std::vector<unsigned char>(bytes.begin(), bytes.end());
 }
 
 CPMDCResult fail_result(const char *message) {
@@ -135,8 +136,7 @@ CPMDCSession *cpmdc_session_create(const void *params_capnp,
   if (!has_flat_message(params_capnp, params_capnp_size_bytes))
     return nullptr;
   auto *session = new CPMDCSession;
-  const size_t n_words = params_capnp_size_bytes / sizeof(::capnp::word);
-  session->params.resize(n_words);
+  session->params.resize(params_capnp_size_bytes);
   std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
   return session;
 }
@@ -146,8 +146,7 @@ int cpmdc_session_set_params(CPMDCSession *session, const void *params_capnp,
   if (session == nullptr ||
       !has_flat_message(params_capnp, params_capnp_size_bytes))
     return -1;
-  const size_t n_words = params_capnp_size_bytes / sizeof(::capnp::word);
-  session->params.resize(n_words);
+  session->params.resize(params_capnp_size_bytes);
   std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
   return 0;
 }
