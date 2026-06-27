@@ -55,6 +55,9 @@ placement (=scratchDir=, =permanentDir=), raw =inputBlocks=, and structured
 Python: =tests/cpmd_params.py= builds =PotentialConfig= + =cpmd=. The helper
 uses =CPMD_ROOT= for =cpmdRoot= and =CPMDC_LIBRARY= / =RGPOT_CPMDC_ENGINE= /
 =RGPOT_CPMD_ENGINE= for =enginePath= when explicit values are not supplied.
+Use =input_sections= to build every structured =CPMDInputSection= arm
+(=generic=, =system=, =cpmd=, =dft=, =atoms=, =set=, and =raw=) without raw
+Cap'n Proto builder code in clients.
 The integration script can exercise configure-only RPC plumbing without a CPMD
 engine:
 

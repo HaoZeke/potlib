@@ -58,7 +58,21 @@ the CPMD `SET` directive path in the engine.
 ## Python helpers and RPC smoke
 
 `tests/cpmd_params.py` builds `CPMDParams` and `PotentialConfig.cpmd` messages
-for pycapnp clients.
+for pycapnp clients. Use `input_sections` for the full structured section
+surface; each item has a `kind` plus arm fields, for example:
+
+```python
+params = make_cpmd_params(
+    pot_capnp,
+    input_sections=[
+        {"kind": "generic", "name": "PIMD",
+         "directives": [{"keyword": "TEMP", "args": ["300"]}]},
+        {"kind": "cpmd", "molecularDynamics": True, "maxStep": 8},
+        {"kind": "dft", "functional": "PBE0", "lsd": True},
+        {"kind": "raw", "text": "&VDW\n  DISPERSION\n&END"},
+    ],
+)
+```
 
 ```bash
 pixi run -e rpctest python tests/test_cpmd_params.py
