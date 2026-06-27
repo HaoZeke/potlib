@@ -10,6 +10,9 @@ endif
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
 
+# Cap'n Proto schema/codegen (ptlrpc) is always required: NWChemPot/CPMDPot take
+# typed NWChemParams/CPMDParams from Potentials.capnp even when potserv is off
+# (with_rpc=false still builds frontends; potserv itself stays behind rpc_enabled).
 subdir('rgpot/rpc')
 
 # NWChemPot is a pure dlopen consumer of the split nwchemc engine: it needs only
