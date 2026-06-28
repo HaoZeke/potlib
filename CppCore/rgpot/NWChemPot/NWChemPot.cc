@@ -119,6 +119,38 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   return true;
 }
 
+// Host-only fields (dlopen path / NWCHEM_TOP hints). Real libnwchemc rejects
+// non-empty enginePath in apply_config_to_embed; keeping them in the blob
+// makes set_params fail and poisons multi-call SCF in one process.
+std::vector<::capnp::word>
+serialize_params_for_engine(const ::NWChemParams::Reader &params) {
+  ::capnp::MallocMessageBuilder msg;
+  auto out = msg.initRoot<::NWChemParams>();
+  out.setBasis(params.getBasis());
+  out.setTheory(params.getTheory());
+  out.setScfType(params.getScfType());
+  out.setCharge(params.getCharge());
+  out.setMultiplicity(params.getMultiplicity());
+  out.setEnginePath("");
+  out.setNwchemRoot("");
+  out.setTask(params.getTask());
+  out.setTitle(params.getTitle());
+  out.setMemoryMb(params.getMemoryMb());
+  out.setScratchDir(params.getScratchDir());
+  out.setPermanentDir(params.getPermanentDir());
+  const auto blocks = params.getInputBlocks();
+  auto out_blocks = out.initInputBlocks(blocks.size());
+  for (unsigned int i = 0; i < blocks.size(); ++i)
+    out_blocks.set(i, blocks[i]);
+  out.setInputStanzas(params.getInputStanzas());
+  auto words = ::capnp::messageToFlatArray(msg);
+  std::vector<::capnp::word> flat(words.size());
+  std::memcpy(flat.data(), words.begin(),
+              words.size() * sizeof(::capnp::word));
+  return flat;
+}
+
+// Full params for getParams() / host bookkeeping (includes enginePath).
 std::vector<::capnp::word>
 serialize_params(const ::NWChemParams::Reader &params) {
   ::capnp::MallocMessageBuilder msg;
@@ -203,29 +235,41 @@ bool g_abi_probe_ok = false;
 
 struct NWChemPot::Impl {
   EngineBundle bundle;
+  // Host-visible Cap'n Proto (may include enginePath / nwchemRoot).
   std::vector<::capnp::word> params_words;
+  // Embed-safe blob (enginePath/nwchemRoot cleared) for set_params / gradient.
+  std::vector<::capnp::word> engine_params_words;
   std::string engine_path;
   std::string nwchem_root;
   // Reused gradient buffer for the engine ABI; avoids a per-call heap
   // allocation in forceImpl. forceImpl is const, hence mutable.
   mutable std::vector<double> grad_scratch;
+
+  void store(const ::NWChemParams::Reader &params) {
+    params_words = serialize_params(params);
+    engine_params_words = serialize_params_for_engine(params);
+  }
 };
 
 NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
-  impl_->params_words = default_params();
+  {
+    ::capnp::MallocMessageBuilder msg;
+    auto p = msg.initRoot<::NWChemParams>();
+    impl_->store(p.asReader());
+  }
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->engine_params_words);
 }
 
 NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
     : Potential(PotType::NWChem), impl_(new Impl) {
-  impl_->params_words = serialize_params(params);
+  impl_->store(params);
   impl_->engine_path = params.getEnginePath().cStr();
   impl_->nwchem_root = params.getNwchemRoot().cStr();
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->engine_params_words);
 }
 
 NWChemPot::~NWChemPot() { delete impl_; }
@@ -236,25 +280,20 @@ bool NWChemPot::setParams(const ::NWChemParams::Reader &params) {
 
   const std::string next_engine_path = params.getEnginePath().cStr();
   const std::string next_nwchem_root = params.getNwchemRoot().cStr();
-  const bool need_reload =
-      !impl_->bundle.loaded || next_engine_path != impl_->engine_path;
 
-  impl_->params_words = serialize_params(params);
+  impl_->store(params);
   impl_->engine_path = next_engine_path;
   impl_->nwchem_root = next_nwchem_root;
   apply_env_hints(impl_->nwchem_root);
 
-  if (need_reload) {
-    impl_->bundle = EngineBundle{};
-    if (!try_load_engine(impl_->bundle, impl_->engine_path))
-      return false;
-  } else if (!impl_->bundle.loaded) {
+  // Do not dlclose a real NWChem embed — GA/MA are process-global.
+  if (!impl_->bundle.loaded) {
     if (!try_load_engine(impl_->bundle, impl_->engine_path))
       return false;
   }
   if (!impl_->bundle.loaded)
     return false;
-  return push_params_to_engine(impl_->bundle, impl_->params_words);
+  return push_params_to_engine(impl_->bundle, impl_->engine_params_words);
 }
 
 void NWChemPot::getParams(::NWChemParams::Builder out) const {
@@ -359,7 +398,9 @@ void NWChemPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
   std::vector<double> &grad = impl_->grad_scratch;
   grad.assign(static_cast<size_t>(n) * 3u, 0.0);
-  const ParamsView params = params_view(impl_->params_words);
+  const ParamsView params = params_view(impl_->engine_params_words.empty()
+                                            ? impl_->params_words
+                                            : impl_->engine_params_words);
   NWChemCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
 

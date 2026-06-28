@@ -219,8 +219,15 @@ TEST_CASE("NWChemPot water B3LYP/6-31G* when real engine present",
   p.setMultiplicity(1);
   p.setTask("gradient");
   p.setTitle("water-b3lyp");
+  // Explicit DFT XC block — reliable B3LYP without depending on scfType promotion
+  // in an older libnwchemc build.
   auto blocks = p.initInputBlocks(1);
   blocks.set(0, "dft\n  xc b3lyp\n  mult 1\nend");
+  // Host-only path must not poison embed set_params (stripped before ABI).
+  if (const char *eng = std::getenv("NWCHEMC_LIBRARY"))
+    p.setEnginePath(eng);
+  else if (const char *eng = std::getenv("RGPOT_NWCHEMC_ENGINE"))
+    p.setEnginePath(eng);
 
   rgpot::NWChemPot pot(p.asReader());
   REQUIRE(pot.available());
@@ -233,18 +240,33 @@ TEST_CASE("NWChemPot water B3LYP/6-31G* when real engine present",
   std::array<std::array<double, 3>, 3> box = {
       {{100.0, 0.0, 0.0}, {0.0, 100.0, 0.0}, {0.0, 0.0, 100.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
-
-  REQUIRE(std::isfinite(energy));
-  // Water B3LYP/6-31G* total energy is strongly bound (~-76 Ha ≈ -2070 eV).
-  REQUIRE(energy < -1000.0);
-  bool any_force = false;
-  for (size_t i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      REQUIRE(std::isfinite(forces(i, j)));
-      if (std::abs(forces(i, j)) > 1e-12)
-        any_force = true;
+  // Successive force evaluations on ONE pot (criterion: multi-SCF in-process).
+  double e1 = 0.0, e2 = 0.0;
+  {
+    auto [energy, forces] = pot(positions, atmtypes, box);
+    e1 = energy;
+    REQUIRE(std::isfinite(energy));
+    // Water B3LYP/6-31G* ~ -76.4 Ha ≈ -2079 eV (not LDA ~-2063 eV).
+    REQUIRE(energy < -2070.0);
+    bool any_force = false;
+    for (size_t i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        REQUIRE(std::isfinite(forces(i, j)));
+        if (std::abs(forces(i, j)) > 1e-12)
+          any_force = true;
+      }
     }
+    REQUIRE(any_force);
   }
-  REQUIRE(any_force);
+  {
+    auto [energy, forces] = pot(positions, atmtypes, box);
+    e2 = energy;
+    REQUIRE(std::isfinite(energy));
+    REQUIRE(energy < -2000.0);
+    // Two SCFs on same geometry: agree within DFT tolerance (eV).
+    REQUIRE_THAT(energy, Catch::Matchers::WithinAbs(e1, 1e-3));
+    (void)forces;
+  }
+  REQUIRE(e1 != 0.0);
+  REQUIRE(e2 != 0.0);
 }
