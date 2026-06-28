@@ -7,6 +7,7 @@
 #include <capnp/message.h>
 
 #include <array>
+#include <cmath>
 #include <vector>
 
 #include "rgpot/NWChemPot/NWChemPot.hpp"
@@ -18,6 +19,10 @@ using Catch::Matchers::WithinAbs;
 
 TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
           "[nwchem][abi]") {
+  if (!rgpot::NWChemPot::probe_available()) {
+    SKIP("libnwchemc not available");
+  }
+
   ::capnp::MallocMessageBuilder msg;
   auto p = msg.initRoot<::NWChemParams>();
   p.setBasis("6-31g");
@@ -39,11 +44,23 @@ TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
 
   auto [energy, forces] = pot(positions, atmtypes, box);
 
-  REQUIRE_THAT(energy, WithinAbs(0.25 * rgpot::units::HARTREE_TO_EV, 1e-12));
-  REQUIRE_THAT(forces(0, 0),
-               WithinAbs(0.001 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
-  REQUIRE_THAT(forces(0, 1),
-               WithinAbs(0.002 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
-  REQUIRE_THAT(forces(0, 2),
-               WithinAbs(0.003 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
+  REQUIRE(std::isfinite(energy));
+  REQUIRE(energy != 0.0);
+  for (int j = 0; j < 3; ++j)
+    REQUIRE(std::isfinite(forces(0, j)));
+
+  const double fake_e = 0.25 * rgpot::units::HARTREE_TO_EV;
+  // In-tree fake returns fixed Ha/grad; real NWChem does not.
+  if (std::abs(energy - fake_e) < 1e-9) {
+    REQUIRE_THAT(energy, WithinAbs(fake_e, 1e-12));
+    REQUIRE_THAT(forces(0, 0),
+                 WithinAbs(0.001 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
+    REQUIRE_THAT(forces(0, 1),
+                 WithinAbs(0.002 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
+    REQUIRE_THAT(forces(0, 2),
+                 WithinAbs(0.003 * rgpot::units::NEG_GRAD_TO_FORCE, 1e-12));
+  } else {
+    // Real embed: O- / BLYP / 6-31G is bound (negative eV scale).
+    REQUIRE(energy < 0.0);
+  }
 }

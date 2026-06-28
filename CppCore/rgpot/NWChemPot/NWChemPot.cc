@@ -307,12 +307,23 @@ bool NWChemPot::available() const {
          impl_->bundle.set_params;
 }
 
+// Keep a process-lifetime engine handle for probes. Real libnwchemc (and NWChem
+// Fortran runtime) is not safe to dlclose and reload in the same process; a
+// temporary EngineBundle destructor would unload symbols and poison later calls.
+EngineBundle &probe_engine_bundle() {
+  static EngineBundle retained;
+  return retained;
+}
+
 bool NWChemPot::probe_available() {
   std::lock_guard<std::mutex> lock(g_probe_mu);
   if (g_probe_done)
     return g_probe_ok;
-  EngineBundle tmp;
-  g_probe_ok = try_load_engine(tmp, "");
+  EngineBundle &tmp = probe_engine_bundle();
+  if (!tmp.loaded)
+    g_probe_ok = try_load_engine(tmp, "");
+  else
+    g_probe_ok = true;
   g_probe_done = true;
   return g_probe_ok;
 }
@@ -321,8 +332,8 @@ bool NWChemPot::abi_available() {
   std::lock_guard<std::mutex> lock(g_probe_mu);
   if (g_abi_probe_done)
     return g_abi_probe_ok;
-  EngineBundle tmp;
-  if (!try_load_engine(tmp, "")) {
+  EngineBundle &tmp = probe_engine_bundle();
+  if (!tmp.loaded && !try_load_engine(tmp, "")) {
     g_abi_probe_ok = false;
   } else if (tmp.available) {
     g_abi_probe_ok = tmp.available() != 0;
