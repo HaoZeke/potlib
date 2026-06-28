@@ -119,11 +119,13 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   return true;
 }
 
-// Host-only fields (dlopen path / NWCHEM_TOP hints). Real libnwchemc rejects
-// non-empty enginePath in apply_config_to_embed; keeping them in the blob
-// makes set_params fail and poisons multi-call SCF in one process.
+// NWChemPot is host-only dlopen of libnwchemc.so (no second "embed mode").
+// Cap'n Proto fields enginePath / nwchemRoot are for *this* process to find
+// and env-hint the library; the loaded ABI rejects non-empty enginePath in
+// set_params / energy_gradient (not NWChem method input). Strip them from
+// the blob passed across the dlopen boundary so multi-call SCF works.
 std::vector<::capnp::word>
-serialize_params_for_engine(const ::NWChemParams::Reader &params) {
+serialize_params_for_abi(const ::NWChemParams::Reader &params) {
   ::capnp::MallocMessageBuilder msg;
   auto out = msg.initRoot<::NWChemParams>();
   out.setBasis(params.getBasis());
