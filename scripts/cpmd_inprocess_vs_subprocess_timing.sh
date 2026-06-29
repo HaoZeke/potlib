@@ -28,6 +28,6 @@ ip = [wall(S/"cpmd_inprocess_blyp_timing1.log"), wall(S/"cpmd_inprocess_blyp_tim
 bl = [wall(S/"cpmd_socket_blyp_timing1.log"), wall(S/"cpmd_socket_blyp_timing2.log")]
 ratio = max(ip) / min(bl)
 print(f"ratio_worst_ip_over_best_baseline={ratio}")
-print(f"same_speed_category={ratio <= 2.0}")
-raise SystemExit(0 if ratio <= 2.0 else 1)
+print(f"order_of_magnitude_faster={ratio <= 0.1}")
+raise SystemExit(0 if ratio <= 0.1 else 1)
 PY
