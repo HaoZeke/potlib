@@ -177,8 +177,12 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
   double energy_acc = 0.0;
   auto forces_acc = torch::zeros({nAtoms, 3}, f64_options);
-  std::vector<double> energy_samples;
-  energy_samples.reserve(static_cast<size_t>(n_passes));
+  // Force samples (CPU float64, n_passes x nAtoms x 3) for orientation force
+  // uncertainty in eV/A — energy scatter is not a force-tolerance scale.
+  std::vector<torch::Tensor> force_samples;
+  if (n_passes > 1) {
+    force_samples.reserve(static_cast<size_t>(n_passes));
+  }
   double model_uq_variance = 0.0;
   bool have_model_uq = false;
 
@@ -270,7 +274,6 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     auto energy_tensor = energy_block->values();
     const double e_pass = energy_tensor.sum().item<double>();
     energy_acc += e_pass;
-    energy_samples.push_back(e_pass);
 
     energy_tensor.backward(torch::ones_like(energy_tensor));
     auto positions_grad = system->positions().grad();
@@ -280,6 +283,9 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
       forces_tensor = forces_tensor.matmul(R_cpu);
     }
     forces_acc += forces_tensor;
+    if (n_passes > 1) {
+      force_samples.push_back(forces_tensor.clone());
+    }
   }
 
   const double inv_n = 1.0 / static_cast<double>(n_passes);
@@ -289,19 +295,21 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
               in.nAtoms * 3 * sizeof(double));
 
   if (have_model_uq) {
+    // Model energy_uncertainty mean (eV); callers may use as force floor at
+    // unit length (angstrom) — that is an explicit energy->force scale choice.
     out->variance = model_uq_variance;
-  } else if (n_passes > 1 && !energy_samples.empty()) {
-    // Report RMS energy scatter over orientations (eV), same role as mean
-    // per-atom energy_uncertainty from the model UQ path — an energy-scale
-    // uncertainty, not a squared variance. Force-criterion smearing treats
-    // this as a force floor at unit length (angstrom length_unit).
-    double mean = out->energy;
+  } else if (n_passes > 1 && !force_samples.empty()) {
+    // RMS force residual over orientations (eV/A): proper force-scale
+    // uncertainty for criterion smearing. Energy orientation scatter can be
+    // several eV on non-invariant evaluations and must not raise force tol.
     double acc2 = 0.0;
-    for (double e : energy_samples) {
-      const double d = e - mean;
-      acc2 += d * d;
+    const double n_comp =
+        static_cast<double>(nAtoms) * 3.0 * static_cast<double>(n_passes);
+    for (const auto &F_i : force_samples) {
+      auto d = F_i - forces_acc;
+      acc2 += d.square().sum().item<double>();
     }
-    out->variance = std::sqrt(acc2 / static_cast<double>(n_passes));
+    out->variance = (n_comp > 0.0) ? std::sqrt(acc2 / n_comp) : 0.0;
   } else {
     out->variance = 0.0;
   }
