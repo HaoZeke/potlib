@@ -26,8 +26,35 @@ struct ForceInput {
 # @struct PotentialResult
 # @brief Results returned from a potential energy evaluation.
 struct PotentialResult {
-  energy @0 :Float64;       # @brief The calculated potential energy.
-  forces @1 :List(Float64); # @brief Flat array of atomic forces [natoms * 3].
+  energy  @0 :Float64;       # Calculated potential energy.
+  forces  @1 :List(Float64); # Flat array of atomic forces [natoms * 3].
+  hessian @2 :List(Float64); # Dense Cartesian Hessian [natoms * 3]^2.
+  dipole  @3 :List(Float64); # Total dipole vector [3] in atomic units.
+  quadrupole @4 :List(Float64); # Traceless quadrupole [6] in atomic units.
+  optimizedPos @5 :List(Float64); # Optimized Cartesian coordinates [natoms * 3].
+  frequencies @6 :List(Float64); # Harmonic vibrational frequencies [natoms * 3] in cm^-1.
+  intensities @7 :List(Float64); # Harmonic IR intensities [natoms * 3] in atomic units.
+  stress @8 :List(Float64); # Stress tensor [9] in energy/length^3 units.
+  polarizability @9 :List(Float64); # Polarizability / aoresponse vector (backend-defined length).
+  gradient @10 :List(Float64); # Flat nuclear gradient [natoms * 3] in energy/length units.
+  normalModes @11 :List(Float64); # Dense Cartesian normal-mode matrix [natoms * 3]^2.
+  zeroPointEnergy @12 :Float64; # Vibrational zero-point correction in energy units.
+  thermalEnergy @13 :Float64; # Vibrational thermal energy correction in energy units.
+  thermalEnthalpy @14 :Float64; # Vibrational thermal enthalpy correction in energy units.
+  entropy @15 :Float64; # Vibrational total entropy (backend units).
+  heatCapacityCv @16 :Float64; # Constant-volume heat capacity (backend units).
+  projectedFrequencies @17 :List(Float64); # Frequencies with translations/rotations projected out.
+  projectedIntensities @18 :List(Float64); # IR intensities for projected modes.
+  # --- cpmdc OpenCPMD extensions (append-only after shared nwchemc surface) ---
+  energyComponents @19 :List(Float64); # ener_com scalars etot..eefield (24) when componentsValid.
+  componentsValid @20 :Bool = false;
+  chargeIntegrals @21 :List(Float64); # chrg: csumg,csumr,csums,csumsabs
+  chargeValid @22 :Bool = false;
+  multiStateEnergies @23 :List(Float64); # ener_c + ener_d catalog
+  multiStateValid @24 :Bool = false;
+  mdTrajectoryRow @25 :List(Float64); # MD ENERGY row incl. EKINC when MD ran
+  mdTrajectoryValid @26 :Bool = false;
+  embedMdPropsSkipped @27 :Bool = true; # true when MD/PROP not harvested this eval (honest skip)
 }
 
 # @struct NWChemParams

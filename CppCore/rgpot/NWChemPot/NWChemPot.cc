@@ -126,25 +126,13 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
 // the blob passed across the dlopen boundary so multi-call SCF works.
 std::vector<::capnp::word>
 serialize_params_for_abi(const ::NWChemParams::Reader &params) {
+  // Deep-copy all schema fields, then clear host-only library paths so the
+  // loaded libnwchemc rejects non-empty enginePath/nwchemRoot in set_params.
   ::capnp::MallocMessageBuilder msg;
-  auto out = msg.initRoot<::NWChemParams>();
-  out.setBasis(params.getBasis());
-  out.setTheory(params.getTheory());
-  out.setScfType(params.getScfType());
-  out.setCharge(params.getCharge());
-  out.setMultiplicity(params.getMultiplicity());
+  msg.setRoot(params);
+  auto out = msg.getRoot<::NWChemParams>();
   out.setEnginePath("");
   out.setNwchemRoot("");
-  out.setTask(params.getTask());
-  out.setTitle(params.getTitle());
-  out.setMemoryMb(params.getMemoryMb());
-  out.setScratchDir(params.getScratchDir());
-  out.setPermanentDir(params.getPermanentDir());
-  const auto blocks = params.getInputBlocks();
-  auto out_blocks = out.initInputBlocks(blocks.size());
-  for (unsigned int i = 0; i < blocks.size(); ++i)
-    out_blocks.set(i, blocks[i]);
-  out.setInputStanzas(params.getInputStanzas());
   auto words = ::capnp::messageToFlatArray(msg);
   std::vector<::capnp::word> flat(words.size());
   std::memcpy(flat.data(), words.begin(),
@@ -237,10 +225,10 @@ bool g_abi_probe_ok = false;
 
 struct NWChemPot::Impl {
   EngineBundle bundle;
-  // Host-visible Cap'n Proto (may include enginePath / nwchemRoot).
+  // Full params for getParams() (may include enginePath / nwchemRoot).
   std::vector<::capnp::word> params_words;
-  // Embed-safe blob (enginePath/nwchemRoot cleared) for set_params / gradient.
-  std::vector<::capnp::word> engine_params_words;
+  // ABI blob (enginePath/nwchemRoot cleared) for set_params / energy_gradient.
+  std::vector<::capnp::word> abi_params_words;
   std::string engine_path;
   std::string nwchem_root;
   // Reused gradient buffer for the engine ABI; avoids a per-call heap
@@ -249,7 +237,7 @@ struct NWChemPot::Impl {
 
   void store(const ::NWChemParams::Reader &params) {
     params_words = serialize_params(params);
-    engine_params_words = serialize_params_for_engine(params);
+    abi_params_words = serialize_params_for_abi(params);
   }
 };
 
@@ -261,7 +249,7 @@ NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
   }
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->engine_params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
@@ -271,7 +259,7 @@ NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
   impl_->nwchem_root = params.getNwchemRoot().cStr();
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->engine_params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 NWChemPot::~NWChemPot() { delete impl_; }
@@ -288,14 +276,14 @@ bool NWChemPot::setParams(const ::NWChemParams::Reader &params) {
   impl_->nwchem_root = next_nwchem_root;
   apply_env_hints(impl_->nwchem_root);
 
-  // Do not dlclose a real NWChem embed — GA/MA are process-global.
+  // Do not dlclose libnwchemc once loaded — NWChem/GA/MA are process-global.
   if (!impl_->bundle.loaded) {
     if (!try_load_engine(impl_->bundle, impl_->engine_path))
       return false;
   }
   if (!impl_->bundle.loaded)
     return false;
-  return push_params_to_engine(impl_->bundle, impl_->engine_params_words);
+  return push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 void NWChemPot::getParams(::NWChemParams::Builder out) const {
@@ -400,9 +388,9 @@ void NWChemPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
   std::vector<double> &grad = impl_->grad_scratch;
   grad.assign(static_cast<size_t>(n) * 3u, 0.0);
-  const ParamsView params = params_view(impl_->engine_params_words.empty()
+  const ParamsView params = params_view(impl_->abi_params_words.empty()
                                             ? impl_->params_words
-                                            : impl_->engine_params_words);
+                                            : impl_->abi_params_words);
   NWChemCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
 
