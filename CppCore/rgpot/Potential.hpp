@@ -12,9 +12,10 @@
 
 // clang-format off
 #include <cstring>
+#include <stdexcept>
+#include <tuple>
 #include <utility>
 #include <vector>
-#include <stdexcept>
 // clang-format on
 
 #ifdef RGPOT_HAS_CACHE
@@ -56,7 +57,9 @@ public:
    * @param box The simulation cell vectors.
    * @return A pair containing the energy and the force matrix.
    */
-  virtual std::pair<double, AtomMatrix>
+  /// Energy, forces, and optional uncertainty scale (eV). See derived
+  /// Potential::operator() for variance semantics.
+  virtual std::tuple<double, AtomMatrix, double>
   operator()(const AtomMatrix &positions, const std::vector<int> &atmtypes,
              const std::array<std::array<double, 3>, 3> &box) = 0;
 
@@ -117,15 +120,15 @@ public:
    * @param positions The atomic coordinates.
    * @param atmtypes The atomic numbers.
    * @param box The simulation cell vectors.
-   * @return A pair containing the energy and the force matrix.
+   * @return Energy, force matrix, and optional model/orientation variance
+   *         (e.g. metatomic energy_uncertainty mean or multi-rotation energy
+   *         sample variance). Variance is 0 when unused.
    */
-  std::pair<double, AtomMatrix>
+  std::tuple<double, AtomMatrix, double>
   operator()(const AtomMatrix &positions, const std::vector<int> &atmtypes,
              const std::array<std::array<double, 3>, 3> &box) override {
     size_t nAtoms = positions.rows();
     AtomMatrix forces = AtomMatrix::Zero(nAtoms, 3);
-    double energy = 0.0;
-    double variance = 0.0;
 
     double flatBox[9];
     static_assert(sizeof(box) == 9 * sizeof(double));
@@ -135,7 +138,7 @@ public:
                   .pos = positions.data(),
                   .atmnrs = atmtypes.data(),
                   .box = flatBox};
-    ForceOut fo{.F = forces.data(), .energy = energy, .variance = variance};
+    ForceOut fo{.F = forces.data(), .energy = 0.0, .variance = 0.0};
 
 #ifdef RGPOT_HAS_CACHE
     // Hashing
@@ -153,7 +156,7 @@ public:
       auto hit = _cache->find(key);
       if (hit) {
         _cache->deserialize_hit(*hit, fo.energy, forces);
-        return {fo.energy, std::move(forces)};
+        return {fo.energy, std::move(forces), fo.variance};
       }
     }
 
@@ -171,7 +174,7 @@ public:
     registry<Derived>::incrementForceCalls();
 #endif
 
-    return {fo.energy, std::move(forces)};
+    return {fo.energy, std::move(forces), fo.variance};
   }
 
   /**

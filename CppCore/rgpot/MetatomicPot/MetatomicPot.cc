@@ -6,12 +6,31 @@
 
 #include <torch/csrc/jit/runtime/graph_executor.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 using namespace std::string_literals;
 
 namespace rgpot {
+
+namespace {
+
+torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype) {
+  auto A = torch::randn({3, 3}, torch::TensorOptions().dtype(dtype).device(device));
+  auto qr = torch::linalg_qr(A);
+  auto Q = std::get<0>(qr);
+  auto R = std::get<1>(qr);
+  auto d = torch::sign(torch::diagonal(R));
+  Q = Q * d.unsqueeze(0);
+  if (torch::det(Q).item<double>() < 0) {
+    Q.select(1, 0).mul_(-1);
+  }
+  return Q;
+}
+
+} // namespace
 
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)
     : Potential(PotType::Metatomic), m_config(config),
@@ -103,35 +122,50 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
   requested_output->set_unit("eV");
   m_eval_options->outputs.insert(m_energy_key, requested_output);
 
+  // Optional per-atom energy_uncertainty (eOn metatomic UQ path)
+  m_uncertainty_threshold = m_config.uncertainty_threshold;
+  if (m_uncertainty_threshold > 0) {
+    try {
+      m_energy_uncertainty_key = metatomic_torch::pick_output(
+          "energy_uncertainty", outputs, torch::nullopt);
+      if (outputs.contains(m_energy_uncertainty_key)) {
+        auto uq_info = outputs.at(m_energy_uncertainty_key);
+        if (uq_info->per_atom) {
+          auto requested_uq =
+              torch::make_intrusive<metatomic_torch::ModelOutputHolder>();
+          requested_uq->per_atom = true;
+          requested_uq->explicit_gradients = {};
+          requested_uq->set_quantity("energy");
+          requested_uq->set_unit("eV");
+          m_eval_options->outputs.insert(m_energy_uncertainty_key, requested_uq);
+        } else {
+          m_uncertainty_threshold = -1.0;
+        }
+      } else {
+        m_uncertainty_threshold = -1.0;
+      }
+    } catch (...) {
+      m_uncertainty_threshold = -1.0;
+    }
+  }
+
   m_check_consistency = m_config.check_consistency;
 }
+
+
 
 void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   std::lock_guard<std::mutex> lock(m_mutex);
 
   long nAtoms = static_cast<long>(in.nAtoms);
+  const bool use_rotation =
+      m_config.random_rotation || m_config.n_symmetry_rotations > 0;
+  const long n_passes =
+      m_config.n_symmetry_rotations > 0 ? m_config.n_symmetry_rotations : 1;
 
-  // 1. Create tensors
   auto f64_options =
       torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU);
 
-  auto torch_positions =
-      torch::from_blob(const_cast<double *>(in.pos), {nAtoms, 3}, f64_options)
-          .to(m_dtype)
-          .to(m_device)
-          .set_requires_grad(true);
-
-  auto torch_cell =
-      torch::from_blob(const_cast<double *>(in.box), {3, 3}, f64_options)
-          .to(m_dtype)
-          .to(m_device);
-
-  auto cell_norms = torch::norm(torch_cell, 2, /*dim=*/1);
-  auto torch_pbc = cell_norms.abs() > 1e-9;
-  bool periodic[3] = {torch_pbc[0].item<bool>(), torch_pbc[1].item<bool>(),
-                      torch_pbc[2].item<bool>()};
-
-  // Cache atomic types tensor (doesn't change between geometry steps)
   if (m_cached_natoms != in.nAtoms) {
     std::vector<int32_t> types_vec(in.atmnrs, in.atmnrs + nAtoms);
     m_cached_types =
@@ -141,45 +175,138 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   }
   auto atomic_types = m_cached_types;
 
-  // 2. Create system
-  auto system = torch::make_intrusive<metatomic_torch::SystemHolder>(
-      atomic_types, torch_positions, torch_cell, torch_pbc);
+  double energy_acc = 0.0;
+  auto forces_acc = torch::zeros({nAtoms, 3}, f64_options);
+  std::vector<double> energy_samples;
+  energy_samples.reserve(static_cast<size_t>(n_passes));
+  double model_uq_variance = 0.0;
+  bool have_model_uq = false;
 
-  // 3. Compute neighbor lists
-  for (const auto &request : m_nl_requests) {
-    auto neighbors =
-        computeNeighbors(request, nAtoms, in.pos, in.box, periodic);
-    metatomic_torch::register_autograd_neighbors(system, neighbors,
-                                                 m_check_consistency);
-    system->add_neighbor_list(request, neighbors);
+  for (long i_pass = 0; i_pass < n_passes; ++i_pass) {
+    torch::Tensor R = torch::eye(3, torch::TensorOptions()
+                                        .dtype(m_dtype)
+                                        .device(m_device));
+    if (use_rotation) {
+      R = random_so3(m_device, m_dtype);
+    }
+    auto R_cpu = R.to(torch::kCPU).to(torch::kFloat64);
+
+    auto pos_cpu = torch::from_blob(const_cast<double *>(in.pos),
+                                    {nAtoms, 3}, f64_options)
+                       .clone();
+    auto cell_cpu =
+        torch::from_blob(const_cast<double *>(in.box), {3, 3}, f64_options)
+            .clone();
+    if (use_rotation) {
+      pos_cpu = pos_cpu.matmul(R_cpu.transpose(0, 1));
+      cell_cpu = cell_cpu.matmul(R_cpu.transpose(0, 1));
+    }
+
+    std::vector<double> pos_buf(static_cast<size_t>(nAtoms) * 3);
+    std::vector<double> cell_buf(9);
+    std::memcpy(pos_buf.data(), pos_cpu.contiguous().data_ptr<double>(),
+                pos_buf.size() * sizeof(double));
+    std::memcpy(cell_buf.data(), cell_cpu.contiguous().data_ptr<double>(),
+                9 * sizeof(double));
+
+    auto torch_positions =
+        torch::from_blob(pos_buf.data(), {nAtoms, 3}, f64_options)
+            .to(m_dtype)
+            .to(m_device)
+            .set_requires_grad(true);
+
+    auto torch_cell =
+        torch::from_blob(cell_buf.data(), {3, 3}, f64_options)
+            .to(m_dtype)
+            .to(m_device);
+
+    auto cell_norms = torch::norm(torch_cell, 2, /*dim=*/1);
+    auto torch_pbc = cell_norms.abs() > 1e-9;
+    bool periodic[3] = {torch_pbc[0].item<bool>(), torch_pbc[1].item<bool>(),
+                        torch_pbc[2].item<bool>()};
+
+    auto system = torch::make_intrusive<metatomic_torch::SystemHolder>(
+        atomic_types, torch_positions, torch_cell, torch_pbc);
+
+    for (const auto &request : m_nl_requests) {
+      auto neighbors = computeNeighbors(request, nAtoms, pos_buf.data(),
+                                        cell_buf.data(), periodic);
+      metatomic_torch::register_autograd_neighbors(system, neighbors,
+                                                   m_check_consistency);
+      system->add_neighbor_list(request, neighbors);
+    }
+
+    auto ivalue_output = m_model.forward({
+        std::vector<metatomic_torch::System>{system},
+        m_eval_options,
+        m_check_consistency,
+    });
+    auto dict_output = ivalue_output.toGenericDict();
+    auto output_map = dict_output.at(m_energy_key)
+                          .toCustomClass<metatensor_torch::TensorMapHolder>();
+
+    if (m_uncertainty_threshold > 0 && i_pass == 0 &&
+        !m_energy_uncertainty_key.empty() &&
+        dict_output.contains(m_energy_uncertainty_key)) {
+      try {
+        auto uncertainty_map =
+            dict_output.at(m_energy_uncertainty_key)
+                .toCustomClass<metatensor_torch::TensorMapHolder>();
+        auto uncertainty_block =
+            metatensor_torch::TensorMapHolder::block_by_id(uncertainty_map, 0);
+        auto flat_uncertainty =
+            uncertainty_block->values().reshape({-1}).to(torch::kCPU);
+        if (flat_uncertainty.numel() > 0) {
+          model_uq_variance =
+              flat_uncertainty.to(torch::kFloat64).mean().item<double>();
+          have_model_uq = true;
+        }
+      } catch (...) {
+      }
+    }
+
+    auto energy_block =
+        metatensor_torch::TensorMapHolder::block_by_id(output_map, 0);
+    auto energy_tensor = energy_block->values();
+    const double e_pass = energy_tensor.sum().item<double>();
+    energy_acc += e_pass;
+    energy_samples.push_back(e_pass);
+
+    energy_tensor.backward(torch::ones_like(energy_tensor));
+    auto positions_grad = system->positions().grad();
+    auto forces_tensor =
+        (-positions_grad).to(torch::kCPU).to(torch::kFloat64);
+    if (use_rotation) {
+      forces_tensor = forces_tensor.matmul(R_cpu);
+    }
+    forces_acc += forces_tensor;
   }
 
-  // 4. Run model
-  auto ivalue_output = m_model.forward({
-      std::vector<metatomic_torch::System>{system},
-      m_eval_options,
-      m_check_consistency,
-  });
-  auto dict_output = ivalue_output.toGenericDict();
-  auto output_map = dict_output.at(m_energy_key)
-                        .toCustomClass<metatensor_torch::TensorMapHolder>();
-
-  // 5. Extract energy
-  auto energy_block =
-      metatensor_torch::TensorMapHolder::block_by_id(output_map, 0);
-  auto energy_tensor = energy_block->values();
-  out->energy = energy_tensor.sum().item<double>();
-
-  // 6. Compute forces via autograd
-  energy_tensor.backward(torch::ones_like(energy_tensor));
-  auto positions_grad = system->positions().grad();
-  auto forces_tensor = -positions_grad.to(torch::kCPU).to(torch::kFloat64);
-
-  std::memcpy(out->F, forces_tensor.contiguous().data_ptr<double>(),
+  const double inv_n = 1.0 / static_cast<double>(n_passes);
+  out->energy = energy_acc * inv_n;
+  forces_acc = forces_acc * inv_n;
+  std::memcpy(out->F, forces_acc.contiguous().data_ptr<double>(),
               in.nAtoms * 3 * sizeof(double));
 
-  out->variance = 0.0;
+  if (have_model_uq) {
+    out->variance = model_uq_variance;
+  } else if (n_passes > 1 && !energy_samples.empty()) {
+    // Report RMS energy scatter over orientations (eV), same role as mean
+    // per-atom energy_uncertainty from the model UQ path — an energy-scale
+    // uncertainty, not a squared variance. Force-criterion smearing treats
+    // this as a force floor at unit length (angstrom length_unit).
+    double mean = out->energy;
+    double acc2 = 0.0;
+    for (double e : energy_samples) {
+      const double d = e - mean;
+      acc2 += d * d;
+    }
+    out->variance = std::sqrt(acc2 / static_cast<double>(n_passes));
+  } else {
+    out->variance = 0.0;
+  }
 }
+
 
 metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
     metatomic_torch::NeighborListOptions request, long nAtoms,

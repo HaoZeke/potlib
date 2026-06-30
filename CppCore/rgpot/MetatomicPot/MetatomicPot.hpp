@@ -36,8 +36,15 @@ struct MetatomicConfig {
   std::string length_unit = "angstrom";
   std::string extensions_directory;
   bool check_consistency = false;
+  // If > 0, request per-atom energy_uncertainty (when the model exposes it)
+  // and write the mean into ForceOut::variance; also log atoms above threshold.
   double uncertainty_threshold = -1.0;
   std::string dtype_override;
+  // eOn #287 / #292: stochastic / multi-orientation averaging of forces.
+  // n_symmetry_rotations > 0 averages that many random SO(3) orientations;
+  // random_rotation alone is a single rotated evaluation.
+  bool random_rotation = false;
+  long n_symmetry_rotations = 0;
 };
 
 class MetatomicPot : public Potential<MetatomicPot> {
@@ -62,6 +69,8 @@ private:
   torch::Device m_device;
   bool m_check_consistency;
   std::string m_energy_key;
+  std::string m_energy_uncertainty_key;
+  double m_uncertainty_threshold = -1.0;
 
   mutable std::mutex m_mutex;
   mutable torch::Tensor m_cached_types; //!< Cached atomic types tensor.
