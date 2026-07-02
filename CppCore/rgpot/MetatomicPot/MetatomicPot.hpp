@@ -40,11 +40,23 @@ struct MetatomicConfig {
   // and write the mean into ForceOut::variance; also log atoms above threshold.
   double uncertainty_threshold = -1.0;
   std::string dtype_override;
-  // eOn #287 / #292: stochastic / multi-orientation averaging of forces.
-  // n_symmetry_rotations > 0 averages that many random SO(3) orientations;
+  // eOn #287 / #292: multi-orientation handling for models that are not
+  // exactly rotationally invariant.
+  // n_symmetry_rotations snaps to a rotation GROUP orbit: >=24 -> chiral
+  // octahedral (24), >=12 -> tetrahedral (12). Group averaging makes the
+  // averaged energy exactly G-invariant and keeps F_avg = -grad E_avg as an
+  // exact finite-sum identity (residual SO(3) non-invariance starts at l=4
+  // for O, l=3 kept for T). 1 < n < 12 falls back to that many seeded
+  // Haar-random orientations (Monte Carlo; 1/sqrt(N) damping only).
   // random_rotation alone is a single rotated evaluation.
   bool random_rotation = false;
   long n_symmetry_rotations = 0;
+  // Probe-scatter mode: output E/F come from the UNROTATED evaluation only
+  // (one coherent surface steers geometry); n_symmetry_rotations extra
+  // orientations are evaluated solely to measure the force-RMS orientation
+  // scatter written to ForceOut::variance (an uncertainty certificate,
+  // never a geometry signal).
+  bool so3_probe_scatter = false;
 };
 
 class MetatomicPot : public Potential<MetatomicPot> {

@@ -41,6 +41,40 @@ torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype,
   return Q.to(dtype).to(device);
 }
 
+
+// Rotation-group orbits as signed permutation matrices with det +1.
+// Chiral octahedral O = all 24; tetrahedral T = the 12 with an even
+// permutation part and an even number of sign flips. Averaging over a GROUP
+// makes E_avg exactly G-invariant and F_avg = -grad E_avg an exact identity.
+std::vector<torch::Tensor> rotation_group(long n, torch::Device device,
+                                          torch::ScalarType dtype) {
+  const int perms[6][3] = {{0, 1, 2}, {1, 2, 0}, {2, 0, 1},
+                           {0, 2, 1}, {1, 0, 2}, {2, 1, 0}};
+  const bool perm_even[6] = {true, true, true, false, false, false};
+  std::vector<torch::Tensor> out;
+  const bool want_tetra = n < 24;
+  for (int p = 0; p < 6; ++p) {
+    for (int sbits = 0; sbits < 8; ++sbits) {
+      const int s0 = (sbits & 1) ? -1 : 1;
+      const int s1 = (sbits & 2) ? -1 : 1;
+      const int s2 = (sbits & 4) ? -1 : 1;
+      const int n_minus = ((sbits & 1) != 0) + ((sbits & 2) != 0) +
+                          ((sbits & 4) != 0);
+      // det = sign(perm) * s0*s1*s2; keep proper rotations only.
+      const int det = (perm_even[p] ? 1 : -1) * s0 * s1 * s2;
+      if (det != 1) continue;
+      if (want_tetra && (!perm_even[p] || (n_minus % 2) != 0)) continue;
+      auto R = torch::zeros({3, 3},
+                            torch::TensorOptions().dtype(torch::kFloat64));
+      R[0][perms[p][0]] = static_cast<double>(s0);
+      R[1][perms[p][1]] = static_cast<double>(s1);
+      R[2][perms[p][2]] = static_cast<double>(s2);
+      out.push_back(R.to(dtype).to(device));
+    }
+  }
+  return out;
+}
+
 } // namespace
 
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)
@@ -171,8 +205,21 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   long nAtoms = static_cast<long>(in.nAtoms);
   const bool use_rotation =
       m_config.random_rotation || m_config.n_symmetry_rotations > 0;
-  const long n_passes =
-      m_config.n_symmetry_rotations > 0 ? m_config.n_symmetry_rotations : 1;
+  const bool probe_scatter =
+      m_config.so3_probe_scatter && m_config.n_symmetry_rotations > 0;
+  // Group orbit when the request reaches a group size; identity-first probe
+  // mode adds the unrotated pass in front of the probes.
+  std::vector<torch::Tensor> group_rots;
+  if (m_config.n_symmetry_rotations >= 12) {
+    group_rots = rotation_group(m_config.n_symmetry_rotations, m_device,
+                                m_dtype);
+  }
+  const long n_rot_passes =
+      !group_rots.empty() ? static_cast<long>(group_rots.size())
+                          : (m_config.n_symmetry_rotations > 0
+                                 ? m_config.n_symmetry_rotations
+                                 : 1);
+  const long n_passes = probe_scatter ? n_rot_passes + 1 : n_rot_passes;
 
   auto f64_options =
       torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU);
@@ -201,11 +248,18 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     torch::Tensor R = torch::eye(3, torch::TensorOptions()
                                         .dtype(m_dtype)
                                         .device(m_device));
-    if (use_rotation) {
-      // Fixed per-pass seed: pass i uses the same orientation on every call,
-      // so the n_symmetry_rotations-averaged PES is deterministic.
-      R = random_so3(m_device, m_dtype,
-                     0x50333A5EEDULL + static_cast<uint64_t>(i_pass));
+    const bool identity_pass = probe_scatter && i_pass == 0;
+    if (use_rotation && !identity_pass) {
+      const long i_rot = probe_scatter ? i_pass - 1 : i_pass;
+      if (!group_rots.empty()) {
+        R = group_rots[static_cast<size_t>(i_rot)];
+      } else {
+        // Fixed per-pass seed: pass i uses the same orientation on every
+        // call, so the averaged PES is deterministic (Monte Carlo regime,
+        // n_symmetry_rotations < 12).
+        R = random_so3(m_device, m_dtype,
+                       0x50333A5EEDULL + static_cast<uint64_t>(i_rot));
+      }
     }
     auto R_cpu = R.to(torch::kCPU).to(torch::kFloat64);
 
@@ -215,8 +269,12 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     auto cell_cpu =
         torch::from_blob(const_cast<double *>(in.box), {3, 3}, f64_options)
             .clone();
-    if (use_rotation) {
-      pos_cpu = pos_cpu.matmul(R_cpu.transpose(0, 1));
+    if (use_rotation && !identity_pass) {
+      // Rotate about the centroid: rotation about the origin also drags the
+      // molecule through the model's input space, mixing orientation error
+      // with translation error.
+      auto centroid = pos_cpu.mean(0, /*keepdim=*/true);
+      pos_cpu = (pos_cpu - centroid).matmul(R_cpu.transpose(0, 1)) + centroid;
       cell_cpu = cell_cpu.matmul(R_cpu.transpose(0, 1));
     }
 
@@ -287,7 +345,9 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         metatensor_torch::TensorMapHolder::block_by_id(output_map, 0);
     auto energy_tensor = energy_block->values();
     const double e_pass = energy_tensor.sum().item<double>();
-    energy_acc += e_pass;
+    if (!probe_scatter) {
+      energy_acc += e_pass;
+    }
 
     energy_tensor.backward(torch::ones_like(energy_tensor));
     auto positions_grad = system->positions().grad();
@@ -296,13 +356,23 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     if (use_rotation) {
       forces_tensor = forces_tensor.matmul(R_cpu);
     }
-    forces_acc += forces_tensor;
-    if (n_passes > 1) {
+    if (probe_scatter && identity_pass) {
+      // Probe mode: the unrotated pass alone steers geometry (energy and
+      // forces from this pass only).
+      energy_acc = e_pass;
+      forces_acc = forces_tensor.clone();
+    } else if (probe_scatter) {
       force_samples.push_back(forces_tensor.clone());
+    } else {
+      forces_acc += forces_tensor;
+      if (n_passes > 1) {
+        force_samples.push_back(forces_tensor.clone());
+      }
     }
   }
 
-  const double inv_n = 1.0 / static_cast<double>(n_passes);
+  const double inv_n =
+      probe_scatter ? 1.0 : 1.0 / static_cast<double>(n_passes);
   out->energy = energy_acc * inv_n;
   forces_acc = forces_acc * inv_n;
   std::memcpy(out->F, forces_acc.contiguous().data_ptr<double>(),
@@ -317,8 +387,11 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     // uncertainty for criterion smearing. Energy orientation scatter can be
     // several eV on non-invariant evaluations and must not raise force tol.
     double acc2 = 0.0;
-    const double n_comp =
-        static_cast<double>(nAtoms) * 3.0 * static_cast<double>(n_passes);
+    const double n_comp = static_cast<double>(nAtoms) * 3.0 *
+                          static_cast<double>(force_samples.size());
+    // Deviation reference: the output force -- the orientation-average in
+    // averaging mode, the unrotated force in probe mode. Either way the
+    // RMS measures how much orientation moves the force actually used.
     for (const auto &F_i : force_samples) {
       auto d = F_i - forces_acc;
       acc2 += d.square().sum().item<double>();
