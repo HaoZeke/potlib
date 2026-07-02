@@ -6,28 +6,30 @@ python = find_program('python3', 'python')
 # Canonical contract pinned via subprojects/potentials-schema.wrap; the two
 # vendored Potentials.capnp copies must stay byte-identical to it.
 potentials_schema_proj = subproject('potentials-schema')
-potentials_schema_canonical = potentials_schema_proj.get_variable('potentials_capnp_file')
+potentials_schema_canonical = potentials_schema_proj.get_variable(
+    'potentials_capnp_file',
+)
 schema_sync_check = [
-  '-c',
-  'import filecmp, sys; sys.exit(0 if filecmp.cmp(sys.argv[1], sys.argv[2], shallow=False) else "vendored Potentials.capnp diverges from pinned potentials-schema release")',
+    '-c',
+    'import filecmp, sys; sys.exit(0 if filecmp.cmp(sys.argv[1], sys.argv[2], shallow=False) else "vendored Potentials.capnp diverges from pinned potentials-schema release")',
 ]
 test(
-  'schema-sync-canonical-rpc',
-  python,
-  args: schema_sync_check + [
-    meson.current_source_dir() / 'Potentials.capnp',
-    potentials_schema_canonical,
-  ],
-  suite: 'schema',
+    'schema-sync-canonical-rpc',
+    python,
+    args: schema_sync_check + [
+        meson.current_source_dir() / 'Potentials.capnp',
+        potentials_schema_canonical,
+    ],
+    suite: 'schema',
 )
 test(
-  'schema-sync-canonical-core',
-  python,
-  args: schema_sync_check + [
-    meson.project_source_root() / 'rgpot-core/schema/Potentials.capnp',
-    potentials_schema_canonical,
-  ],
-  suite: 'schema',
+    'schema-sync-canonical-core',
+    python,
+    args: schema_sync_check + [
+        meson.project_source_root() / 'rgpot-core/schema/Potentials.capnp',
+        potentials_schema_canonical,
+    ],
+    suite: 'schema',
 )
 
 gen_rpc = custom_target(
