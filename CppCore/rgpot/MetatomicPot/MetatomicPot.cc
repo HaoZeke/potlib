@@ -2,6 +2,7 @@
 // Copyright 2023--present rgpot developers
 
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
+#include <ATen/CPUGeneratorImpl.h>
 #include "vesin.h"
 
 #include <torch/csrc/jit/runtime/graph_executor.h>
@@ -17,8 +18,18 @@ namespace rgpot {
 
 namespace {
 
-torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype) {
-  auto A = torch::randn({3, 3}, torch::TensorOptions().dtype(dtype).device(device));
+// Haar-uniform SO(3) sample from a SEEDED CPU generator. The seed is the
+// pass index, so every force call averages over the SAME orientation set:
+// the averaged PES is then a fixed, smooth function of the positions.
+// Drawing from the global RNG instead makes the effective PES stochastic
+// call-to-call (same x, different E/F), which feeds a surrogate
+// non-repeatable data and lets optimizer dynamics walk into clash-scale
+// geometries.
+torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype,
+                         uint64_t seed) {
+  auto gen = at::detail::createCPUGenerator(seed);
+  auto A = torch::randn({3, 3}, gen,
+                        torch::TensorOptions().dtype(torch::kFloat64));
   auto qr = torch::linalg_qr(A);
   auto Q = std::get<0>(qr);
   auto R = std::get<1>(qr);
@@ -27,7 +38,7 @@ torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype) {
   if (torch::det(Q).item<double>() < 0) {
     Q.select(1, 0).mul_(-1);
   }
-  return Q;
+  return Q.to(dtype).to(device);
 }
 
 } // namespace
@@ -191,7 +202,10 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
                                         .dtype(m_dtype)
                                         .device(m_device));
     if (use_rotation) {
-      R = random_so3(m_device, m_dtype);
+      // Fixed per-pass seed: pass i uses the same orientation on every call,
+      // so the n_symmetry_rotations-averaged PES is deterministic.
+      R = random_so3(m_device, m_dtype,
+                     0x50333A5EEDULL + static_cast<uint64_t>(i_pass));
     }
     auto R_cpu = R.to(torch::kCPU).to(torch::kFloat64);
 
