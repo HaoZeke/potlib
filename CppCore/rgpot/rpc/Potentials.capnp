@@ -21,6 +21,10 @@ struct ForceInput {
   box        @2 :List(Float64); # @brief Simulation cell vectors [9] (row-major 3x3).
   lengthUnit @3 :Text = "angstrom"; # @brief Unit for positions and box vectors.
   energyUnit @4 :Text = "eV";       # @brief Unit for energy and forces output.
+  hasCharge @5 :Bool = false;       # @brief Override NWChemParams.charge for this step.
+  charge @6 :Int32 = 0;             # @brief Per-step charge when hasCharge is true.
+  hasMultiplicity @7 :Bool = false; # @brief Override NWChemParams.multiplicity for this step.
+  multiplicity @8 :Int32 = 1;       # @brief Per-step spin multiplicity when hasMultiplicity is true.
 }
 
 # @struct PotentialResult
@@ -97,11 +101,44 @@ struct NWChemDftSmearing {
   }
 }
 
+# Logical DFT integration grid (replaces directive-only multi-token grid cards).
+# Prefer quality preset; optional radial/angular tokens for custom grids (text on embed).
+struct NWChemDftGridSpec {
+  quality @0 :Quality = unspecified;
+  radial  @1 :Text = ""; # Optional radial grid token (e.g. lebedev).
+  angular @2 :Text = ""; # Optional angular grid token.
+
+  enum Quality {
+    unspecified @0; # Do not emit grid from this struct.
+    xcoarse     @1;
+    coarse      @2;
+    medium      @3;
+    fine        @4;
+    xfine       @5;
+    huge        @6;
+  }
+}
+
 struct NWChemDftStanza {
   xc         @0 :Text = "";                  # Exchange-correlation keyword.
   direct     @1 :Bool = false;               # Emit "direct".
   smearing   @2 :NWChemDftSmearing;          # Emit "smear ...".
-  directives @3 :List(NWChemDirective);      # Extra structured DFT directives.
+  # Residual escape for unmodeled DFT cards only (not grid/convergence/odft/diis).
+  directives @3 :List(NWChemDirective);
+  iterations @4 :Int32 = 0;                  # Emit/promote dft iterations when >0.
+  grid       @5 :Text = "";                  # Legacy single-token grid; prefer gridSpec.
+  # Convergence thresholds (convergence energy/density/gradient); promote dft:e_conv / d_conv / g_conv.
+  energyConv    @6 :Float64 = 0.0;
+  densityConv   @7 :Float64 = 0.0;
+  gradientConv  @8 :Float64 = 0.0;
+  # Open-shell DFT (odft) -> dft:ipol=2 when true.
+  odft          @9 :Bool = false;
+  diis          @10 :NWChemToggle = unspecified; # Promote dft:diis; nodiis when disabled.
+  nfock         @11 :Int32 = 0;              # Promote dft:nfock (DIIS Fock history).
+  levelShift    @12 :Float64 = 0.0;          # Promote dft:rlshift + dft:levelshift=true when >0.
+  vectorsInput  @13 :Text = "";              # Promote dft:input vectors on embed.
+  vectorsOutput @14 :Text = "";              # Promote dft:output vectors on embed.
+  gridSpec      @15 :NWChemDftGridSpec;      # Logical multi-token/preset grid (typed; text on embed).
 }
 
 enum NWChemModuleName {
@@ -216,22 +253,608 @@ struct NWChemPseudopotentialEntry {
   }
 }
 
+enum NWChemPseudopotentialSpinMode {
+  unspecified @0; # Do not emit pspspin.
+  enabled     @1; # Promote nwpw:pspspin=true directly; spinRules render text rules.
+  disabled    @2; # Render/promote pspspin off.
+}
+
+struct NWChemPseudopotentialSpinRule {
+  channel                  @0 :Channel = up;
+  angularMomentum          @1 :AngularMomentum = s;
+  scale                    @2 :Float64 = 1.0;
+  ionIndices               @3 :List(Int32);
+  hasMagneticQuantumNumber @4 :Bool = false;
+  magneticQuantumNumber    @5 :Int32 = 0;
+
+  enum Channel {
+    up   @0;
+    down @1;
+  }
+
+  enum AngularMomentum {
+    s @0;
+    p @1;
+    d @2;
+    f @3;
+  }
+}
+
+struct NWChemPseudopotentialUtermRule {
+  angularMomentum @0 :AngularMomentum = s;
+  uScale          @1 :Float64 = 0.0;
+  jScale          @2 :Float64 = 0.0;
+  ionIndices      @3 :List(Int32);
+
+  enum AngularMomentum {
+    s @0;
+    p @1;
+    d @2;
+    f @3;
+  }
+}
+
+enum NWChemPseudopotentialBlockName {
+  pseudopotentials        @0; # Emit NWChem "pseudopotentials".
+  pseudopotentialLibraries @1; # Emit NWChem "pseudopotential_libraries" alias.
+}
+
 struct NWChemPseudopotentialStanza {
   entries    @0 :List(NWChemPseudopotentialEntry);
   directives @1 :List(NWChemDirective); # Extra nwpw directives near the block.
+  pspSpin    @2 :NWChemPseudopotentialSpinMode = unspecified; # Direct pspspin state, plus disabled text reset.
+  spinRules  @3 :List(NWChemPseudopotentialSpinRule); # Emit/promote pspspin up/down scaling rules.
+  semicoreSmall @4 :NWChemToggle = unspecified; # Promote nwpw:psp:semicore_small.
+  uterm      @5 :NWChemToggle = unspecified; # Emit/promote NWPW uterm on/off.
+  utermRules @6 :List(NWChemPseudopotentialUtermRule); # Emit/promote indexed uterm rules.
+  blockName  @7 :NWChemPseudopotentialBlockName = pseudopotentials; # Select the NWChem pseudopotential block spelling.
+}
+
+struct NWChemKVector {
+  x      @0 :Float64 = 0.0; # First reduced Brillouin-zone coordinate.
+  y      @1 :Float64 = 0.0; # Second reduced Brillouin-zone coordinate.
+  z      @2 :Float64 = 0.0; # Third reduced Brillouin-zone coordinate.
+  weight @3 :Float64 = 0.0; # Optional NWChem kvector weight.
+}
+
+struct NWChemBrillouinZoneStanza {
+  zoneName          @0 :Text = ""; # NWChem zone_name; empty uses zone_default.
+  kVectors          @1 :List(NWChemKVector); # Explicit kvector entries.
+  maxKpointsPrint   @2 :Int32 = 0; # max_kpoints_print value.
+  monkhorstPackX    @3 :Int32 = 0; # First monkhorst-pack grid value.
+  monkhorstPackY    @4 :Int32 = 0; # Second monkhorst-pack grid value.
+  monkhorstPackZ    @5 :Int32 = 0; # Third monkhorst-pack grid value.
+  directives        @6 :List(NWChemDirective);
+  zoneStructureName @7 :Text = ""; # Emit/promote band_structure:zone_name.
+  zoneFftName       @8 :Text = ""; # Emit/promote band_fft:zone_name.
+  tetrahedronGridX  @9 :Int32 = 0; # First NWPW tetrahedron grid value.
+  tetrahedronGridY  @10 :Int32 = 0; # Second NWPW tetrahedron grid value.
+  tetrahedronGridZ  @11 :Int32 = 0; # Third NWPW tetrahedron grid value.
+  tetrahedronZoneName @12 :Text = ""; # Optional trailing NWPW tetrahedron zone token.
+  dosGridX          @13 :Int32 = 0; # First NWPW dos-grid value.
+  dosGridY          @14 :Int32 = 0; # Second NWPW dos-grid value.
+  dosGridZ          @15 :Int32 = 0; # Third NWPW dos-grid value.
+  dosGridZoneName   @16 :Text = ""; # Optional trailing NWPW dos-grid zone token.
+  dosFftGridX       @17 :Int32 = 0; # First NWPW dos-fft-grid value.
+  dosFftGridY       @18 :Int32 = 0; # Second NWPW dos-fft-grid value.
+  dosFftGridZ       @19 :Int32 = 0; # Third NWPW dos-fft-grid value.
+  dosFftGridZoneName @20 :Text = ""; # Optional trailing NWPW dos-fft-grid zone token.
+}
+
+enum NWChemSimulationCellLatticeKind {
+  unspecified @0; # Do not emit a compact cubic lattice directive.
+  sc          @1; # Emit/promote NWChem "sc".
+  fcc         @2; # Emit/promote NWChem "fcc".
+  bcc         @3; # Emit/promote NWChem "bcc".
+}
+
+struct NWChemSimulationCellStanza {
+  cellName            @0  :Text = ""; # NWChem cell_name; empty uses cell_default.
+  boundaryConditions  @1  :Text = ""; # periodic, surface, free-space, ...
+  latticeVectorsBohr  @2  :List(Float64); # Flat 3x3 simulation-cell vectors in Bohr.
+  ngridX              @3  :Int32 = 0; # First ngrid value.
+  ngridY              @4  :Int32 = 0; # Second ngrid value.
+  ngridZ              @5  :Int32 = 0; # Third ngrid value.
+  ngridSmallX         @6  :Int32 = 0; # First ngrid_small value.
+  ngridSmallY         @7  :Int32 = 0; # Second ngrid_small value.
+  ngridSmallZ         @8  :Int32 = 0; # Third ngrid_small value.
+  boxDeltaBohr        @9  :Float64 = 0.0; # box_delta in Bohr.
+  boxOrient           @10 :Bool = false; # Emit/promote box_orient.
+  boxDifferentLengths @11 :Bool = false; # Emit/promote box_different_lengths.
+  latticeKind         @12 :NWChemSimulationCellLatticeKind = unspecified;
+  latticeLengthBohr   @13 :Float64 = 0.0; # sc/fcc/bcc compact lattice length in Bohr.
+  directives          @14 :List(NWChemDirective);
+}
+
+enum NWChemNwpwBalanceMode {
+  unspecified @0; # Do not emit balance/nobalance.
+  balance     @1; # Emit/promote NWChem "balance".
+  nobalance   @2; # Emit/promote NWChem "nobalance".
+}
+
+enum NWChemNwpwBoAlgorithm {
+  unspecified    @0; # Do not emit bo_algorithm.
+  verlet         @1; # NWChem bo_algorithm verlet.
+  velocityVerlet @2; # NWChem bo_algorithm velocity-verlet.
+  leapFrog       @3; # NWChem bo_algorithm leap-frog.
+}
+
+enum NWChemNwpwSpinMode {
+  unspecified  @0; # Do not emit/promote dft/odft.
+  restricted   @1; # Emit dft; promote CGSD/BAND/CPSD ispin = 1.
+  unrestricted @2; # Emit odft; promote CGSD/BAND/CPSD ispin = 2.
+}
+
+enum NWChemNwpwMinimizer {
+  unspecified   @0; # Do not emit/promote nwpw:minimizer.
+  cgGrassman    @1; # Emit cg grassman; promote nwpw:minimizer = 1.
+  cgStiefel     @2; # Emit cg stiefel; promote nwpw:minimizer = 4.
+  cgStich       @3; # Emit cg stich; promote nwpw:minimizer = 9.
+  lmbfgsGrassman @4; # Emit lmbfgs grassman; promote nwpw:minimizer = 2.
+  lmbfgsStiefel @5; # Emit lmbfgs stiefel; promote nwpw:minimizer = 7.
+  lmbfgsStich   @6; # Emit lmbfgs stich; promote nwpw:minimizer = 10.
+  scfDensity    @7; # Emit scf density; promote nwpw:minimizer = 8.
+  scfPotential  @8; # Emit scf potential; promote nwpw:minimizer = 5.
+}
+
+enum NWChemNwpwKsAlgorithm {
+  unspecified @0; # Do not emit/promote nwpw:ks_algorithm.
+  blockCg     @1; # Emit block-cg; promote nwpw:ks_algorithm = -1.
+  cg          @2; # Emit cg; promote nwpw:ks_algorithm = 0.
+  rmmDiis     @3; # Emit rmm-diis; promote nwpw:ks_algorithm = 1.
+}
+
+enum NWChemNwpwScfAlgorithm {
+  unspecified @0; # Do not emit/promote nwpw:scf_algorithm.
+  simple      @1; # Emit simple; promote nwpw:scf_algorithm = 0.
+  broyden     @2; # Emit broyden; promote nwpw:scf_algorithm = 1.
+  diis        @3; # Emit diis; promote nwpw:scf_algorithm = 2.
+  anderson    @4; # Emit anderson; promote nwpw:scf_algorithm = 3.
+}
+
+enum NWChemNwpwToggle {
+  unspecified @0; # Do not emit the option.
+  enabled     @1; # Emit/promote the option as enabled.
+  disabled    @2; # Emit/promote the option as disabled.
+}
+
+enum NWChemToggle {
+  unspecified @0; # Do not emit the option.
+  enabled     @1; # Emit/promote the option as enabled.
+  disabled    @2; # Emit/promote the option as disabled.
+}
+
+# Closed choices for Gaussian basis library loads (embed + render).
+# Open-ended library *names* stay Text on NWChemParams.basis / directives.
+enum NWChemBasisLibraryRoot {
+  unspecified @0; # Default classic libraries/ resolution (NWCHEM_BASIS_LIBRARY / nwchemrc / compiled).
+  classic     @1; # Force basis/libraries/ (not libraries.bse).
+  bse         @2; # Force basis/libraries.bse/ (spherical details from BSE files when present).
+}
+
+enum NWChemBasisAngularKind {
+  unspecified @0; # Default cartesian on embed unless libraries.bse enables read_sphere.
+  cartesian   @1; # Force cartesian shells.
+  spherical   @2; # Force spherical shells (basis spherical).
+}
+
+enum NWChemBasisSegmentMode {
+  unspecified @0; # Default segment contractions (NWChem library default).
+  segment     @1; # Segment general contractions.
+  nosegment   @2; # Do not segment (osegment = false).
+}
+
+enum NWChemPrintLevel {
+  unspecified @0; # Do not emit a print directive.
+  none        @1; # Emit "print none".
+  low         @2; # Emit "print low".
+  medium      @3; # Emit "print medium".
+  high        @4; # Emit "print high".
+  debug       @5; # Emit "print debug".
+}
+
+enum NWChemTceReference {
+  unspecified @0; # Do not emit tce reference.
+  dft         @1; # Emit DFT; promote tce:reference = 0.
+  hf          @2; # Emit HF; promote tce:reference = 1.
+  scf         @3; # Emit SCF; promote tce:reference = 1.
+}
+
+enum NWChemTceTwoElectronStorage {
+  unspecified @0; # Do not emit/promote tce:model2e.
+  default     @1; # Emit/promote tce:model2e = default.
+  orbital     @2; # Emit 2eorb; promote tce:model2e = 2eorb.
+  spin        @3; # Emit 2espin; promote tce:model2e = 2espin.
+}
+
+enum NWChemTceIoAlgorithm {
+  unspecified @0; # Do not emit/promote tce:ioalg.
+  fortran     @1; # Emit io fortran; promote tce:ioalg = 0.
+  eaf         @2; # Emit io eaf; promote tce:ioalg = 1.
+  ga          @3; # Emit io ga; promote tce:ioalg = 2.
+  sf          @4; # Emit io sf; promote tce:ioalg = 3.
+  replicated  @5; # Emit io replicated; promote tce:ioalg = 4.
+  dra         @6; # Emit io dra; promote tce:ioalg = 5.
+  gaEaf       @7; # Emit io ga_eaf; promote tce:ioalg = 6.
+}
+
+enum NWChemTceFreezeMode {
+  unspecified @0; # Do not emit a symbolic TCE freeze directive.
+  atomic      @1; # Emit "freeze atomic".
+  core        @2; # Emit "freeze core".
+  coreAtomic  @3; # Emit "freeze core atomic".
+}
+
+enum NWChemNwpwSmearType {
+  unspecified        @0; # Do not emit fractional_smeartype.
+  fixed              @1; # NWChem smear fixed.
+  step               @2; # NWChem smear step.
+  fermi              @3; # NWChem smear fermi.
+  gaussian           @4; # NWChem smear gaussian.
+  marzariVanderbilt  @5; # NWChem smear marzari-vanderbilt.
+}
+
+enum NWChemNwpwLcaoMode {
+  unspecified @0; # Do not emit lcao/lcao_skip.
+  lcao        @1; # Emit/promote NWChem "lcao".
+  skip        @2; # Emit/promote NWChem "lcao_skip".
+}
+
+enum NWChemNwpwEfieldType {
+  unspecified @0; # Do not emit/promote nwpw:efield_type.
+  periodic    @1; # Emit/promote periodic electric-field mode.
+  apc         @2; # Emit/promote APC electric-field mode.
+  rgrid       @3; # Emit/promote rgrid electric-field mode.
+}
+
+enum NWChemNwpwMappingAlias {
+  unspecified @0; # Do not emit a named NWPW mapping alias.
+  slab1d      @1; # Emit/promote NWChem "1d-slab" mapping alias.
+  hilbert2d   @2; # Emit/promote NWChem "2d-hilbert" mapping alias.
+  hcurve2d    @3; # Emit/promote NWChem "2d-hcurve" mapping alias.
+}
+
+struct NWChemNwpwStanza {
+  energyCutoff       @0 :Float64 = 0.0; # Emit/promote NWPW energy_cutoff.
+  wavefunctionCutoff @1 :Float64 = 0.0; # Emit/promote NWPW wavefunction_cutoff.
+  ewaldRcut          @2 :Float64 = 0.0; # Emit/promote NWPW ewald_rcut.
+  ewaldNcut          @3 :Int32 = 0;     # Emit/promote NWPW ewald_ncut.
+  directives         @4 :List(NWChemDirective);
+  cellName                    @5  :Text = ""; # Emit/promote NWPW cell_name.
+  inputWavefunctionFilename   @6  :Text = ""; # Emit/promote NWPW input_wavefunction_filename.
+  outputWavefunctionFilename  @7  :Text = ""; # Emit/promote NWPW output_wavefunction_filename.
+  fakeMass                    @8  :Float64 = 0.0; # Emit/promote NWPW fake_mass.
+  timeStep                    @9  :Float64 = 0.0; # Emit/promote NWPW time_step.
+  loopStart                   @10 :Int32 = 0;     # First value in NWPW loop.
+  loopEnd                     @11 :Int32 = 0;     # Second value in NWPW loop.
+  toleranceEnergy             @12 :Float64 = 0.0; # First NWPW tolerances value.
+  toleranceDensity            @13 :Float64 = 0.0; # Second NWPW tolerances value.
+  toleranceGradient           @14 :Float64 = 0.0; # Third NWPW tolerances value.
+  exchangeCorrelation         @15 :Text = "";      # Emit/promote NWPW exchange_correlation.
+  balanceMode                 @16 :NWChemNwpwBalanceMode = unspecified; # Emit/promote balance/nobalance.
+  boStepStart                 @17 :Int32 = 0;       # First NWPW bo_steps value.
+  boStepEnd                   @18 :Int32 = 0;       # Second NWPW bo_steps value.
+  boTimeStep                  @19 :Float64 = 0.0;   # Emit/promote NWPW bo_time_step.
+  boAlgorithm                 @20 :NWChemNwpwBoAlgorithm = unspecified; # Emit/promote NWPW bo_algorithm.
+  boFakeMass                  @21 :Float64 = 0.0;   # Emit/promote NWPW bo_fake_mass.
+  scalingFirst                @22 :Float64 = 0.0;   # First NWPW scaling value.
+  scalingSecond               @23 :Float64 = 0.0;   # Second NWPW scaling value.
+  npFftProcesses              @24 :Int32 = 0;       # First NWPW np_dimensions value.
+  npOrbitalProcesses          @25 :Int32 = 0;       # Second NWPW np_dimensions value.
+  npKspaceProcesses           @26 :Int32 = 0;       # Third NWPW np_dimensions value.
+  spinOrbit                   @27 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW spin_orbit.
+  parallelIo                  @28 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW parallel_io.
+  xyzFilename                 @29 :Text = "";       # Emit/promote NWPW xyz_filename.
+  ionMotionFilename           @30 :Text = "";       # Emit/promote NWPW ion_motion_filename.
+  electronMotionFilename      @31 :Text = "";       # Emit/promote NWPW emotion_filename.
+  hamiltonianMotionFilename   @32 :Text = "";       # Emit/promote NWPW hmotion_filename.
+  orbitalMotionFilename       @33 :Text = "";       # Emit/promote NWPW omotion_filename.
+  eigenvalueMotionFilename    @34 :Text = "";       # Emit/promote NWPW eigmotion_filename.
+  fractionalOrbitalsStart     @35 :Int32 = 0;       # First NWPW fractional_orbitals value.
+  fractionalOrbitalsEnd       @36 :Int32 = 0;       # Second NWPW fractional_orbitals value.
+  smearTemperature            @37 :Float64 = 0.0;   # Emit/promote NWPW smear temperature RTDB value.
+  smearAlpha                  @38 :Float64 = 0.0;   # Emit/promote NWPW smear alpha.
+  smearType                   @39 :NWChemNwpwSmearType = unspecified; # Emit/promote NWPW smear type.
+  virtualOrbitalsStart        @40 :Int32 = 0;       # First NWPW virtual_orbitals value.
+  virtualOrbitalsEnd          @41 :Int32 = 0;       # Second NWPW virtual_orbitals value.
+  lcaoMode                    @42 :NWChemNwpwLcaoMode = unspecified; # Emit/promote lcao/lcao_skip.
+  ewaldGridX                  @43 :Int32 = 0;       # First NWPW ewald_ngrid value.
+  ewaldGridY                  @44 :Int32 = 0;       # Second NWPW ewald_ngrid value.
+  ewaldGridZ                  @45 :Int32 = 0;       # Third NWPW ewald_ngrid value.
+  noseHoover                  @46 :NWChemNwpwToggle = unspecified; # Emit/promote Nose-Hoover or energy nose toggle.
+  noseRestart                 @47 :NWChemNwpwToggle = unspecified; # Emit/promote Nose-Hoover restart/start.
+  noseElectronPeriod          @48 :Float64 = 0.0;   # Nose-Hoover electron period Pe.
+  noseElectronTemperature     @49 :Float64 = 0.0;   # Nose-Hoover electron temperature Te.
+  noseIonPeriod               @50 :Float64 = 0.0;   # Nose-Hoover ion period Pr.
+  noseIonTemperature          @51 :Float64 = 0.0;   # Nose-Hoover ion temperature Tr.
+  noseElectronChainLength     @52 :Int32 = 0;       # Nose-Hoover Mchain value.
+  noseIonChainLength          @53 :Int32 = 0;       # Nose-Hoover Nchain value.
+  atomEfield                  @54 :NWChemNwpwToggle = unspecified; # Emit/promote atom_efield.
+  atomEfieldGradient          @55 :NWChemNwpwToggle = unspecified; # Emit/promote atom_efield_grad.
+  mulliken                    @56 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW mulliken/off.
+  mullikenKawai               @57 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW mulliken kawai.
+  periodicDipole              @58 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW periodic_dipole.
+  electricField               @59 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW efield.
+  electricFieldX              @60 :Float64 = 0.0;    # First NWPW efield vector value.
+  electricFieldY              @61 :Float64 = 0.0;    # Second NWPW efield vector value.
+  electricFieldZ              @62 :Float64 = 0.0;    # Third NWPW efield vector value.
+  electricFieldCenterSet      @63 :Bool = false;     # Emit/promote NWPW efield center.
+  electricFieldCenterX        @64 :Float64 = 0.0;    # First NWPW efield center value.
+  electricFieldCenterY        @65 :Float64 = 0.0;    # Second NWPW efield center value.
+  electricFieldCenterZ        @66 :Float64 = 0.0;    # Third NWPW efield center value.
+  electricFieldType           @67 :NWChemNwpwEfieldType = unspecified; # Emit/promote NWPW efield type.
+  smoothCutoff                @68 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW smooth_cutoff.
+  smoothCutoffAfac            @69 :Float64 = 0.0;    # First NWPW smooth_cutoff value.
+  smoothCutoffSigma           @70 :Float64 = 0.0;    # Second NWPW smooth_cutoff value.
+  cutoffBootWavefunction      @71 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW cutoff_boot_wavefunction.
+  fastErf                     @72 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW fast_erf.
+  dipoleMotion                @73 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW dipole_motion.
+  dipoleMotionFilename        @74 :Text = "";       # Emit/promote NWPW dipole_motion filename.
+  rhoUseSymmetry              @75 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW symmetry.
+  fmm                         @76 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW fmm.
+  fmmLmax                     @77 :Int32 = 0;       # NWPW fmm lmax value.
+  fmmLongRange                @78 :Int32 = 0;       # NWPW fmm lr value.
+  born                        @79 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW Born solvation.
+  bornDielectric              @80 :Float64 = 0.0;   # NWPW born dielectric value.
+  bornRelax                   @81 :NWChemNwpwToggle = unspecified; # NWPW born relax flag.
+  bornVRadiiAngstrom          @82 :List(Float64);    # NWPW born input radii in Angstrom.
+  cpmdProperties              @83 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW cpmd_properties.
+  useGridComparison           @84 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW use_grid_cmp.
+  director                    @85 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW director.
+  directorFilename            @86 :Text = "";       # Emit/promote NWPW director filename.
+  cellExpandX                 @87 :Int32 = 0;       # First NWPW expand_cell value.
+  cellExpandY                 @88 :Int32 = 0;       # Second NWPW expand_cell value.
+  cellExpandZ                 @89 :Int32 = 0;       # Third NWPW expand_cell value.
+  mapping                     @90 :Int32 = 0;       # NWPW mapping value.
+  rotation                    @91 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW rotation.
+  lmaxMultipole               @92 :Int32 = -1;      # NWPW integrate_mult_l / lmax_multipole value.
+  fei                         @93 :Bool = false;    # Emit/promote NWPW Fei.
+  feiFilename                 @94 :Text = "";       # Filename token in NWPW Fei.
+  initialVelocitiesTemperature @95 :Float64 = 0.0;  # NWPW initial_velocities temperature in K.
+  initialVelocitiesSeed       @96 :Int32 = -1;      # NWPW initial_velocities seed; negative uses NWChem default.
+  makeHmass2                  @97 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW makehmass2.
+  translateVectorSet          @98 :Bool = false;    # Emit/promote NWPW translate_vector.
+  translateVectorX            @99 :Float64 = 0.0;   # First NWPW translate_vector value.
+  translateVectorY            @100 :Float64 = 0.0;  # Second NWPW translate_vector value.
+  translateVectorZ            @101 :Float64 = 0.0;  # Third NWPW translate_vector value.
+  translateGeometryName       @102 :Text = "";      # Optional NWPW translate_vector geometry name.
+  translateReorder            @103 :NWChemNwpwToggle = unspecified; # Optional NWPW translate_vector reorder flag.
+  socketType                  @104 :Text = "";      # NWPW socket type token.
+  socketIp                    @105 :Text = "";      # Optional NWPW socket IP or socket path token.
+  apcSet                      @106 :Bool = false;   # Emit/promote NWPW APC values.
+  apcGc                       @107 :Float64 = 0.0;  # NWPW APC Gc value.
+  apcGamma                    @108 :List(Float64);  # NWPW APC gamma values.
+  translation                 @109 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW translation.
+  minimizer                   @110 :NWChemNwpwMinimizer = unspecified; # Emit/promote NWPW minimizer.
+  ksAlgorithm                 @111 :NWChemNwpwKsAlgorithm = unspecified; # Emit/promote NWPW KS algorithm.
+  scfAlgorithm                @112 :NWChemNwpwScfAlgorithm = unspecified; # Emit/promote NWPW SCF algorithm.
+  precondition                @113 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW SCF precondition flag.
+  kerkerG0Set                 @114 :Bool = false;   # Emit/promote NWPW SCF kerker g0.
+  kerkerG0                    @115 :Float64 = 0.0;  # NWPW SCF kerker g0 value.
+  ksAlphaSet                  @116 :Bool = false;   # Emit/promote NWPW SCF alpha.
+  ksAlpha                     @117 :Float64 = 0.0;  # NWPW SCF alpha value.
+  ksMaxitOrbSet               @118 :Bool = false;   # Emit/promote NWPW SCF inner iterations.
+  ksMaxitOrb                  @119 :Int32 = 0;      # NWPW SCF inner iteration count.
+  ksMaxitOrbsSet              @120 :Bool = false;   # Emit/promote NWPW SCF outer iterations.
+  ksMaxitOrbs                 @121 :Int32 = 0;      # NWPW SCF outer iteration count.
+  diisHistoriesSet            @122 :Bool = false;   # Emit/promote NWPW SCF DIIS histories.
+  diisHistories               @123 :Int32 = 0;      # NWPW SCF DIIS history count.
+  oneElectronGuessSet         @124 :Bool = false;   # Emit/promote NWPW one_electron_guess.
+  oneElectronGuessItIn        @125 :Int32 = 0;      # NWPW one-electron guess inner iterations.
+  oneElectronGuessItOut       @126 :Int32 = 0;      # NWPW one-electron guess outer iterations.
+  oneElectronGuessItOrtho     @127 :Int32 = 0;      # NWPW one-electron guess orthogonalization iterations.
+  vfieldFilenames             @128 :List(Text);     # Emit/promote NWPW vfield filenames.
+  singlePrecisionHfx          @129 :Bool = false;   # Emit/promote NWPW single_precision_hfx.
+  dosAlphaSet                 @130 :Bool = false;   # Emit/promote NWPW DOS alpha.
+  dosAlpha                    @131 :Float64 = 0.0;  # NWPW DOS alpha value.
+  dosNpointsSet               @132 :Bool = false;   # Emit/promote NWPW DOS point count.
+  dosNpoints                  @133 :Int32 = 0;      # NWPW DOS point count.
+  dosEminSet                  @134 :Bool = false;   # Emit/promote NWPW DOS minimum energy.
+  dosEmin                     @135 :Float64 = 0.0;  # NWPW DOS minimum energy.
+  dosEmaxSet                  @136 :Bool = false;   # Emit/promote NWPW DOS maximum energy.
+  dosEmax                     @137 :Float64 = 0.0;  # NWPW DOS maximum energy.
+  dosFilename                 @138 :Text = "";      # Emit/promote NWPW dos_filename.
+  geometryOptimize            @139 :Bool = false;   # Emit/promote NWPW geometry_optimize.
+  auxiliaryPotentials         @140 :Bool = false;   # Emit/promote NWPW auxiliary_potentials.
+  multiplicity                @141 :Int32 = 0;      # Emit/promote NWPW mult.
+  spinMode                    @142 :NWChemNwpwSpinMode = unspecified; # Emit/promote NWPW dft/odft.
+  allowTranslation            @143 :Bool = false;   # Emit/promote NWPW allow_translation alias.
+  cutoffWavefunction          @144 :Float64 = 0.0;  # Wavefunction value in NWPW cutoff alias.
+  cutoffEnergy                @145 :Float64 = 0.0;  # Optional energy value in NWPW cutoff alias.
+  mcStepStart                 @146 :Int32 = 0;      # First NWPW mc_steps alias value.
+  mcStepEnd                   @147 :Int32 = 0;      # Second NWPW mc_steps alias value.
+  etMovecsA                   @148 :Text = "";      # First movecs token in NWPW et.
+  etMovecsB                   @149 :Text = "";      # Second movecs token in NWPW et.
+  etIonA                      @150 :Text = "";      # First ion token in NWPW et.
+  etIonB                      @151 :Text = "";      # Second ion token in NWPW et.
+  temperatureIon              @152 :Float64 = 0.0;  # First NWPW temperature argument, Tion.
+  temperatureIonPeriod        @153 :Float64 = 0.0;  # Second NWPW temperature argument, Pion.
+  temperatureElectron         @154 :Float64 = 0.0;  # Third NWPW temperature argument, Telc.
+  temperatureElectronPeriod   @155 :Float64 = 0.0;  # Fourth NWPW temperature argument, Pelc.
+  temperatureRestart          @156 :NWChemNwpwToggle = unspecified; # restart/start token in NWPW temperature.
+  temperatureIonChainLength   @157 :Int32 = 0;      # First chain argument in NWPW temperature.
+  temperatureElectronChainLength @158 :Int32 = 0;   # Second chain argument in NWPW temperature.
+  mappingAlias                @159 :NWChemNwpwMappingAlias = unspecified; # Named NWPW mapping alias.
+  virtualAliasSet             @160 :Bool = false;   # Emit/promote NWPW virtual alias with defaults.
+  virtualAliasStart           @161 :Int32 = 0;      # First NWPW virtual alias value.
+  virtualAliasEnd             @162 :Int32 = 0;      # Second NWPW virtual alias value.
+  boTimeStepSet               @163 :Bool = false;   # Emit/promote NWPW bo_time_step with the default value when boTimeStep is unset.
+  boFakeMassSet               @164 :Bool = false;   # Emit/promote NWPW bo_fake_mass with the default value when boFakeMass is unset.
+  scalingSet                  @165 :Bool = false;   # Emit/promote NWPW scaling with default values when scalingFirst is unset.
+  npDimensionsSet             @166 :Bool = false;   # Emit/promote NWPW np_dimensions with default values when all dimensions are unset.
+  tolerancesSet               @167 :Bool = false;   # Emit/promote NWPW tolerances with default values when all tolerance fields are unset.
+  mappingSet                  @168 :Bool = false;   # Emit/promote NWPW mapping with the default value when mapping is unset.
+  dosSet                      @169 :Bool = false;   # Emit/promote NWPW dos with the default alpha when DOS scalar fields are unset.
+  lcaoMask                    @170 :NWChemNwpwToggle = unspecified; # Emit/promote NWPW lcao_mask.
+  lcaoMaskUpOrbitals          @171 :List(Int32); # NWPW lcao_mask up/alpha orbital indexes.
+  lcaoMaskDownOrbitals        @172 :List(Int32); # NWPW lcao_mask down/beta orbital indexes.
+  occupations                 @173 :List(Float64); # Emit/promote NWPW occupations block occupation values.
+  occupationStates            @174 :List(Int32);   # State indexes paired with occupations; unset values default to state 1.
+  extraOrbitals               @175 :Int32 = 0;     # Emit/promote NWPW occupations extra_orbitals.
+  scalingAtomIndices          @176 :List(Int32);   # One-based atom indexes appended to NWPW scaling.
+}
+
+# Logical SCF convergence card (was directive-only "convergence tight|loose|...").
+struct NWChemScfConvergence {
+  mode @0 :Mode = unspecified;
+
+  enum Mode {
+    unspecified @0; # Do not emit convergence line from this struct.
+    tight       @1; # Emit "convergence tight".
+    loose       @2; # Emit "convergence loose".
+    default     @3; # Emit "convergence default" (NWChem spelling).
+    energy      @4; # Emit "convergence energy" (energy-only criterion).
+    density     @5; # Emit "convergence density".
+    gradient    @6; # Emit "convergence gradient".
+  }
+}
+
+# Logical SCF semidirect integral storage (was directive-only semidirect card).
+# filesize/memsize in megawords when >0; promote int2e:* on embed when set.
+# enabled alone (no sizes) emits "semidirect" on full and embed (no RTDB for the
+# keyword). disabled is a no-op (leave NWChem default; no explicit off keyword).
+struct NWChemScfSemidirect {
+  enabled  @0 :NWChemToggle = unspecified; # enabled => emit semidirect; disabled => no-op.
+  filesize @1 :Int32 = 0; # Promote int2e:filesize when >0 (omit size tokens on embed).
+  memsize  @2 :Int32 = 0; # Promote int2e:memsize when >0 (omit size tokens on embed).
 }
 
 # @struct NWChemScfStanza
 # @brief Typed SCF/HF block controls (vectors, convergence, thresh).
-# Extra directives cover the long tail of SCF options via NWChemDirective.
+# directives is residual escape for unmodeled SCF cards only.
 struct NWChemScfStanza {
-  vectorsInput  @0 :Text = "";   # Emit "vectors input <path>" when non-empty.
-  vectorsOutput @1 :Text = "";   # Emit "vectors output <path>" when non-empty.
+  vectorsInput  @0 :Text = "";   # Emit "vectors input <path>"; embed promotes scf:input vectors.
+  vectorsOutput @1 :Text = "";   # Emit "vectors output <path>"; embed promotes scf:output vectors.
   maxiter       @2 :Int32 = 0;   # SCF max iterations; embed writes RTDB directly.
   thresh        @3 :Float64 = 0; # SCF convergence threshold; embed writes RTDB directly.
   tol2e         @4 :Float64 = 0; # Two-electron tolerance; embed writes RTDB directly.
-  noprint       @5 :Bool = false;# Emit "noprint".
-  directives    @6 :List(NWChemDirective);
+  noprint       @5 :Bool = false;# Emit "noprint" (text-only; no single RTDB flag).
+  directives    @6 :List(NWChemDirective); # Residual unmodeled SCF cards only.
+  # Wavefunction keyword (rhf/uhf/rohf/...). Emitted in the scf block and promoted
+  # to RTDB key scf:scftype on embed so HF spin cases are C-ABI accessible without
+  # relying only on NWChemParams.scfType / directives.
+  wavefunctionType @7 :Text = "";
+  # Open-shell count for UHF/ROHF; negative means unset. Promotes scf:nopen.
+  nopen            @8 :Int32 = -1;
+  diis             @9 :NWChemToggle = unspecified; # Promote scf:diis (enabled/disabled).
+  diisBas          @10 :Int32 = 0; # Promote scf:diisbas when >0.
+  maxsub           @11 :Int32 = 0; # Promote scf:maxsub when >0.
+  lock             @12 :NWChemToggle = unspecified; # Promote scf:lock.
+  adapt            @13 :NWChemToggle = unspecified; # Promote scf:adapt.
+  noscf            @14 :NWChemToggle = unspecified; # Promote scf:noscf when enabled.
+  convergence      @15 :NWChemScfConvergence; # Logical convergence card (not directives).
+  semidirect       @16 :NWChemScfSemidirect;  # Logical semidirect / int2e storage.
+}
+
+# @struct NWChemCcsdStanza
+# @brief Classic CCSD block controls backed by stable ccsd:* RTDB keys.
+struct NWChemCcsdStanza {
+  maxiter           @0 :Int32 = 0; # Emit/promote ccsd:maxiter.
+  thresh            @1 :Float64 = 0.0; # Emit/promote ccsd:thresh.
+  tol2e             @2 :Float64 = 0.0; # Emit/promote ccsd:tol2e.
+  iprt              @3 :Int32 = 0; # Emit/promote ccsd:iprt.
+  maxDiis           @4 :Int32 = 0; # Emit/promote ccsd:maxdiis / diisbas.
+  frozenCore        @5 :Int32 = 0; # Emit/promote ccsd:frozen core.
+  frozenVirtual     @6 :Int32 = 0; # Emit/promote ccsd:frozen virtual.
+  useDisk           @7 :NWChemToggle = unspecified; # disabled emits/promotes nodisk.
+  sameSpinScale     @8 :Float64 = 0.0; # Emit/promote ccsd:fss.
+  oppositeSpinScale @9 :Float64 = 0.0; # Emit/promote ccsd:fos.
+  directives        @10 :List(NWChemDirective);
+  printLevel        @11 :NWChemPrintLevel = unspecified; # Emit CCSD print level.
+  printItems        @12 :List(Text); # Extra CCSD print names after the level.
+  noPrintItems      @13 :List(Text); # CCSD noprint names.
+  doa               @14 :List(Int32); # Emit CCSD DOA debugging switches.
+  dob               @15 :List(Int32); # Emit CCSD DOB debugging switches.
+  dog               @16 :List(Int32); # Emit CCSD DOG debugging switches.
+  doh               @17 :List(Int32); # Emit CCSD DOH debugging switches.
+  dojk              @18 :List(Int32); # Emit CCSD DOJK debugging switches.
+  dos               @19 :List(Int32); # Emit CCSD DOS debugging switches.
+  dod               @20 :List(Int32); # Emit CCSD DOD debugging switches.
+  useTriplesDriverNonblocking @21 :NWChemToggle = unspecified; # Emit/promote ccsd:use_trpdrv_nb.
+  useCcsdOpenmp               @22 :NWChemToggle = unspecified; # Emit/promote ccsd:use_ccsd_omp.
+  useTriplesDriverOpenmp      @23 :NWChemToggle = unspecified; # Emit/promote ccsd:use_trpdrv_omp.
+  useTriplesDriverOffload     @24 :NWChemToggle = unspecified; # Emit/promote ccsd:use_trpdrv_offload.
+}
+
+# @struct NWChemTceStanza
+# @brief Tensor Contraction Engine controls for CC, CI, MBPT, EOM-CC, and CR-EOMCC.
+struct NWChemTceStanza {
+  method                @0  :Text = ""; # Full-deck method keyword, e.g. ccsd(t), cr-ccsd(t), bwccsd.
+  model                 @1  :Text = ""; # Emit/promote tce:model normalized value.
+  model2e               @2  :NWChemTceTwoElectronStorage = unspecified; # Emit/promote tce:model2e.
+  perturbative          @3  :Text = ""; # Promote tce:perturbative.
+  ccsdVariant           @4  :Text = ""; # Promote tce:ccsdvar.
+  noTriplesSingles      @5  :NWChemToggle = unspecified; # Promote tce:nts.
+  reference             @6  :NWChemTceReference = unspecified; # Emit/promote tce:reference.
+  frozenCore            @7  :Int32 = 0; # Emit/promote tce:frozen core.
+  frozenVirtual         @8  :Int32 = 0; # Emit/promote tce:frozen virtual.
+  thresh                @9  :Float64 = 0.0; # Emit/promote tce:thresh.
+  levelShift            @10 :Float64 = 0.0; # Emit/promote tce:zlshift.
+  leftLevelShift        @11 :Float64 = 0.0; # Emit/promote tce:zlshiftl.
+  levelShift2Alpha      @12 :Float64 = 0.0; # First value in tce:zlshift2.
+  levelShift2Beta       @13 :Float64 = 0.0; # Second value in tce:zlshift2.
+  levelShift3Alpha      @14 :Float64 = 0.0; # First value in tce:zlshift3.
+  levelShift3Beta       @15 :Float64 = 0.0; # Second value in tce:zlshift3.
+  maxiter               @16 :Int32 = 0; # Emit/promote tce:maxiter.
+  ioAlgorithm           @17 :NWChemTceIoAlgorithm = unspecified; # Emit/promote tce:ioalg.
+  diis                  @18 :Int32 = 0; # Emit/promote tce:diis.
+  diis2                 @19 :Int32 = 0; # Emit/promote tce:diis2.
+  diis3                 @20 :Int32 = 0; # Emit/promote tce:diis3.
+  eomSolver             @21 :Int32 = 0; # Emit eomsol; promote tce:eoms.
+  hbarDimension         @22 :Int32 = 0; # Emit hbard; promote tce:hbard.
+  nroots                @23 :Int32 = 0; # Emit/promote tce:nroots.
+  target                @24 :Int32 = 0; # Emit/promote tce:target.
+  targetSymmetry        @25 :Text = ""; # Emit targetsym; promote tce:targetsym.
+  symmetry              @26 :NWChemToggle = unspecified; # Emit/promote tce:symmetry.
+  densityMatrix         @27 :NWChemToggle = unspecified; # Emit densmat when enabled; promote tce:densmat.
+  densityMatrixFile     @28 :Text = ""; # Emit/promote tce:file_densmat.
+  left                  @29 :NWChemToggle = unspecified; # Promote tce:left.
+  multipole             @30 :Int32 = 0; # Emit/promote tce:multipole.
+  fragment              @31 :Int32 = -1; # Emit/promote tce:fragment when >= 0.
+  recomputeFock         @32 :NWChemToggle = unspecified; # Emit fock/nofock; promote tce:recompf.
+  activeOccupiedAlpha   @33 :Int32 = 0; # Emit/promote tce:active_oa.
+  activeOccupiedBeta    @34 :Int32 = 0; # Emit/promote tce:active_ob.
+  activeVirtualAlpha    @35 :Int32 = 0; # Emit/promote tce:active_va.
+  activeVirtualBeta     @36 :Int32 = 0; # Emit/promote tce:active_vb.
+  activeOccupied        @37 :Int32 = 0; # Emit oact; promote tce:oact.
+  activeUnoccupied      @38 :Int32 = 0; # Emit uact; promote tce:uact.
+  activeEnergyMin       @39 :Float64 = 0.0; # Emit emin_act; promote tce:eactmin.
+  activeEnergyMax       @40 :Float64 = 0.0; # Emit emax_act; promote tce:eactmax.
+  activeExcitationLevel @41 :Int32 = 0; # Emit t3a_lvl; promote tce:act_excit_lvl.
+  maxDiff               @42 :Float64 = 0.0; # Emit/promote tce:maxdiff.
+  atomicTileSize        @43 :Int32 = 0; # Emit attilesize; promote tce:maxs.
+  split                 @44 :Int32 = 0; # Emit split; promote tce:ichopx.
+  twoElectronMethod     @45 :Int32 = 0; # Emit 2emet; promote tce:i4im.
+  diskBackend           @46 :Int32 = -1; # Emit idiskx; promote tce:idiskx when >= 0.
+  tileSize              @47 :Int32 = 0; # Emit/promote tce:tilesize.
+  cudaDevices           @48 :Int32 = 0; # Emit/promote tce:cuda.
+  mrcc                  @49 :NWChemToggle = unspecified; # Promote tce:mrcc.
+  tccSpaces             @50 :NWChemToggle = unspecified; # Emit tcc_spaces; promote tce:ltcc.
+  eaCcsd                @51 :NWChemToggle = unspecified; # Emit/promote tce:eaccsd when enabled.
+  ipCcsd                @52 :NWChemToggle = unspecified; # Emit/promote tce:ipccsd when enabled.
+  directives            @53 :List(NWChemDirective);
+  freezeMode            @54 :NWChemTceFreezeMode = unspecified; # Emit symbolic freeze directive; not directly promoted.
+  dipole                @55 :Bool = false; # Emit/promote TCE dipole response keyword.
+  printLevel            @56 :NWChemPrintLevel = unspecified; # Emit TCE print level.
+  printItems            @57 :List(Text); # Extra TCE print names after the level.
+  quadrupole            @58 :Bool = false; # Emit/promote TCE quadrupole response keyword.
+  octupole              @59 :Bool = false; # Emit/promote TCE octupole response keyword.
+}
+
+# @struct NWChemMrccDataStanza
+# @brief TCE MRCC data block for reference roots, active spaces, and occupation strings.
+struct NWChemMrccDataStanza {
+  root           @0 :Int32 = 0; # Emit "root <n>".
+  casElectrons   @1 :Int32 = 0; # First value in "cas <electrons> <orbitals>".
+  casOrbitals    @2 :Int32 = 0; # Second value in "cas <electrons> <orbitals>".
+  nref           @3 :Int32 = 0; # Emit explicit nref; zero derives from references length.
+  references     @4 :List(Text); # MRCC occupation strings following nref.
+  se4t           @5 :Bool = false; # Emit "se4t".
+  noAposteriori  @6 :Bool = false; # Emit "no_aposteriori".
+  subgroupSize   @7 :Int32 = 0; # Emit "subgroupsize <n>".
+  improveTiling  @8 :Bool = false; # Emit "improvetiling".
+  usspt          @9 :Bool = false; # Emit "usspt".
+  directives     @10 :List(NWChemDirective);
 }
 
 # @struct NWChemTaskStanza
@@ -260,21 +883,70 @@ struct NWChemDriverStanza {
 
 # @struct NWChemPropertyStanza
 # @brief Property evaluation block (dipole, mulliken, ...).
+# Bool flags promote to prop:<name> integer 1 on embed (prop_input.F convention).
 struct NWChemPropertyStanza {
   dipole     @0 :Bool = false;
   mulliken   @1 :Bool = false;
   quadrupol  @2 :Bool = false; # NWChem keyword "quadrupole" (typo preserved in field name only).
   directives @3 :List(NWChemDirective);
+  octupole         @4 :Bool = false; # prop:octupole
+  esp              @5 :Bool = false; # prop:esp
+  efield           @6 :Bool = false; # prop:efield
+  efieldGrad       @7 :Bool = false; # prop:efieldgrad
+  electronDensity  @8 :Bool = false; # prop:electrondensity
+  spinDensity      @9 :Bool = false; # prop:spindensity
+  spinPopulation   @10 :Bool = false; # prop:spinpopulation
+  shielding        @11 :Bool = false; # prop:shldopt path via shielding keyword
+  hyperfine        @12 :Bool = false; # prop:hypopt
+  polarizability   @13 :Bool = false; # prop:polarizability when set in prop_input
+}
+
+# @struct NWChemMp2Stanza
+# @brief Classic MP2 block (mp2_input.F RTDB keys).
+struct NWChemMp2Stanza {
+  freezeCore       @0 :Int32 = 0;   # Promote mp2:number frozen core when >0 (also freeze atomic).
+  freezeVirtual    @1 :Int32 = 0;   # Promote mp2:number frozen virtual when >0.
+  tight            @2 :Bool = false; # Emit tight AO tolerances (aotol2e path).
+  aotol2e          @3 :Float64 = 0.0; # Promote mp2:aotol2e when >0.
+  aotol2eFock      @4 :Float64 = 0.0; # Promote mp2:aotol2e fock when >0.
+  backtol          @5 :Float64 = 0.0; # Promote mp2:backtol when >0.
+  sameSpinScale    @6 :Float64 = 0.0; # Promote mp2:fss (SCS-MP2).
+  oppositeSpinScale @7 :Float64 = 0.0; # Promote mp2:fos.
+  scs              @8 :NWChemToggle = unspecified; # Promote mp2:scs when enabled.
+  scratchDisk      @9 :Float64 = 0.0; # Promote mp2:scratchdisk (GB) when >0.
+  directives       @10 :List(NWChemDirective);
+}
+
+# @struct NWChemTddftStanza
+# @brief Linear-response TDDFT block (tddft_input.F RTDB keys).
+struct NWChemTddftStanza {
+  nroots       @0 :Int32 = 0;    # Promote tddft:nroots.
+  tda          @1 :NWChemToggle = unspecified; # Promote tddft:tda (Tamm-Dancoff).
+  maxiter      @2 :Int32 = 0;    # Promote tddft:maxiter.
+  thresh       @3 :Float64 = 0.0; # Promote tddft:thresh.
+  maxvecs      @4 :Int32 = 0;    # Promote tddft:maxvecs.
+  singlet      @5 :NWChemToggle = unspecified; # Promote tddft:singlet.
+  triplet      @6 :NWChemToggle = unspecified; # Promote tddft:triplet.
+  target       @7 :Int32 = 0;    # Promote tddft:target (1-based state index when >0).
+  targetSym    @8 :Text = "";    # Promote tddft:targetsym.
+  symmetry     @9 :NWChemToggle = unspecified; # Promote tddft:symmetry.
+  algorithm    @10 :Int32 = 0;   # Promote tddft:algorithm when >0.
+  energyCutoff @11 :Float64 = 0.0; # Promote tddft:ecut + tddft:lecut when >0.
+  directives   @12 :List(NWChemDirective);
 }
 
 # @struct NWChemBasisStanza
 # @brief Structured Gaussian basis / ECP block (complements top-level basis name).
-# Use when callers need spherical/cartesian, segment, or per-element library lines.
+# Use when callers need spherical/cartesian, segment, library root, or per-element lines.
+# Named enums are preferred for closed options; legacy spherical Bool remains for compatibility.
 struct NWChemBasisStanza {
-  spherical  @0 :Bool = false; # Emit "* library ... spherical" style when true.
-  segment    @1 :Text = "";    # Optional segment label for "* library <segment>".
-  ecp        @2 :Text = "";    # Optional ECP library/block name emitted as extra line.
-  directives @3 :List(NWChemDirective); # Per-element "H library 6-31g" etc.
+  spherical   @0 :Bool = false; # Legacy: true => spherical when angularKind is unspecified.
+  segment     @1 :Text = "";    # Optional segment *label* for "* library <segment>" text render.
+  ecp         @2 :Text = "";    # Optional ECP library name (embed stores ecp basis when non-empty).
+  directives  @3 :List(NWChemDirective); # Per-element "H library 6-31g" etc.
+  libraryRoot @4 :NWChemBasisLibraryRoot = unspecified; # classic vs BSE library tree.
+  angularKind @5 :NWChemBasisAngularKind = unspecified; # cartesian vs spherical (overrides spherical bool).
+  segmentMode @6 :NWChemBasisSegmentMode = unspecified; # segment vs nosegment for bas_tag_lib.
 }
 
 # @struct NWChemGeometryStanza
@@ -303,6 +975,14 @@ struct NWChemInputStanza {
   property        @10 :NWChemPropertyStanza;
   basisStanza     @11 :NWChemBasisStanza;
   geometry        @12 :NWChemGeometryStanza;
+  nwpw            @13 :NWChemNwpwStanza;
+  ccsd            @14 :NWChemCcsdStanza;
+  tce             @15 :NWChemTceStanza;
+  mrccData        @16 :NWChemMrccDataStanza;
+  brillouinZone   @17 :NWChemBrillouinZoneStanza;
+  simulationCell  @18 :NWChemSimulationCellStanza;
+  mp2             @19 :NWChemMp2Stanza;
+  tddft           @20 :NWChemTddftStanza;
 
   enum Kind {
     generic         @0;
@@ -317,6 +997,14 @@ struct NWChemInputStanza {
     property        @9;
     basis           @10; # NWChemInputStanza.basisStanza
     geometry        @11;
+    nwpw            @12;
+    ccsd            @13;
+    tce             @14;
+    mrccData        @15;
+    brillouinZone   @16;
+    simulationCell  @17;
+    mp2             @18;
+    tddft           @19;
   }
 }
 
@@ -326,7 +1014,7 @@ struct NWChemParams {
   scfType      @2 :Text = "rhf";     # HF: rhf/uhf; DFT: xc (blyp, b3lyp, ...).
   charge       @3 :Int32 = 0;
   multiplicity @4 :Int32 = 1;        # 2S+1.
-  enginePath   @5 :Text = "";        # libnwchem_engine.so (dlopen); empty => probe/env.
+  enginePath   @5 :Text = "";        # Reserved dynamic engine path; linked embed builds reject non-empty values.
   nwchemRoot   @6 :Text = "";        # NWCHEM_TOP for embed; empty => env.
   task         @7 :Text = "gradient"; # energy | gradient | property; frontend usually calls gradient.
   title        @8 :Text = "";         # Optional NWChem title/start prefix.
@@ -339,111 +1027,519 @@ struct NWChemParams {
   # NWChemInputStanza.raw, inputBlocks, NWChemSetDirective, or NWChemModuleStanza.custom.
 }
 
+# Future backend option structs (extend here, then add a PotentialConfig union arm):
+#   struct XTBParams { method @0 :Text = "GFN2-xTB"; ... }
+#   struct TBLiteParams { method @0 :Text = "GFN2-xTB"; ... }
+#   struct MetatomicParams { modelPath @0 :Text; device @1 :Text = "cpu"; ... }
+
+# --- CPMD structured input (section-oriented, mirrors CPMD &SECTION decks) ---
+
 struct CPMDDirective {
-  keyword @0 :Text;
-  args    @1 :List(Text);
+  keyword @0 :Text;       # Line keyword inside a section, e.g. "CONVERGENCE ORBITALS".
+  args    @1 :List(Text); # Tokenized arguments on following lines or same line.
 }
 
 struct CPMDGenericSection {
-  name       @0 :Text;
-  directives @1 :List(CPMDDirective);
+  name       @0 :Text;                 # Section name without ampersands, e.g. "CPMD".
+  directives @1 :List(CPMDDirective);  # Structured section body.
 }
 
 struct CPMDSetDirective {
-  key   @0 :Text;
-  value @1 :Text;
+  key   @0 :Text; # Dotted SECTION.KEYWORD, e.g. "CPMD.PRINT FORCES ON".
+  value @1 :Text; # Optional value emitted on the following indented line.
+}
+
+struct CPMDKPoint {
+  coordinates @0 :List(Float64); # Explicit KPOINTS coordinates kx, ky, kz.
+  weight      @1 :Float64 = 1.0; # KPOINTS integration weight.
+}
+
+struct CPMDKPointBand {
+  points @0 :Int32 = 0;      # Number of interpolated KPOINTS BANDS points.
+  start  @1 :List(Float64);  # Initial KPOINTS BANDS vector.
+  end    @2 :List(Float64);  # Final KPOINTS BANDS vector.
+}
+
+struct CPMDCouplingSurface {
+  stateI      @0 :Int32 = 0;      # First coupled KS state index.
+  stateJ      @1 :Int32 = 0;      # Second coupled KS state index.
+  coefficient @2 :Float64 = 0.0;  # Coupling coefficient for NSURF.
 }
 
 struct CPMDSystemSection {
-  symmetry        @0 :Int32 = 0;
-  angstrom        @1 :Bool = true;
-  cell            @2 :List(Float64);
-  cutOffRy        @3 :Float64 = 70.0;
-  scale           @4 :Float64 = 0.0;
-  charge          @5 :Int32 = 0;
-  multiplicity    @6 :Int32 = 1;
+  symmetry        @0 :Int32 = 0;          # SYMMETRY code.
+  angstrom        @1 :Bool = true;        # Emit ANGSTROM for CELL / ATOMS.
+  cell            @2 :List(Float64);      # CELL vectors or a,b,c,alpha,beta,gamma (6 or 9).
+  cutOffRy        @3 :Float64 = 70.0;     # CUTOFF in Rydberg (CPMD default unit).
+  scale           @4 :Float64 = 0.0;      # Optional SCALE factor; 0 => omit.
+  charge          @5 :Int32 = 0;          # CHARGE of the system.
+  multiplicity    @6 :Int32 = 1;          # Spin multiplicity 2S+1 (maps to LSD/spin when >1).
   directives      @7 :List(CPMDDirective);
+  densityCutOffRy @8 :Float64 = 0.0;      # DENSITY CUTOFF; 0 => omit.
+  poissonSolver   @9 :Text;               # POISSON SOLVER argument, e.g. HOCKNEY.
+  poissonParameter @10 :Float64 = 0.0;    # Optional POISSON ... PARAMETER value.
+  surface         @11 :Text;              # SURFACE direction, e.g. XY/YZ/ZX.
+  referenceCell   @12 :List(Float64);      # REFERENCE CELL values (6) or vectors (9).
+  classicalCell   @13 :List(Float64);      # CLASSICAL CELL values (6).
+  isotropicCell   @14 :Bool = false;       # ISOTROPIC CELL.
+  zFlexibleCell   @15 :Bool = false;       # ZFLEXIBLE CELL.
+  densityCutoffNumber @16 :Int32 = 0;      # DENSITY CUTOFF NUMBER; 0 => omit.
+  dual            @17 :Float64 = 0.0;      # DUAL density cutoff factor; 0 => omit.
+  constantCutoff  @18 :List(Float64);      # CONSTANT CUTOFF akin, skin, eckin (3).
+  mesh            @19 :List(Int32);        # MESH nr1, nr2, nr3.
+  scaleCartesian  @20 :Bool = false;       # SCALE CARTESIAN; combines with scale as S=.
+  doubleGrid      @21 :Text;               # DOUBLE GRID argument, e.g. ON/OFF.
+  symmetrizeCoordinates @22 :Bool = false; # SYMMETRIZE COORDINATES.
+  tesr            @23 :Int32 = 0;          # TESR value; 0 => omit.
+  polymer         @24 :Bool = false;       # POLYMER.
+  cluster         @25 :Bool = false;       # CLUSTER.
+  cutoffShape     @26 :Text;               # CUTOFF qualifier, e.g. SPHERICAL/NOSPHERICAL.
+  hfxCutoff       @27 :List(Float64);       # HFX CUTOFF hfxwfe, hfxdee (2).
+  boxWalls        @28 :Float64 = 0.0;       # BOX WALLS skin; 0 => omit.
+  nSup            @29 :Int32 = 0;           # NSUP alpha spin states; 0 => omit.
+  states          @30 :Int32 = 0;           # STATES count; 0 => omit.
+  occupation      @31 :List(Float64);       # OCCUPATION values; length should match states.
+  occupationFixed @32 :Bool = false;        # OCCUPATION FIXED.
+  externalField   @33 :List(Float64);       # EXTERNAL FIELD vector (3).
+  pressure        @34 :Float64 = 0.0;       # PRESSURE; 0 => omit.
+  stressTensor    @35 :List(Float64);       # STRESS TENSOR values (9).
+  shockVelocity   @36 :Float64 = 0.0;       # SHOCK VELOCITY; 0 => omit.
+  checkSymmetryPrecision @37 :Float64 = 0.0; # CHECK SYMMETRY precision; 0 => omit.
+  checkSymmetryOff @38 :Bool = false;       # CHECK SYMMETRY OFF.
+  wCut            @39 :Float64 = 0.0;       # WCUT; 0 => omit.
+  wGauss          @40 :List(Float64);       # WGAUSS sigma values.
+  lowSpinExcitation @41 :Text;              # LOW SPIN EXCITATION options, e.g. ROKS.
+  lowSpinExcitationLsets @42 :Bool = false; # LOW SPIN EXCITATION LSETS.
+  lseParameters   @43 :List(Float64);       # LSE PARAMETERS lsea, lseb (2).
+  modifiedGoedecker @44 :Bool = false;      # MODIFIED GOEDECKER.
+  modifiedGoedeckerParameters @45 :List(Float64); # MODIFIED GOEDECKER PARAMETERS lambda_ab, lambda_ba (2).
+  energyProfile   @46 :Bool = false;        # ENERGY PROFILE.
+  pointGroup       @47 :Text;                # POINT GROUP selector line, e.g. AUTO, NAME=C2v, or 26.
+  pointGroupDelta  @48 :Float64 = 0.0;       # POINT GROUP DELTA accuracy; 0 => omit.
+  pointGroupMolecule @49 :Bool = false;      # POINT GROUP MOLECULE.
+  scaleX         @50 :Float64 = 0.0;          # SCALE SX= value; 0 => omit.
+  scaleY         @51 :Float64 = 0.0;          # SCALE SY= value; 0 => omit.
+  scaleZ         @52 :Float64 = 0.0;          # SCALE SZ= value; 0 => omit.
+  kpoints        @53 :List(CPMDKPoint);       # KPOINTS explicit weighted points.
+  kpointsScaled  @54 :Bool = false;           # KPOINTS SCALED.
+  kpointsOnlyDiagonal @55 :Bool = false;      # KPOINTS ONLYDIAG.
+  kpointsMonkhorstPack @56 :List(Int32);      # KPOINTS MONKHORST-PACK nk1, nk2, nk3.
+  kpointsMonkhorstSymmetrized @57 :Bool = false; # KPOINTS MONKHORST-PACK SYMMETRIZED.
+  kpointsMonkhorstFull @58 :Bool = false;     # KPOINTS MONKHORST-PACK FULL.
+  kpointsMonkhorstKdp @59 :Bool = false;      # KPOINTS MONKHORST-PACK KDP.
+  kpointsMonkhorstShift @60 :List(Float64);   # KPOINTS MONKHORST-PACK mesh-line SHIFT vector.
+  kpointBands    @61 :List(CPMDKPointBand);   # KPOINTS BANDS segments.
+  kpointsBlock   @62 :Int32 = 0;              # KPOINTS BLOCK=n; 0 => omit.
+  kpointsBlockAll @63 :Bool = false;          # KPOINTS BLOCK ALL.
+  kpointsBlockCalculated @64 :Bool = false;   # KPOINTS BLOCK CALCULATED.
+  kpointsBlockNoSwap @65 :Bool = false;       # KPOINTS BLOCK NOSWAP.
+  lowSpinExcitationPenalty @66 :Float64 = 0.0; # LOW SPIN EXCITATION PENALTY; 0 => omit.
+  cdftDonorAtoms @67 :List(Int32);             # DONOR atom indexes.
+  cdftDonorWeights @68 :List(Int32);           # DONOR WMULT integer weights.
+  cdftAcceptorAtoms @69 :List(Int32);          # ACCEPTOR atom indexes.
+  cdftAcceptorHdasDonors @70 :List(Int32);     # ACCEPTOR HDAS donor atom indexes.
+  cdftAcceptorWeights @71 :List(Int32);        # ACCEPTOR WMULT integer weights.
+  couplingsFiniteDifference @72 :Bool = false; # COUPLINGS FD.
+  couplingsFiniteDifferenceDisplacement @73 :Float64 = 0.0; # COUPLINGS FD=eps; 0 => omit value.
+  couplingsProductDisplacement @74 :Float64 = 0.0; # COUPLINGS PROD=eps; 0 => omit.
+  couplingsLinres @75 :Bool = false;           # COUPLINGS LINRES.
+  couplingsLinresTolerance @76 :Float64 = 0.0; # COUPLINGS LINRES TOL=; 0 => omit.
+  couplingsLinresNvects @77 :Int32 = 0;        # COUPLINGS LINRES NVECT=; 0 => omit.
+  couplingsLinresSpecify @78 :Bool = false;    # COUPLINGS LINRES NVECT=... SPECIFY.
+  couplingsLinresBruteForce @79 :Bool = false; # COUPLINGS LINRES BRUTE FORCE.
+  couplingsLinresThresholds @80 :List(Float64); # COUPLINGS LINRES THRESHOLDS low/med/high pairs.
+  couplingsSurfaces @81 :List(CPMDCouplingSurface); # COUPLINGS NSURF surface triples.
+  couplingsFiniteDifferenceAtoms @82 :List(Int32); # COUPLINGS NAT atom indexes.
+  cellAbsolute @83 :Bool = false;          # CELL ABSOLUTE.
+  cellDegree @84 :Bool = false;            # CELL DEGREE.
+  referenceCellAbsolute @85 :Bool = false; # REFERENCE CELL ABSOLUTE.
+  referenceCellDegree @86 :Bool = false;   # REFERENCE CELL DEGREE.
+  classicalCellAbsolute @87 :Bool = false; # CLASSICAL CELL ABSOLUTE.
+  classicalCellDegree @88 :Bool = false;   # CLASSICAL CELL DEGREE.
+  cellVectors @89 :Bool = false;            # CELL VECTORS.
+  referenceCellVectors @90 :Bool = false;   # REFERENCE CELL VECTORS.
 }
 
 struct CPMDCpmdSection {
-  optimizeWavefunction @0 :Bool = true;
-  molecularDynamics    @1 :Bool = false;
+  optimizeWavefunction @0 :Bool = true;   # OPTIMIZE WAVEFUNCTION.
+  molecularDynamics    @1 :Bool = false;  # MOLECULAR DYNAMICS.
   convergenceOrbitals  @2 :Float64 = 1.0e-6;
-  maxStep              @3 :Int32 = 0;
-  timestep             @4 :Float64 = 0.0;
-  restartWavefunction  @5 :Bool = false;
-  trajectory           @6 :Bool = false;
+  maxStep              @3 :Int32 = 0;     # MAXSTEP; 0 => omit (CPMD default).
+  timestep             @4 :Float64 = 0.0; # TIMESTEP; 0 => omit.
+  restartWavefunction  @5 :Bool = false;  # RESTART WAVEFUNCTION.
+  trajectory           @6 :Bool = false;  # TRAJECTORY.
   directives           @7 :List(CPMDDirective);
-  optimizeGeometry     @8 :Bool = false;
-  maxIter              @9 :Int32 = 0;
-  convergenceGeometry  @10 :Float64 = 0.0;
-  electronMass         @11 :Float64 = 0.0;
-  molecularDynamicsCp        @12 :Bool = false;
-  molecularDynamicsBo        @13 :Bool = false;
-  molecularDynamicsEh        @14 :Bool = false;
-  molecularDynamicsPt        @15 :Bool = false;
-  molecularDynamicsClassical @16 :Bool = false;
-  molecularDynamicsFile      @17 :Text;
-  nose                 @18 :Bool = false;
-  noseIons             @19 :Bool = false;
-  noseElectrons        @20 :Bool = false;
-  berendsen            @21 :Text;
-  langevin             @22 :Bool = false;
-  annealing            @23 :Text;
-  quench               @24 :Bool = false;
-  rattle               @25 :Bool = false;
-  shake                @26 :Bool = false;
-  constraint           @27 :Text;
-  trotter              @28 :Text;
-  restart              @29 :Bool = false;
-  printOptions         @30 :Text;
-  storeOptions         @31 :Text;
-  centerMoleculeOff    @32 :Bool = false;
-  centerMoleculeOn     @33 :Bool = false;
-  diis                 @34 :Bool = false;
-  odiis                @35 :Bool = false;
-  pcg                  @36 :Bool = false;
-  diagonalization      @37 :Bool = false;
-  freeEnergy           @38 :Bool = false;
-  interface            @39 :Bool = false;
-  qmmm                 @40 :Bool = false;
-  bicanonicalEnsemble  @41 :Bool = false;
-  cdft                 @42 :Bool = false;
-  properties           @43 :Bool = false;
+  optimizeGeometry     @8 :Bool = false;  # OPTIMIZE GEOMETRY.
+  maxIter              @9 :Int32 = 0;     # MAXITER; 0 => omit.
+  convergenceGeometry  @10 :Float64 = 0.0; # CONVERGENCE GEOMETRY; 0 => omit.
+  electronMass         @11 :Float64 = 0.0; # EMASS; 0 => omit.
+  molecularDynamicsCp        @12 :Bool = false; # MOLECULAR DYNAMICS CP.
+  molecularDynamicsBo        @13 :Bool = false; # MOLECULAR DYNAMICS BO.
+  molecularDynamicsEh        @14 :Bool = false; # MOLECULAR DYNAMICS EH.
+  molecularDynamicsPt        @15 :Bool = false; # MOLECULAR DYNAMICS PT.
+  molecularDynamicsClassical @16 :Bool = false; # MOLECULAR DYNAMICS CLASSICAL.
+  molecularDynamicsFile      @17 :Text;         # MOLECULAR DYNAMICS FILE.
+  nose                 @18 :Bool = false; # NOSE.
+  noseIons             @19 :Bool = false; # NOSE IONS.
+  noseElectrons        @20 :Bool = false; # NOSE ELECTRONS.
+  berendsen            @21 :Text;         # BERENDSEN.
+  langevin             @22 :Bool = false; # LANGEVIN.
+  annealing            @23 :Text;         # ANNEALING.
+  quench               @24 :Bool = false; # QUENCH.
+  rattle               @25 :Bool = false; # RATTLE.
+  shake                @26 :Bool = false; # SHAKE.
+  constraint           @27 :Text;         # CONSTRAINT.
+  trotter              @28 :Text;         # TROTTER.
+  restart              @29 :Bool = false; # RESTART.
+  printOptions         @30 :Text;         # PRINT.
+  storeOptions         @31 :Text;         # STORE.
+  centerMoleculeOff    @32 :Bool = false; # CENTER MOLECULE OFF.
+  centerMoleculeOn     @33 :Bool = false; # CENTER MOLECULE ON.
+  diis                 @34 :Bool = false; # DIIS.
+  odiis                @35 :Bool = false; # ODIIS.
+  pcg                  @36 :Bool = false; # PCG.
+  diagonalization      @37 :Bool = false; # DIAGONALIZATION.
+  freeEnergy           @38 :Bool = false; # FREE-ENERGY.
+  interface            @39 :Bool = false; # INTERFACE.
+  qmmm                 @40 :Bool = false; # QMMM.
+  bicanonicalEnsemble  @41 :Bool = false; # BICANONICAL ENSEMBLE.
+  cdft                 @42 :Bool = false; # CDFT.
+  properties           @43 :Bool = false; # PROPERTIES.
+  vdwCorrection        @44 :Text;         # VDW CORRECTION argument, e.g. ON/OFF.
+  vdwWannier           @45 :Text;         # VDW WANNIER argument, e.g. ON/OFF.
+  dcacp                @46 :Bool = false; # DCACP.
+  isolatedMolecule     @47 :Bool = false; # ISOLATED MOLECULE.
+  maxRuntime           @48 :Float64 = 0.0; # MAXRUNTIME; 0 => omit.
+  timestepElectrons    @49 :Float64 = 0.0; # TIMESTEP ELECTRONS; 0 => omit.
+  timestepIons         @50 :Float64 = 0.0; # TIMESTEP IONS; 0 => omit.
+  cellMass             @51 :Float64 = 0.0; # CMASS; 0 => omit.
+  temperatureElectron  @52 :Float64 = 0.0; # TEMPERATURE ELECTRON; 0 => omit.
+  temperature          @53 :Float64 = 0.0; # TEMPERATURE; 0 => omit.
+  temperatureRamp      @54 :Bool = false; # TEMPERATURE RAMP.
+  temperatureRampTime  @55 :Float64 = 0.0; # TEMPERATURE RAMP second value.
+  temperatureRampRate  @56 :Float64 = 0.0; # TEMPERATURE RAMP third value.
+  rescaleOldVelocities @57 :Bool = false; # RESCALE OLD VELOCITIES.
+  reverseVelocities    @58 :Bool = false; # REVERSE VELOCITIES.
+  subtractComVelocity  @59 :Int32 = 0; # SUBTRACT COMVEL; 0 => omit.
+  subtractRotVelocity  @60 :Int32 = 0; # SUBTRACT ROTVEL; 0 => omit.
+  prngSeed             @61 :Int32 = 0; # PRNGSEED; 0 => omit.
+  tempControlIons      @62 :Text; # TEMPCONTROL IONS payload.
+  tempControlElectrons @63 :Text; # TEMPCONTROL ELECTRONS payload.
+  tempControlCell      @64 :Text; # TEMPCONTROL CELL payload.
+  berendsenIons        @65 :Text; # BERENDSEN IONS payload.
+  berendsenElectrons   @66 :Text; # BERENDSEN ELECTRONS payload.
+  berendsenCell        @67 :Text; # BERENDSEN CELL payload.
+  noseIonsThermostat      @68 :Text; # NOSE IONS payload.
+  noseElectronsThermostat @69 :Text; # NOSE ELECTRONS payload.
+  noseCellThermostat      @70 :Text; # NOSE CELL payload.
+  noseParameters          @71 :Text; # NOSE PARAMETERS payload.
+  convergenceCell         @72 :Float64 = 0.0; # CONVERGENCE CELL; 0 => omit.
+  convergenceAdapt        @73 :Float64 = 0.0; # CONVERGENCE ADAPT; 0 => omit.
+  convergenceEnergy       @74 :Float64 = 0.0; # CONVERGENCE ENERGY; 0 => omit.
+  convergenceCalfor       @75 :Float64 = 0.0; # CONVERGENCE CALFOR; 0 => omit.
+  convergenceRelax        @76 :Int32 = 0; # CONVERGENCE RELAX; 0 => omit.
+  convergenceRhofix       @77 :Float64 = 0.0; # CONVERGENCE RHOFIX; 0 => omit.
+  convergenceInitial      @78 :Float64 = 0.0; # CONVERGENCE INITIAL; 0 => omit.
+  convergenceConstraint   @79 :Text; # CONVERGENCE CONSTRAINT payload.
+  annealingIons           @80 :Float64 = 0.0; # ANNEALING IONS; 0 => omit.
+  annealingElectrons      @81 :Float64 = 0.0; # ANNEALING ELECTRONS; 0 => omit.
+  annealingCell           @82 :Float64 = 0.0; # ANNEALING CELL; 0 => omit.
+  dampingIons             @83 :Float64 = 0.0; # DAMPING IONS; 0 => omit.
+  dampingElectrons        @84 :Float64 = 0.0; # DAMPING ELECTRONS; 0 => omit.
+  dampingCell             @85 :Float64 = 0.0; # DAMPING CELL; 0 => omit.
+  hessian                 @86 :Text; # HESSIAN inline options.
+  project                 @87 :Text; # PROJECT inline option.
+  stressTensorSample      @88 :Int32 = 0; # STRESS TENSOR sample; 0 => omit.
+  stressTensorVirial      @89 :Bool = false; # STRESS TENSOR VIRIAL.
+  classStressSample       @90 :Int32 = 0; # CLASSTRESS sample; 0 => omit.
+  storeSelection          @91 :Text; # STORE inline selection.
+  storeInterval           @92 :Int32 = 0; # STORE interval; 0 => omit.
+  storeSelfConsistentInterval @93 :Int32 = 0; # STORE SC interval; 0 => omit.
+  storeOffSelection       @94 :Text; # STORE OFF inline selection.
+  restFileCount           @95 :Int32 = 0; # RESTFILE count; 0 => omit.
+  restFileSample          @96 :Text; # RESTFILE SAMPLE payload.
+  trajectoryOptions       @97 :Text; # TRAJECTORY inline options.
+  trajectorySample        @98 :Int32 = 0; # TRAJECTORY SAMPLE value; 0 => omit.
+  trajectoryRange         @99 :Text; # TRAJECTORY RANGE payload.
+  movieSample             @100 :Int32 = 0; # MOVIE SAMPLE value; 0 => omit.
+  movieOff                @101 :Bool = false; # MOVIE OFF.
+  energyBands             @102 :Bool = false; # ENERGYBANDS.
+  externalPotential       @103 :Bool = false; # EXTERNAL POTENTIAL.
+  externalPotentialAdd    @104 :Bool = false; # EXTERNAL POTENTIAL ADD.
+  electrostaticPotential  @105 :Bool = false; # ELECTROSTATIC POTENTIAL.
+  electrostaticPotentialSample @106 :Int32 = 0; # ELECTROSTATIC POTENTIAL SAMPLE.
+  dipoleDynamicsSample    @107 :Int32 = 0; # DIPOLE DYNAMICS SAMPLE.
+  dipoleDynamicsWannier   @108 :Bool = false; # DIPOLE DYNAMICS WANNIER.
+  rhoOut                  @109 :Bool = false; # RHOOUT.
+  rhoOutSample            @110 :Int32 = 0; # RHOOUT SAMPLE.
+  rhoOutBandsCount        @111 :Int32 = 0; # RHOOUT BANDS count.
+  rhoOutBands             @112 :Text; # RHOOUT BANDS payload.
+  elf                     @113 :Bool = false; # ELF.
+  elfParameters           @114 :Text; # ELF PARAMETER payload.
+  wannierParameters       @115 :Text; # WANNIER PARAMETER payload.
+  wannierOptimization     @116 :Text; # WANNIER OPTIMIZATION option.
+  wannierType             @117 :Text; # WANNIER TYPE option.
+  wannierReference        @118 :Text; # WANNIER REFERENCE payload.
+  wannierSerial           @119 :Bool = false; # WANNIER SERIAL.
+  wannierDos              @120 :Bool = false; # WANNIER DOS.
+  wannierMolecular        @121 :Bool = false; # WANNIER MOLECULAR.
+  wannierWfnOutOptions    @122 :Text; # WANNIER WFNOUT inline options.
+  wannierWfnOutPayload    @123 :Text; # WANNIER WFNOUT payload.
+  compress                @124 :Text; # COMPRESS inline option.
+  memory                  @125 :Text; # MEMORY inline options.
+  realSpaceWfnKeep        @126 :Bool = false; # REAL SPACE WFN KEEP.
+  realSpaceWfnSize        @127 :Float64 = 0.0; # REAL SPACE WFN SIZE; 0 => omit.
+  splineOptions           @128 :Text; # SPLINE inline options.
+  splinePoints            @129 :Int32 = 0; # SPLINE POINTS payload; 0 => omit.
+  splineRange             @130 :Float64 = 0.0; # SPLINE RANGE payload; 0 => omit.
+  finiteDifferences       @131 :Text; # FINITE DIFFERENCES payload.
+  taskGroups              @132 :Text; # TASKGROUPS inline option.
+  taskGroupsCount         @133 :Int32 = 0; # TASKGROUPS count; 0 => omit.
+  distributeFnl           @134 :Text; # DISTRIBUTE FNL ON/OFF.
+  filePath                @135 :Text; # FILEPATH payload.
+  benchmark               @136 :Text; # BENCHMARK payload.
+  mirror                  @137 :Bool = false; # MIRROR.
+  shiftPotential          @138 :Text; # SHIFT POTENTIAL payload.
+  glocalizationParameters @139 :Text; # GLOCALIZATION PARAMETERS payload.
+  glocalizationOptimization @140 :Text; # GLOCALIZATION OPTIMIZATION option.
+  gfunctionalType         @141 :Text; # GFUNCTIONAL TYPE option.
+  spreadRspace            @142 :Text; # SPREAD RSPACE payload after '='.
+  gUnitarityOptions       @143 :Text; # PIPPO unitarity options.
+  stepTuning              @144 :Bool = false; # STEP TUNING.
+  gAntisym                @145 :Bool = false; # G_ANTISYM.
+  gAntisymPenalty         @146 :Bool = false; # G_ANTISYM PENALTY.
+  gKick                   @147 :Bool = false; # G_KICK.
+  gComplex                @148 :Bool = false; # G_COMPLEX.
+  gReal                   @149 :Bool = false; # G_REAL.
+  readMatrix              @150 :Bool = false; # READ MATRIX.
+  gStepTune               @151 :Bool = false; # G_STEP TUNE.
+  glocWfnOutOptions       @152 :Text; # GLOC WFNOUT inline options.
+  glocWfnOutPayload       @153 :Text; # GLOC WFNOUT payload line.
+  noGeoCheck              @154 :Bool = false; # NO_GEO_CHECK.
+  brokenSymmetry          @155 :Bool = false; # BROKEN symmetry.
+  distributedLinalg       @156 :Text; # DISTRIBUTED LINALG ON/OFF.
+  linalgNewOrtho          @157 :Text; # LINALG NEWORTHO ON/OFF.
+  disorthoBlockSize       @158 :Int32 = 0; # DISORTHO_BSIZE; 0 => omit.
+  statesBlockSize         @159 :Int32 = 0; # BLOCKSIZE STATES; 0 => omit.
+  allToAllPrecision       @160 :Text; # ALLTOALL precision option.
+  gshell                  @161 :Bool = false; # GSHELL.
+  localPotential          @162 :Bool = false; # LOCAL POTENTIAL.
+  cdftOptions             @163 :Text; # CDFT inline options.
+  cdftPayload             @164 :Text; # CDFT payload line.
+  cdftHdaPayload          @165 :Text; # CDFT HDA payload line.
+  vgfactor                @166 :Text; # VGFACTOR payload line.
+  vMirror                 @167 :Bool = false; # VMIRROR.
+  combineSystemsOptions   @168 :Text; # COMBINE SYSTEMS inline options.
+  combineSystemsPayload   @169 :Text; # COMBINE SYSTEMS payload line.
+  combineSystemsSabPayload @170 :Text; # COMBINE SYSTEMS SAB payload line.
+  kshamOptions            @171 :Text; # KSHAM inline options.
+  kshamPayload            @172 :Text; # KSHAM payload line.
+  czonesSet               @173 :Text; # CZONES SET payload lines.
+  woutOptions             @174 :Text; # WOUT inline options.
+  woutPayload             @175 :Text; # WOUT payload line.
+  xfmqcTrajectories       @176 :Int32 = 0; # XFMQC trajectory count; 0 => omit.
+  molecularDynamicsFileOptions @177 :Text; # MOLECULAR DYNAMICS FILE inline options.
+  molecularDynamicsBdTrajectories @178 :Int32 = 0; # MOLECULAR DYNAMICS BD payload.
+  parrinelloRahmanOptions @179 :Text; # PARRINELLO-RAHMAN inline options.
+  optimizeGeometryOptions @180 :Text; # OPTIMIZE GEOMETRY inline options.
+  optimizeGeometrySample  @181 :Int32 = 0; # OPTIMIZE GEOMETRY SAMPLE payload.
+  optimizeCombinedOptions @182 :Text; # OPTIMIZE COMBINED inline options.
+  optimizeCombinedSample  @183 :Int32 = 0; # OPTIMIZE COMBINED SAMPLE payload.
+  cheby                   @184 :Bool = false; # CHEBY.
+  cayley                  @185 :Bool = false; # CAYLEY.
+  rungeKutta              @186 :Bool = false; # RUNGE-KUTTA.
+  forceMatch              @187 :Bool = false; # FORCEMATCH.
+  debugOptions            @188 :Text; # DEBUG inline options.
+  kohnShamEnergiesOptions @189 :Text; # KOHN-SHAM ENERGIES inline options.
+  kohnShamEnergiesCount   @190 :Int32 = 0; # KOHN-SHAM ENERGIES payload count.
+  surfaceHoppingOptions   @191 :Text; # SURFACE HOPPING inline options.
+  roksOptions             @192 :Text; # ROKS inline options.
+  roksExpertPayload       @193 :Text; # ROKS EXPERT payload line.
+  pathSampling            @194 :Bool = false; # PATH SAMPLING.
+  fixrhoUpwfnOptions      @195 :Text; # FIXRHO UPWFN inline options.
+  fixrhoVectors           @196 :Int32 = 0; # FIXRHO VECT payload; 0 => omit.
+  fixrhoLoop              @197 :Text; # FIXRHO LOOP min/max payload.
+  fixrhoWftol             @198 :Float64 = 0.0; # FIXRHO WFTOL; 0 => omit.
+  bogoliubovCorrection    @199 :Text; # BOGOLIUBOV CORRECTION inline option.
+  vibrationalAnalysisOptions @200 :Text; # VIBRATIONAL ANALYSIS inline options.
+  vibrationalAnalysisSample @201 :Int32 = 0; # VIBRATIONAL ANALYSIS SAMPLE payload.
+  vibrationalAnalysisMode @202 :Int32 = 0; # VIBRATIONAL ANALYSIS MODE= value.
+  electronicSpectra       @203 :Bool = false; # ELECTRONIC SPECTRA.
+  spinOrbitCouplingStates @204 :List(Int32); # SPIN-ORBIT COUPLING state pair.
+  propagationSpectra      @205 :Bool = false; # PROPAGATION SPECTRA.
+  propagationDistrub      @206 :Bool = false; # PROPAGATION DISTRUB.
+  gaugePulse              @207 :Bool = false; # GAUGEPULSE.
+  gaugeFieldFrequency     @208 :Float64 = 0.0; # GAUGEFIELD payload; 0 => omit.
+  nacv                    @209 :Bool = false; # NACV.
+  orbitalHardnessOptions  @210 :Text; # ORBITAL HARDNESS inline options.
+  pathIntegral            @211 :Bool = false; # PATH INTEGRAL.
+  pathMinimization        @212 :Bool = false; # PATH MINIMIZATION.
+  langevinOptions         @213 :Text; # LANGEVIN inline options.
+  langevinParameter       @214 :Text; # LANGEVIN payload line.
+  qmmmEasy                @215 :Bool = false; # QMMMEASY.
+  interfaceOptions        @216 :Text; # INTERFACE inline options.
+  trotterFactorCount      @217 :Int32 = 0; # TROTTER FACTOR= count; 0 => omit.
+  trotterFactorPayload    @218 :Text; # TROTTER FACTOR payload lines.
+  linearResponse          @219 :Bool = false; # LINEAR RESPONSE.
+  harmonicReference       @220 :Text; # HARMONIC REFERENCE option.
+  scaledMasses            @221 :Text; # SCALED MASSES option.
+  tddft                   @222 :Bool = false; # TDDFT.
+  ssic                    @223 :Float64 = 0.0; # SSIC payload; 0 => omit.
+  nonorthogonalOrbitalsOptions @224 :Text; # NONORTHOGONAL ORBITALS option.
+  nonorthogonalOrbitalsLimit @225 :Float64 = 0.0; # NONORTHOGONAL ORBITALS payload.
+  lanczosDiagonalizationOptions @226 :Text; # LANCZOS DIAGONALIZATION inline options.
+  lanczosParametersCount  @227 :Int32 = 0; # LANCZOS PARAMETERS N= count.
+  lanczosParametersPayload @228 :Text; # LANCZOS PARAMETERS payload lines.
+  davidsonDiagonalization @229 :Bool = false; # DAVIDSON DIAGONALIZATION.
+  davidsonParameters      @230 :Text; # DAVIDSON PARAMETERS payload line.
+  alexanderMixing         @231 :Float64 = 0.0; # ALEXANDER MIXING payload; 0 => omit.
+  andersonMixingGspace    @232 :Bool = false; # ANDERSON MIXING G-SPACE.
+  andersonMixingCount     @233 :Int32 = 0; # ANDERSON MIXING N= count.
+  andersonMixingPayload   @234 :Text; # ANDERSON MIXING payload lines.
+  broydenMixingOptions    @235 :Text; # BROYDEN MIXING inline options.
+  broydenMixingPayload    @236 :Text; # BROYDEN MIXING payload line.
+  diisMixingCount         @237 :Int32 = 0; # DIIS MIXING N= count.
+  diisMixingPayload       @238 :Text; # DIIS MIXING payload lines.
+  moverhoMixing           @239 :Float64 = 0.0; # MOVERHO payload; 0 => omit.
+  extrapolateWfnOptions   @240 :Text; # EXTRAPOLATE WFN inline options.
+  extrapolateWfnOrder     @241 :Int32 = 0; # EXTRAPOLATE WFN payload; 0 => omit.
+  extrapolateConstraintOrder @242 :Int32 = 0; # EXTRAPOLATE CONSTRAINT payload.
+  tsdeOptions             @243 :Text; # TSDE inline options.
+  tsdpOptions             @244 :Text; # TSDP inline options.
+  tcgp                    @245 :Bool = false; # TCGP.
+  tsdc                    @246 :Bool = false; # TSDC.
+  steepestDescentOptions  @247 :Text; # STEEPEST DESCENT inline options.
+  conjugateGradientOptions @248 :Text; # CONJUGATE GRADIENT inline options.
+  odiisOptions            @249 :Text; # ODIIS inline options.
+  odiisVectors            @250 :Int32 = 0; # ODIIS payload; 0 => omit.
+  hamiltonianCutoff       @251 :Float64 = 0.0; # HAMILTONIAN CUTOFF payload.
+  gdiisVectors            @252 :Int32 = 0; # GDIIS payload; 0 => omit.
+  lbfgsOptions            @253 :Text; # LBFGS inline options.
+  lbfgsPayload            @254 :Text; # LBFGS payload line.
+  prfoOptions             @255 :Text; # PRFO inline options.
+  prfoPayload             @256 :Text; # PRFO payload line.
+  hesscore                @257 :Bool = false; # HESSCORE.
+  bfgs                    @258 :Bool = false; # BFGS.
+  rfoOrder                @259 :Int32 = 0; # RFO ORDER= value; 0 => omit.
+  inrParametersCount      @260 :Int32 = 0; # INR PARAMETERS N= count.
+  inrParametersPayload    @261 :Text; # INR PARAMETERS payload lines.
+  implicitNewtonOptions   @262 :Text; # IMPLICIT NEWTON inline options.
+  implicitNewtonMaxIter   @263 :Int32 = 0; # IMPLICIT NEWTON payload; 0 => omit.
+  mixsd                   @264 :Float64 = 0.0; # MIXSD payload; 0 => omit.
+  mixdiis                 @265 :Float64 = 0.0; # MIXDIIS payload; 0 => omit.
+  restartOptions          @266 :Text; # RESTART inline options.
+  intFileOptions          @267 :Text; # INTFILE inline options.
+  intFileName             @268 :Text; # INTFILE filename payload.
+  initializeWavefunctionOptions @269 :Text; # INITIALIZE WAVEFUNCTION inline options.
+  rattleParameters        @270 :Text; # RATTLE payload line.
+  orthogonalizationOptions @271 :Text; # ORTHOGONALIZATION inline options.
+  quenchOptions           @272 :Text; # QUENCH inline options.
+  randomizeOptions        @273 :Text; # RANDOMIZE inline options.
+  randomizeAmplitude      @274 :Float64 = 0.0; # RANDOMIZE payload; 0 => omit.
+  useMts                  @275 :Bool = false; # USE_MTS.
+  nabdyZmax               @276 :Int32 = 0; # NABDY_ZMAX payload; 0 => omit.
+  nabdySoft               @277 :Float64 = 0.0; # NABDY_SOFT payload; 0 => omit.
+  nabdyRedistributeAmplitude @278 :Bool = false; # NABDY_REDISTR_AMPLI.
+  nabdyScaleP             @279 :Bool = false; # NABDY_SCALEP.
+  nabdyThermo             @280 :Text; # NABDY_THERMO payload line.
+  noseIonsOptions         @281 :Text; # NOSE IONS inline options.
+  useInStream             @282 :Bool = false; # USE_IN_STREAM.
+  useOutStream            @283 :Bool = false; # USE_OUT_STREAM.
+  useCublas               @284 :Bool = false; # USE_CUBLAS.
+  useCufft                @285 :Bool = false; # USE_CUFFT.
+  blasNStreamsPerDevice   @286 :Int32 = 0; # BLAS_N_STREAMS_PER_DEVICE payload.
+  blasNDevicesPerTask     @287 :Int32 = 0; # BLAS_N_DEVICES_PER_TASK payload.
+  fftNStreamsPerDevice    @288 :Int32 = 0; # FFT_N_STREAMS_PER_DEVICE payload.
+  fftNDevicesPerTask      @289 :Int32 = 0; # FFT_N_DEVICES_PER_TASK payload.
+  useMpiIo                @290 :Bool = false; # USE_MPI_IO.
+  traceOptions            @291 :Text; # TRACE inline options.
+  traceProcedure          @292 :Text; # TRACE_PROCEDURE payload line.
+  traceMaxDepth           @293 :Int32 = 0; # TRACE_MAX_DEPTH payload.
+  traceMaxCalls           @294 :Int32 = 0; # TRACE_MAX_CALLS payload.
+  structureOptions        @295 :Text; # STRUCTURE inline options.
+  structureSelection      @296 :Text; # STRUCTURE SELECT payload lines.
+  wannierNproc            @297 :Int32 = 0; # WANNIER NPROC payload.
+  wannierRelocalizeInScf  @298 :Bool = false; # WANNIER RELOCALIZE_IN_SCF.
+  wannierRecomputeDipoleMatricesEvery @299 :Int32 = 0; # WANNIER RECOMPUTE_DIPOLE_MATRICES_EVERY payload.
+  wannierRelocalizeEvery  @300 :Int32 = 0; # WANNIER RELOCALIZE_EVERY payload.
+  paraUseMpiInPlace       @301 :Bool = false; # PARA_USE_MPI_IN_PLACE.
+  paraBuffSize            @302 :Int32 = 0; # PARA_BUFF_SIZE payload.
+  paraStackBuffSize       @303 :Int32 = 0; # PARA_STACK_BUFF_SIZE payload.
+  cpGroups                @304 :Text; # CP_GROUPS payload line.
+  fileFusionPayload       @305 :Text; # FILE FUSION payload lines.
+  fileMergePayload        @306 :Text; # FILE MERGE payload lines.
+  fileSeparationPayload   @307 :Text; # FILE SEPARATION payload lines.
+  noReset                 @308 :Int32 = 0; # NO_RESET payload.
+  lbfgsNtrust             @309 :Int32 = 0; # LBFGS NTRUST payload; 0 => omit.
+  lbfgsNrestt             @310 :Int32 = 0; # LBFGS NRESTT payload; 0 => omit.
+  lbfgsNtrstr             @311 :Int32 = 0; # LBFGS NTRSTR payload; 0 => omit.
+  lbfgsTrustr             @312 :Float64 = 0.0; # LBFGS TRUSTR payload; 0 => omit.
+  prfoMode                @313 :Int32 = 0; # PRFO MODE payload; 0 => omit.
+  prfoMdlock              @314 :Int32 = 0; # PRFO MDLOCK payload; 0 => omit.
+  prfoTolenv              @315 :Float64 = 0.0; # PRFO TOLENV payload; 0 => omit.
+  prfoTrustp              @316 :Float64 = 0.0; # PRFO TRUSTP payload; 0 => omit.
+  prfoOmin                @317 :Float64 = 0.0; # PRFO OMIN payload; 0 => omit.
+  prfoNsvib               @318 :Int32 = 0; # PRFO NSVIB payload; 0 => omit.
+  prfoCoreAtoms           @319 :List(Int32); # PRFO CORE=<n> atom indexes.
+  prfoNsmaxp              @320 :Int32 = 0; # PRFO NSMAXP payload; 0 => omit.
+  prfoProjectedHessian    @321 :Bool = false; # PRFO PRJHES.
+  prfoDisplacement        @322 :Float64 = 0.0; # PRFO DISPL payload; 0 => omit.
+  prfoHessianType         @323 :Int32 = 0; # PRFO HESSTYPE payload; 0 => omit.
+  lsd                     @324 :Bool = false; # LSD / LOCAL SPIN DENSITY.
+  checkMemory             @325 :Bool = false; # CHECK MEMORY.
+  trotterFactorizationOff @326 :Bool = false; # TROTTER FACTORIZATION OFF.
+  damping                 @327 :Text; # DAMPING payload for ions/electrons/cell.
+  dipoleDynamics          @328 :Bool = false; # DIPOLE DYNAMICS.
+  realSpaceWfn            @329 :Bool = false; # REAL SPACE WFN.
+  noseIonsLocalT0         @330 :Bool = false; # NOSE IONS LOCAL T0.
+  noseIonsLocalThermostatCount @331 :Int32 = 0; # NOSE IONS LOCAL thermostat count.
+  noseIonsLocalThermostats @332 :Text; # NOSE IONS LOCAL thermostat payload lines.
+  noseIonsLocalRangeCount @333 :Int32 = 0; # NOSE IONS LOCAL range count.
+  noseIonsLocalRanges     @334 :Text; # NOSE IONS LOCAL range payload lines.
+  noseIonsCafesGroupCount @335 :Int32 = 0; # NOSE IONS CAFES group count.
+  noseIonsCafesGroups     @336 :Text; # NOSE IONS CAFES group payload lines.
+  trotterFactorization    @337 :Float64 = 0.0; # TROTTER FACTORIZATION payload; 0 => omit.
 }
 
 struct CPMDDftSection {
-  functional    @0 :Text = "BLYP";
-  lsd           @1 :Bool = false;
+  functional    @0 :Text = "BLYP";        # FUNCTIONAL name (LDA, BLYP, PBE, ...).
+  lsd           @1 :Bool = false;         # LSD (spin polarized).
   directives    @2 :List(CPMDDirective);
-  gcCutoff      @3 :Float64 = 0.0;
-  xcDriver      @4 :Text;
-  libxc         @5 :Text;
-  lrKernel      @6 :Text;
-  refunct       @7 :Text;
-  mtsHighFunc   @8 :Text;
-  mtsLowFunc    @9 :Text;
-  hfx           @10 :Bool = false;
-  hfxScreening  @11 :Text;
-  hubbard       @12 :Text;
-  alpha         @13 :Float64 = 0.0;
-  beta          @14 :Float64 = 0.0;
-  oldCode       @15 :Bool = false;
-  newCode       @16 :Bool = false;
-  correlation   @17 :Text;
-  exchange      @18 :Text;
-  becke88       @19 :Bool = false;
+  gcCutoff      @3 :Float64 = 0.0;        # GC-CUTOFF; 0 => omit.
+  xcDriver      @4 :Text;                 # XC_DRIVER.
+  libxc         @5 :Text;                 # LIBXC.
+  lrKernel      @6 :Text;                 # LR KERNEL.
+  refunct       @7 :Text;                 # REFUNCT.
+  mtsHighFunc   @8 :Text;                 # MTS_HIGH_FUNC.
+  mtsLowFunc    @9 :Text;                 # MTS_LOW_FUNC.
+  hfx           @10 :Bool = false;        # HFX.
+  hfxScreening  @11 :Text;                # HFX-SCREENING.
+  hubbard       @12 :Text;                # HUBBARD.
+  alpha         @13 :Float64 = 0.0;       # ALPHA; 0 => omit.
+  beta          @14 :Float64 = 0.0;       # BETA; 0 => omit.
+  oldCode       @15 :Bool = false;        # OLDCODE.
+  newCode       @16 :Bool = false;        # NEWCODE.
+  correlation   @17 :Text;                # CORRELATION.
+  exchange      @18 :Text;                # EXCHANGE.
+  becke88       @19 :Bool = false;        # BECKE88.
 }
 
 struct CPMDAtomsPseudopotential {
-  element @0 :Text;
-  path    @1 :Text;
-  lmax    @2 :Int32 = -1;
+  element @0 :Text;  # Element symbol, e.g. "H".
+  path    @1 :Text;  # Pseudopotential file path or library token.
+  lmax    @2 :Int32 = -1; # Optional LMAX; -1 => omit.
 }
 
 struct CPMDAtomsSection {
   pseudopotentials @0 :List(CPMDAtomsPseudopotential);
+  # Explicit Cartesian coordinates are supplied per step via ForceInput; this
+  # section only carries PP and fixed &ATOMS directives for deck rendering.
   directives       @1 :List(CPMDDirective);
+}
+
+struct CPMDDirectiveSection {
+  directives @0 :List(CPMDDirective); # Keyword/value lines inside a named section.
+  subsections @1 :List(CPMDGenericSection); # Nested NAME ... END NAME blocks.
 }
 
 enum CPMDSectionKind {
@@ -454,6 +1550,27 @@ enum CPMDSectionKind {
   atoms   @4;
   set     @5;
   raw     @6;
+  atom    @7;
+  basis   @8;
+  clas    @9;
+  eam     @10;
+  exte    @11;
+  hardness @12;
+  info    @13;
+  linres  @14;
+  molstates @15;
+  mts     @16;
+  nlcc    @17;
+  path    @18;
+  pimd    @19;
+  potential @20;
+  prop    @21;
+  ptddft  @22;
+  resp    @23;
+  tddft   @24;
+  vdw     @25;
+  vectors @26;
+  wavefunction @27;
 }
 
 struct CPMDInputSection {
@@ -464,30 +1581,52 @@ struct CPMDInputSection {
     dft     @3 :CPMDDftSection;
     atoms   @4 :CPMDAtomsSection;
     set     @5 :CPMDSetDirective;
-    raw     @6 :Text;
+    raw     @6 :Text; # Full &SECTION ... &END block text.
+    atom    @7 :CPMDDirectiveSection;
+    basis   @8 :CPMDDirectiveSection;
+    clas    @9 :CPMDDirectiveSection;
+    eam     @10 :CPMDDirectiveSection;
+    exte    @11 :CPMDDirectiveSection;
+    hardness @12 :CPMDDirectiveSection;
+    info    @13 :CPMDDirectiveSection;
+    linres  @14 :CPMDDirectiveSection;
+    molstates @15 :CPMDDirectiveSection;
+    mts     @16 :CPMDDirectiveSection;
+    nlcc    @17 :CPMDDirectiveSection;
+    path    @18 :CPMDDirectiveSection;
+    pimd    @19 :CPMDDirectiveSection;
+    potential @20 :CPMDDirectiveSection;
+    prop    @21 :CPMDDirectiveSection;
+    ptddft  @22 :CPMDDirectiveSection;
+    resp    @23 :CPMDDirectiveSection;
+    tddft   @24 :CPMDDirectiveSection;
+    vdw     @25 :CPMDDirectiveSection;
+    vectors @26 :CPMDDirectiveSection;
+    wavefunction @27 :CPMDDirectiveSection;
   }
 }
 
+# @struct CPMDParams
+# @brief CPMD-specific knobs (backend arm inside PotentialConfig / rgpot params).
+#
+# Not a standalone config language — only used when the active potential is CPMD.
+# Same fields in/out via Cap'n Proto. Geometry for each evaluation is ForceInput.
 struct CPMDParams {
-  functional    @0 :Text = "BLYP";
-  cutOffRy      @1 :Float64 = 70.0;
-  charge        @2 :Int32 = 0;
-  multiplicity  @3 :Int32 = 1;
-  task          @4 :Text = "gradient";
-  title         @5 :Text = "";
-  memoryMb      @6 :UInt32 = 0;
-  scratchDir    @7 :Text = "";
-  permanentDir  @8 :Text = "";
-  cpmdRoot      @9 :Text = "";
-  enginePath    @10 :Text = "";
-  inputBlocks   @11 :List(Text);
-  inputSections @12 :List(CPMDInputSection);
+  functional   @0 :Text = "BLYP";     # Default DFT functional (also in dft section).
+  cutOffRy     @1 :Float64 = 70.0;    # Plane-wave cutoff in Rydberg.
+  charge       @2 :Int32 = 0;
+  multiplicity @3 :Int32 = 1;         # 2S+1; >1 enables LSD when rendering defaults.
+  task         @4 :Text = "gradient"; # energy | gradient | md | optimize (frontend hint).
+  title        @5 :Text = "";         # Optional comment header in rendered deck.
+  memoryMb     @6 :UInt32 = 0;        # Frontend memory hint; 0 => environment defaults.
+  scratchDir   @7 :Text = "";         # Fallback &CPMD FILEPATH directory.
+  permanentDir @8 :Text = "";         # Preferred &CPMD FILEPATH restart directory.
+  cpmdRoot     @9 :Text = "";         # OpenCPMD source/build tree; empty => env CPMD_ROOT.
+  enginePath   @10 :Text = "";        # Frontend engine selection hint.
+  inputBlocks  @11 :List(Text);       # Raw &SECTION blocks applied before generated ones.
+  inputSections @12 :List(CPMDInputSection); # Structured CPMD input sections.
+  # Long-tail options: use CPMDInputSection.raw, inputBlocks, or set.
 }
-
-# Backend option structs extend here, then add a PotentialConfig union arm:
-#   struct XTBParams { method @0 :Text = "GFN2-xTB"; ... }
-#   struct TBLiteParams { method @0 :Text = "GFN2-xTB"; ... }
-#   struct MetatomicParams { modelPath @0 :Text; device @1 :Text = "cpu"; ... }
 
 # @struct PotentialConfig
 # @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
@@ -498,19 +1637,18 @@ struct CPMDParams {
 # TOML/JSON/YAML option files for backends.
 #
 # Tagged union: exactly one backend's options (or none). Add new arms as new
-# potentials gain runtime knobs (e.g. metatomic @3 :MetatomicParams).
+# potentials gain runtime knobs (e.g. metatomic @2 :MetatomicParams).
 # `calculate` geometry stays on ForceInput; this struct is method/backend setup only.
 struct PotentialConfig {
   union {
     none      @0 :Void;         # No backend-specific options (or no-op configure).
     nwchem    @1 :NWChemParams; # NWChemPot / potserv ... NWChem
-    cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... CPMD
-    # metatomic @3 :MetatomicParams;
+    cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... OpenCPMD
+    # metatomic @3 :MetatomicParams;  # reserved pattern for later
     # xtb       @4 :XTBParams;
     # tblite    @5 :TBLiteParams;
   }
 }
-
 # @interface Potential
 # @brief The RPC interface for remote calculations.
 interface Potential {
@@ -523,4 +1661,44 @@ interface Potential {
   # @param config Backend-tagged options (nwchem, future metatomic/xtb/...).
   # @return ok=false if the arm does not match the server backend or apply failed.
   configure @1 (config :PotentialConfig) -> (ok :Bool, message :Text);
+
+  # @brief Compute only the scalar potential energy for this geometry.
+  # @return PotentialResult.energy in ForceInput.energyUnit.
+  calculateEnergy @2 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute potential energy and force vector for this geometry.
+  # @return PotentialResult.energy and PotentialResult.forces.
+  calculateForces @3 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute a dense Cartesian Hessian for this geometry.
+  # @return PotentialResult.hessian in energyUnit / lengthUnit^2.
+  calculateHessian @4 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute the total electric dipole vector for this geometry.
+  # @return PotentialResult.dipole in atomic units.
+  calculateDipole @5 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute the total traceless electric quadrupole tensor.
+  # @return PotentialResult.quadrupole in atomic units as xx, xy, xz, yy, yz, zz.
+  calculateQuadrupole @6 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute the periodic stress tensor for this geometry.
+  # @return PotentialResult.stress in energyUnit / lengthUnit^3.
+  calculateStress @7 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Optimize this geometry and return final coordinates.
+  # @return PotentialResult.optimizedPos in ForceInput.lengthUnit.
+  calculateOptimize @8 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute harmonic vibrational frequencies and IR intensities.
+  # @return PotentialResult.frequencies in cm^-1 and intensities in atomic units.
+  calculateFrequencies @9 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute the electric polarizability response vector.
+  # @return PotentialResult.polarizability stores NWChem aoresponse:alpha.
+  calculatePolarizability @10 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Compute potential energy and nuclear gradient for this geometry.
+  # @return PotentialResult.energy and PotentialResult.gradient.
+  calculateGradient @11 (fip :ForceInput) -> (result :PotentialResult);
 }
