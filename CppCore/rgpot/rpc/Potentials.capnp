@@ -1099,6 +1099,8 @@ struct NWChemInputStanza {
   constraints     @24 :NWChemConstraintsStanza;
   vib             @25 :NWChemVibStanza;
   bq              @26 :NWChemBqStanza;
+  dplot           @27 :NWChemDplotStanza;
+  esp             @28 :NWChemEspStanza;
 
   enum Kind {
     generic         @0;
@@ -1127,6 +1129,8 @@ struct NWChemInputStanza {
     constraints     @23;
     vib             @24;
     bq              @25;
+    dplot           @26;
+    esp             @27;
   }
 }
 
@@ -1787,6 +1791,11 @@ struct CPMDInputSection {
     vectors @26 :CPMDDirectiveSection;
     wavefunction @27 :CPMDDirectiveSection;
     vdwParams @28 :CPMDVdwSection; # Typed &VDW; supersedes the directive-only vdw arm.
+    propParams @29 :CPMDPropSection;     # Typed &PROP.
+    linresParams @30 :CPMDLinresSection; # Typed &LINRES.
+    pimdParams @31 :CPMDPimdSection;     # Typed &PIMD.
+    pathParams @32 :CPMDPathSection;     # Typed &PATH.
+    tddftParams @33 :CPMDTddftSection;   # Typed &TDDFT.
   }
 }
 
@@ -1868,6 +1877,87 @@ struct MetatomicParams {
     perAtom           @1 :Bool = false;
     explicitGradients @2 :List(Text); # Gradient names, e.g. "positions", "strain".
   }
+}
+
+# @struct NWChemDplotStanza
+# @brief "dplot" block: density/orbital cube output.
+struct NWChemDplotStanza {
+  title       @0 :Text = "";
+  gaussianCube @1 :Text = "";     # gaussian <file> output.
+  civecs      @2 :Text = "";      # TDDFT transition-density source.
+  limitXyz    @3 :List(Float64);  # LimitXYZ extents (6 or 9 values).
+  spin        @4 :Text = "";      # total | alpha | beta | spindens.
+  orbitals    @5 :List(Int32);    # orbitals view list.
+  output      @6 :Text = "";      # output <file>.
+  directives  @7 :List(NWChemDirective);
+}
+
+# @struct NWChemEspStanza
+# @brief "esp" block: ESP / RESP atomic charges.
+struct NWChemEspStanza {
+  recalculate   @0 :Bool = false;
+  rangeFactor   @1 :Float64 = 0.0; # range <f>; 0 => omit.
+  probe         @2 :Float64 = 0.0; # probe <r>; 0 => omit.
+  spacing       @3 :Float64 = 0.0; # spacing <s>; 0 => omit.
+  restrain      @4 :Bool = false;  # RESP restraint.
+  restrainHfree @5 :Bool = false;  # restrain hfree.
+  directives    @6 :List(NWChemDirective);
+}
+
+# ---- Typed CPMD long-tail sections (upgrade from directive-only arms) ----
+
+# @struct CPMDPropSection
+# @brief Typed &PROP: post-SCF property requests.
+struct CPMDPropSection {
+  dipoleMoment   @0 :Bool = false; # DIPOLE MOMENT.
+  localize       @1 :Bool = false; # LOCALIZE (Wannier).
+  polarizability @2 :Bool = false; # POLARIZABILITY.
+  cubecenter     @3 :List(Float64); # CUBECENTER x y z.
+  cubefileDensity @4 :Bool = false; # CUBEFILE DENSITY.
+  cubefileOrbitals @5 :List(Int32); # CUBEFILE ORBITALS list.
+  chargesGaussian @6 :Bool = false; # CHARGES.
+  directives     @7 :List(CPMDDirective);
+}
+
+# @struct CPMDLinresSection
+# @brief Typed &LINRES: linear-response convergence controls.
+struct CPMDLinresSection {
+  convergence @0 :Float64 = 0.0; # CONVERGENCE; 0 => omit.
+  maxSteps    @1 :Int32 = 0;     # MAXSTEP; 0 => omit.
+  hthrs       @2 :Float64 = 0.0; # HTHRS preconditioner threshold; 0 => omit.
+  directives  @3 :List(CPMDDirective);
+}
+
+# @struct CPMDPimdSection
+# @brief Typed &PIMD: path-integral MD controls.
+struct CPMDPimdSection {
+  replicas    @0 :Int32 = 0;     # TROTTER DIMENSION / replica count; 0 => omit.
+  facmass     @1 :Float64 = 0.0; # FACMASS; 0 => omit.
+  centroidDynamics @2 :Bool = false; # CENTROID DYNAMICS.
+  normalModes @3 :Bool = false;  # NORMAL MODES transform.
+  staging     @4 :Bool = false;  # STAGING transform.
+  directives  @5 :List(CPMDDirective);
+}
+
+# @struct CPMDPathSection
+# @brief Typed &PATH: NEB / string minimum-energy-path controls.
+struct CPMDPathSection {
+  replicaNumber @0 :Int32 = 0;    # REPLICA NUMBER; 0 => omit.
+  nebSpring     @1 :Float64 = 0.0; # NEB spring constant via directives; 0 => omit.
+  factor        @2 :Float64 = 0.0; # FACTOR step scaling; 0 => omit.
+  nloop         @3 :Int32 = 0;     # NLOOP path iterations; 0 => omit.
+  alpha         @4 :Float64 = 0.0; # ALPHA mixing; 0 => omit.
+  directives    @5 :List(CPMDDirective);
+}
+
+# @struct CPMDTddftSection
+# @brief Typed &TDDFT: excited-state controls.
+struct CPMDTddftSection {
+  states       @0 :Int32 = 0;     # STATES n; 0 => omit.
+  tammDancoff  @1 :Bool = false;  # TAMM-DANCOFF.
+  diagonalizer @2 :Text = "";     # DIAGONALIZER token (DAVIDSON, ...).
+  convergence  @3 :Float64 = 0.0; # CONVERGENCE; 0 => omit.
+  directives   @4 :List(CPMDDirective);
 }
 
 # @struct PotentialConfig
