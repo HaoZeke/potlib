@@ -140,6 +140,7 @@ struct NWChemDftStanza {
   vectorsOutput @14 :Text = "";              # Promote dft:output vectors on embed.
   gridSpec      @15 :NWChemDftGridSpec;      # Logical multi-token/preset grid (typed; text on embed).
   disp          @16 :NWChemDftDisp;          # Grimme dispersion: emit "disp vdw <n> ..." tokens.
+  cdft          @17 :NWChemCdftSpec;         # Constrained DFT lines.
 }
 
 # @struct NWChemDftDisp
@@ -1104,6 +1105,7 @@ struct NWChemInputStanza {
   qmd             @29 :NWChemQmdStanza;
   raman           @30 :NWChemRamanStanza;
   fon             @31 :NWChemFonStanza;
+  neb             @32 :NWChemNebStanza;
 
   enum Kind {
     generic         @0;
@@ -1137,6 +1139,7 @@ struct NWChemInputStanza {
     qmd             @28;
     raman           @29;
     fon             @30;
+    neb             @31;
   }
 }
 
@@ -2031,6 +2034,60 @@ struct CPMDVectorsSection {
   newOrtho   @0 :Bool = false; # NEWORTHO.
   overlap    @1 :Bool = false; # OVERLAP diagnostics.
   directives @2 :List(CPMDDirective);
+}
+
+# @struct NWChemNebStanza
+# @brief "neb" block; keywords mined from optim/neb/neb_input.F.
+struct NWChemNebStanza {
+  nbeads     @0 :Int32 = 0;     # neb:nbeads; 0 => omit.
+  kbeads     @1 :Float64 = 0.0; # neb:kbeads spring constant; 0 => omit.
+  maxiter    @2 :Int32 = 0;     # neb:steps; 0 => omit.
+  stepsize   @3 :Float64 = 0.0; # neb:stepsize; 0 => omit.
+  trust      @4 :Float64 = 0.0; # neb:trust radius; 0 => omit.
+  nhist      @5 :Int32 = 0;     # neb:m history depth; 0 => omit.
+  algorithm  @6 :Int32 = 0;     # neb:algorithm; 0 => omit.
+  reset      @7 :Bool = false;  # neb:nebnew restart reset.
+  convergence @8 :Convergence = unspecified; # loose | default | tight presets.
+  gmax       @9 :Float64 = 0.0;  # Explicit neb:gmax; 0 => omit.
+  grms       @10 :Float64 = 0.0; # neb:grms.
+  xmax       @11 :Float64 = 0.0; # neb:xmax.
+  xrms       @12 :Float64 = 0.0; # neb:xrms.
+  directives @13 :List(NWChemDirective);
+  enum Convergence {
+    unspecified @0;
+    loose       @1;
+    default     @2;
+    tight       @3;
+  }
+}
+
+# @struct NWChemCdftConstraint
+# @brief One dft-block cdft line: atom ranges, charge|spin, target value.
+struct NWChemCdftConstraint {
+  firstAtomStart  @0 :Int32;
+  firstAtomEnd    @1 :Int32;
+  secondAtomStart @2 :Int32 = 0; # 0 => single-range constraint.
+  secondAtomEnd   @3 :Int32 = 0;
+  kind            @4 :Kind = charge;
+  value           @5 :Float64;
+  enum Kind {
+    charge @0;
+    spin   @1;
+  }
+}
+
+# @struct NWChemCdftSpec
+# @brief Constrained-DFT controls inside the dft block (cdft_inp.F).
+struct NWChemCdftSpec {
+  constraints @0 :List(NWChemCdftConstraint);
+  convergence @1 :Float64 = 0.0; # dft:dl_conv; 0 => default 1e-6.
+  population  @2 :Population = unspecified; # dft:ipop scheme.
+  enum Population {
+    unspecified @0;
+    becke       @1;
+    mulliken    @2;
+    lowdin      @3;
+  }
 }
 
 # @struct PotentialConfig
