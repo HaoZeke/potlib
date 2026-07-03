@@ -1120,6 +1120,8 @@ struct NWChemInputStanza {
   etrans          @35 :NWChemEtransStanza;
   rism            @36 :NWChemRismStanza;
   dimQm           @37 :NWChemDimQmStanza;
+  metadynamics    @38 :NWChemMetadynamicsStanza;
+  cellOptimize    @39 :NWChemCellOptimizeStanza;
 
   enum Kind {
     generic         @0;
@@ -1159,6 +1161,8 @@ struct NWChemInputStanza {
     etrans          @34;
     rism            @35;
     dimQm           @36;
+    metadynamics    @37;
+    cellOptimize    @38;
   }
 }
 
@@ -2079,6 +2083,61 @@ struct NWChemNebStanza {
     loose       @1;
     default     @2;
     tight       @3;
+  }
+}
+
+# @struct NWChemMetadynamicsCv
+# @brief One collective variable line inside the nwpw metadynamics block
+# (metadynamics_input.F). bond/angle/dihedral take bare atom indices; the
+# coordination number takes two index groups plus n/m/r0 switching function.
+struct NWChemMetadynamicsCv {
+  kind      @0 :Kind = bond;
+  atoms     @1 :List(Int32);   # bond: 2, angle: 3, dihedral: 4 indices.
+  index1    @2 :List(Int32);   # coordNumber group 1.
+  index2    @3 :List(Int32);   # coordNumber group 2.
+  weight    @4 :Float64 = 0.0; # w hill height (au); 0 => engine default 5e-5.
+  sigma     @5 :Float64 = 0.0; # hill width (au); 0 => default 0.1.
+  rangeLow  @6 :Float64 = 0.0; # "range <lo> <hi>"; both 0 => omit.
+  rangeHigh @7 :Float64 = 0.0;
+  nrange    @8 :Int32 = 0;     # grid points; 0 => default 501.
+  n         @9 :Float64 = 0.0; # coordNumber exponent; 0 => default 6.
+  m         @10 :Float64 = 0.0; # 0 => default 12.
+  r0        @11 :Float64 = 0.0; # switching radius; 0 => default 3.0.
+  enum Kind {
+    bond        @0;
+    angle       @1;
+    dihedral    @2;
+    coordNumber @3;
+  }
+}
+
+# @struct NWChemMetadynamicsStanza
+# @brief nwpw metadynamics block; renders nested inside "nwpw ... end".
+struct NWChemMetadynamicsStanza {
+  cvs               @0 :List(NWChemMetadynamicsCv);
+  tempered          @1 :Bool = false; # well-tempered variant.
+  boundary          @2 :Float64 = 0.0; # boundary potential; 0 => omit.
+  potentialFilename @3 :Text = "";
+  printShift        @4 :Int32 = 0;
+  directives        @5 :List(NWChemDirective); # equation/bondings etc. stay literal.
+}
+
+# @struct NWChemCellOptimizeStanza
+# @brief nwpw cell_optimize block (cell_optimize_input.F); renders nested
+# inside "nwpw ... end".
+struct NWChemCellOptimizeStanza {
+  cellName          @0 :Text = "";   # cell_optimize:cell_name; "" => cell_default.
+  strategy          @1 :Strategy = unspecified; # "optimize all|lattice|lattice_vectors".
+  optimizeLattice   @2 :List(Text);  # lat_a lat_b lat_c alpha beta gamma subset.
+  optimizeLatticeVectors @3 :List(Text); # a11..a33 subset.
+  latticeTolerances @4 :List(Float64);   # up to 6 values.
+  cycles            @5 :Int32 = 0;   # 0 => engine default 10.
+  directives        @6 :List(NWChemDirective);
+  enum Strategy {
+    unspecified    @0;
+    all            @1;
+    lattice        @2;
+    latticeVectors @3;
   }
 }
 
