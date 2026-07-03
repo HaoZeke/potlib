@@ -1628,6 +1628,40 @@ struct CPMDParams {
   # Long-tail options: use CPMDInputSection.raw, inputBlocks, or set.
 }
 
+# @struct CommonMethodSpec
+# @brief NOMAD-metainfo-aligned normalized method overlay (the thin Esperanto).
+#
+# Field names follow NOMAD's normalized method quantities (xc functional as
+# libxc identifiers, Monkhorst-Pack k mesh, smearing kind/width, SCF
+# thresholds). This struct lowers ONE-WAY into the native backend arm before
+# it is applied; any knob the native arm also sets wins. It never replaces the
+# arms -- the long tail of code-specific options stays code-native.
+struct CommonMethodSpec {
+  xcFunctionals @0 :List(Text);        # libxc names ("GGA_X_PBE", "GGA_C_PBE") or composites ("PBE", "B3LYP").
+  basisSet      @1 :Text = "";         # Gaussian basis name, or "planewave".
+  planewaveCutoffEv @2 :Float64 = 0.0; # >0 configures the plane-wave cutoff (eV).
+  charge        @3 :Int32 = 0;
+  spinMultiplicity @4 :Int32 = 0;      # 2S+1; 0 = unset (backend default).
+  scfEnergyToleranceEv @5 :Float64 = 0.0; # SCF energy-change convergence (eV); 0 = unset.
+  scfMaxIterations @6 :Int32 = 0;      # 0 = unset.
+  kMesh @7 :List(Int32);               # Monkhorst-Pack divisions [3]; empty = molecular/Gamma.
+  smearing @8 :Smearing;
+  vanDerWaalsMethod @9 :Text = "";     # e.g. "DFT-D3", "DFT-D3(BJ)".
+  relativityMethod  @10 :Text = "";    # e.g. "ZORA", "DKH".
+
+  struct Smearing {
+    kind    @0 :Kind = none;
+    widthEv @1 :Float64 = 0.0;
+    enum Kind {
+      none             @0;
+      fermi            @1;
+      gaussian         @2;
+      methfesselPaxton @3;
+    }
+  }
+}
+
+
 # @struct PotentialConfig
 # @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
 #
@@ -1644,10 +1678,12 @@ struct PotentialConfig {
     none      @0 :Void;         # No backend-specific options (or no-op configure).
     nwchem    @1 :NWChemParams; # NWChemPot / potserv ... NWChem
     cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... OpenCPMD
-    # metatomic @3 :MetatomicParams;  # reserved pattern for later
-    # xtb       @4 :XTBParams;
-    # tblite    @5 :TBLiteParams;
+    # metatomic @4 :MetatomicParams;  # reserved pattern for later
+    # xtb       @5 :XTBParams;
+    # tblite    @6 :TBLiteParams;
   }
+  # Normalized overlay applied BEFORE the native arm; native settings win.
+  common @3 :CommonMethodSpec;
 }
 # @interface Potential
 # @brief The RPC interface for remote calculations.
