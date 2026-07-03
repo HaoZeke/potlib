@@ -1116,6 +1116,8 @@ struct NWChemInputStanza {
   fon             @31 :NWChemFonStanza;
   neb             @32 :NWChemNebStanza;
   stringMethod    @33 :NWChemStringStanza;
+  gw              @34 :NWChemGwStanza;
+  etrans          @35 :NWChemEtransStanza;
 
   enum Kind {
     generic         @0;
@@ -1151,6 +1153,8 @@ struct NWChemInputStanza {
     fon             @30;
     neb             @31;
     stringMethod    @32;
+    gw              @33;
+    etrans          @34;
   }
 }
 
@@ -1864,6 +1868,8 @@ struct CommonMethodSpec {
   smearing @8 :Smearing;
   vanDerWaalsMethod @9 :Text = "";     # e.g. "DFT-D3", "DFT-D3(BJ)".
   relativityMethod  @10 :Text = "";    # e.g. "ZORA", "DKH".
+  vanDerWaalsS6     @11 :Float64 = 0.0; # Global dispersion scaling s6; 0 = engine default.
+                                        # Lowers to dft:vdw (NWChem) / vdwParams.s6 (CPMD).
 
   struct Smearing {
     kind    @0 :Kind = none;
@@ -2070,6 +2076,51 @@ struct NWChemNebStanza {
     default     @2;
     tight       @3;
   }
+}
+
+# @struct NWChemGwStanza
+# @brief Molecular GW block; grammar and gw:* RTDB keys from gwmol/gw_input.F.
+struct NWChemGwStanza {
+  evgw       @0 :Bool = false;   # gw:evgw eigenvalue self-consistency.
+  evgw0      @1 :Bool = false;   # gw:evgw0 (G updated, W0 frozen).
+  eviter     @2 :Int32 = 0;      # gw:eviter; 0 => omit count.
+  method     @3 :Method = unspecified; # gw:cdgw contour deformation vs analytic.
+  ngl        @4 :Int32 = 0;      # gw:ngl Gauss-Legendre grid points (cdgw).
+  solver     @5 :Solver = unspecified; # gw:graph vs gw:newton root search.
+  qpiter     @6 :Int32 = 0;      # gw:qpiter Newton iterations.
+  thresholdEv @7 :Float64 = 0.0; # gw:threshold; rendered "convergence <x> ev".
+  occAlpha   @8 :Int32 = 0;      # gw:noqp_alpha states alpha occ.
+  virAlpha   @9 :Int32 = 0;      # gw:nvqp_alpha states alpha vir.
+  occBeta    @10 :Int32 = 0;     # gw:noqp_beta.
+  virBeta    @11 :Int32 = 0;     # gw:nvqp_beta.
+  first      @12 :Int32 = 0;     # gw:first orbital counting offset.
+  ncap       @13 :Bool = false;  # gw:ncap modified eigenvalue start.
+  eta        @14 :Float64 = 0.0; # gw:eta imaginary infinitesimal.
+  rpa        @15 :Bool = false;  # gw:rpa correlation energy.
+  diag       @16 :Bool = false;  # gw:diag invert by diagonalization.
+  core       @17 :Bool = false;  # gw:core count from core upwards.
+  directives @18 :List(NWChemDirective);
+  enum Method {
+    unspecified @0;
+    cdgw        @1;
+    analytic    @2;
+  }
+  enum Solver {
+    unspecified @0;
+    graph       @1;
+    newton      @2;
+  }
+}
+
+# @struct NWChemEtransStanza
+# @brief Electron-transfer coupling block; et:* RTDB keys from etrans/et_input.F.
+struct NWChemEtransStanza {
+  tol2e      @0 :Float64 = 0.0;  # et:tol2e two-electron screening threshold.
+  fock       @1 :NWChemToggle = unspecified; # fock vs nofock (et:method_2e).
+  fmo        @2 :Bool = false;   # et:fmo fragment MO coupling.
+  vectorsReactant @3 :Text = ""; # "vectors <reactant.movecs> <product.movecs>".
+  vectorsProduct  @4 :Text = "";
+  directives @5 :List(NWChemDirective);
 }
 
 # @struct NWChemStringStanza
