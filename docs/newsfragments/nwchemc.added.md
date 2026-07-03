@@ -1,1 +1,0 @@
-NWChemPot integrates the split nwchemc C ABI: always-built frontend, `dlopen` of `libnwchemc` (or CI `nwchemc_fake_engine`), Cap'n Proto `NWChemParams` / `PotentialConfig.nwchem`, and `potserv <port> NWChem`. Set `NWCHEMC_LIBRARY` or `RGPOT_NWCHEMC_ENGINE` / `RGPOT_NWCHEM_ENGINE` for the engine path.

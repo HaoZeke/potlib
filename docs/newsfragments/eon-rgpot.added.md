@@ -1,1 +1,1 @@
-Scaffold documentation for an eOn potential over rgpot RPC (CPMD BLYP and NWChem via potserv, vs SocketNWChem benchmarking). Implementation lands on `feat/eon-rgpot-potential`.
+eOn integration: eOn ships an in-process `RgpotPot` potential (`-Dwith_rgpot=true`) that consumes rgpot's `NWChemPot` / `CPMDPot` frontends as a Meson subproject and `dlopen`s `libnwchemc` / `libcpmdc` directly, with `potserv` remaining available for out-of-process RPC. See `docs/orgmode/howto/eon-rgpot.org`.

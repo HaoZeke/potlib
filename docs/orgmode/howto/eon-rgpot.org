@@ -1,46 +1,48 @@
-#+TITLE: eOn Potentials Over rgpot RPC
+#+TITLE: eOn Potentials Over rgpot
 #+OPTIONS: toc:nil todo:nil num:nil author:nil title:nil
 #+STARTUP: content
 
-* eOn Potentials Over rgpot RPC
+* eOn Potentials Over rgpot
 
-This branch tracks the **eOn ↔ rgpot** integration: an eOn-side potential that
-drives **potserv** (or an in-process bridge) so eOn can run **CPMD** (e.g. BLYP)
-and **NWChem** through the Cap'n Proto =Potential= interface instead of legacy
-sockets where that is desirable.
+The **eOn ↔ rgpot** integration gives eOn access to rgpot's quantum-chemistry
+backends (**NWChem** via =nwchemc=, **CPMD** e.g. BLYP via =cpmdc=) through two
+independent roles:
 
-rgpot already exposes the backends; eOn must implement the client.
+- **In-process (shipped in eOn):** eOn's =RgpotPot= (=-Dwith_rgpot=true=) links
+rgpot's =NWChemPot= / =CPMDPot= frontends as a Meson subproject and =dlopen=s
+the engine libraries directly. No sockets, no potserv. Configured through the
+eOn =[RgpotPot]= INI section (=backend=, =basis=, =theory=, =scf_type=,
+=functional=, =charge=, =multiplicity=, =engine_library=, ...).
+- **Out-of-process RPC (this repo):** =potserv <port> NWChem|CPMD= serves the
+Cap'n Proto =Potential= interface for any client; eOn can also act as an RPC
+*server* via =eonclient --serve= (=-Dwith_serve=true=).
 
-**Status:** scaffold / design only on this branch.
-Engine builds live in =nwchemc= / =cpmdc=; rgpot frontends =dlopen= them.
-
-**Non-goals for the first landing:** rewriting eOn's SocketNWChem internals
-beyond a comparison benchmark; GPU/MPI production NWChem in CI.
+Engine builds live in =nwchemc= / =cpmdc=; rgpot frontends =dlopen= them at
+runtime in both roles.
 
 * Why This Shape
 
 - =configure(PotentialConfig)= once per method (NWChemParams / CPMDParams).
 - =calculate(ForceInput)= per geometry (positions, atomic numbers, cell, units).
-- Units on the wire (=lengthUnit= / =energyUnit=); eOn should negotiate Å + eV
-unless the eOn pot layer converts explicitly.
+- Units on the wire (=lengthUnit= / =energyUnit=); eOn's =RgpotPot= converts
+Hartree → eV and Hartree/bohr → eV/Å at the boundary.
 - Engines are optional at build time: CI uses fake =libnwchemc= / =libcpmdc=;
 production sets =NWCHEMC_LIBRARY= / =CPMDC_LIBRARY= (or aliases).
 
-* Target Work Items
+* Landed Work Items
 
-1. **eOn potential class** (in the eOn tree, not necessarily this repo): Cap'n
-Proto client to =potserv= (or shared =rgpot-core= / C bridge if in-process is
-preferred).
-Mirror =tests/nwchem_params.py= / =tests/cpmd_params.py= for configure payloads.
-2. **CPMD BLYP example** in eOn: small system, =potserv <port> CPMD= with real
-=libcpmdc=, =PotentialConfig.cpmd= (functional BLYP, task gradient / energy
-as required).
-3. **NWChem path:** same pot with =NWChem= backend; compare wall time and setup
-cost to eOn **SocketNWChem** on a fixed deck class.
-4. **rgpot ergonomics** (this repo, as needed while implementing 1--3): docs,
-example scripts under =scripts/= or =tests/=, any missing configure fields
-discovered during eOn bring-up, potctl notes for CI stress with =NWChem= /
-=CPMD= names.
+1. **eOn potential class** (eOn tree): =client/potentials/Rgpot/= —
+=RgpotPot= (eOn =Potential= subclass) over an opaque =RGPotEngine= TU that
+isolates rgpot / Cap'n Proto headers from eOn's own =Potential= type.
+2. **CPMD BLYP example** (eOn tree): =examples/rgpot_cpmd_blyp/= with the
+in-process =[RgpotPot]= configuration.
+3. **NWChem comparison** (eOn tree): =scripts/bench_rgpot_vs_socket_forces.sh=
+and =scripts/rgpot_nwchem_vs_socket.sh= compare =RgpotPot= against eOn's
+=SocketNWChem= on a fixed deck class.
+4. **rgpot ergonomics** (this repo): potentials-schema v1.5.0 parity (typed
+NWChem/CPMD arms, metatomic outputs surface), schema-sync CI gate, and the
+in-process CPMD timing harness
+(=scripts/cpmd_inprocess_vs_subprocess_timing.sh=).
 
 * Operator Cheatsheet (rgpot side)
 
@@ -64,4 +66,5 @@ See =CppCore/rgpot/NWChemPot/README.md=, =CppCore/rgpot/CPMDPot/README.md=, and
 - =docs/orgmode/howto/eindir-anneal.org= — minimizers via embedded eindir
 objective in =rgpot-core= (orthogonal to eOn's own optimizers, but shares the
 potential energy API story).
-- Branch =feat/eon-rgpot-potential= / draft PR for implementation commits.
+- eOn user guide pages =rgpot_pot.md= / =rgpot_integration.md= (eOn tree) for
+the consumer-side documentation.

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0](https://github.com/OmniPotentRPC/rgpot/tree/2.0.0) - 2026-06-26
 
+> Channel note: `v2.0.0` was prepared on `main` but never tagged or published;
+> the content below first ships in `v2.1.0`.
+
 ### Added
 
 - NWChemPot backend: stable message-based C ABI (`nwchem_c_abi.h`), always-built frontend with `dlopen` of optional `libnwchemc`, stub ABI for CI without NWChem, Cap'n Proto `NWChemParams`/`configure @1`, and `potserv ... NWChem`.
