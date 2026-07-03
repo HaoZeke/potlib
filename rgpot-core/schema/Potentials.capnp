@@ -1846,6 +1846,19 @@ struct CommonMethodSpec {
 }
 
 
+# @struct MetatomicParams
+# @brief Metatomic (torch ML potential) backend arm, mirroring rgpot's
+# MetatomicConfig so the model selection travels on the shared wire instead of
+# rgpot-side ad-hoc config. lengthUnit/energyUnit stay on ForceInput.
+struct MetatomicParams {
+  modelPath            @0 :Text;            # Exported metatomic-torch model (.pt).
+  device               @1 :Text = "cpu";    # torch device string, e.g. "cuda:0".
+  extensionsDirectory  @2 :Text = "";       # TorchScript extensions dir.
+  checkConsistency     @3 :Bool = false;    # metatomic consistency checks.
+  uncertaintyThreshold @4 :Float64 = -1.0;  # <0 disables uncertainty gating.
+  dtypeOverride        @5 :Text = "";       # e.g. "float32"; empty => model dtype.
+}
+
 # @struct PotentialConfig
 # @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
 #
@@ -1862,7 +1875,7 @@ struct PotentialConfig {
     none      @0 :Void;         # No backend-specific options (or no-op configure).
     nwchem    @1 :NWChemParams; # NWChemPot / potserv ... NWChem
     cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... OpenCPMD
-    # metatomic @4 :MetatomicParams;  # reserved pattern for later
+    metatomic @4 :MetatomicParams; # MetatomicPot (torch ML models)
     # xtb       @5 :XTBParams;
     # tblite    @6 :TBLiteParams;
   }
