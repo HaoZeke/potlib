@@ -1122,6 +1122,8 @@ struct NWChemInputStanza {
   dimQm           @37 :NWChemDimQmStanza;
   metadynamics    @38 :NWChemMetadynamicsStanza;
   cellOptimize    @39 :NWChemCellOptimizeStanza;
+  mepgs           @40 :NWChemMepgsStanza;
+  tropt           @41 :NWChemTroptStanza;
 
   enum Kind {
     generic         @0;
@@ -1163,6 +1165,8 @@ struct NWChemInputStanza {
     dimQm           @36;
     metadynamics    @37;
     cellOptimize    @38;
+    mepgs           @39;
+    tropt           @40;
   }
 }
 
@@ -2078,6 +2082,59 @@ struct NWChemNebStanza {
   xmax       @11 :Float64 = 0.0; # neb:xmax.
   xrms       @12 :Float64 = 0.0; # neb:xrms.
   directives @13 :List(NWChemDirective);
+  enum Convergence {
+    unspecified @0;
+    loose       @1;
+    default     @2;
+    tight       @3;
+  }
+}
+
+# @struct NWChemMepgsStanza
+# @brief Minimum-energy-path Gonzalez-Schlegel IRC block; mepgs:*/gsopt:*
+# RTDB keys from optim/mepgs/mepgs_input.F.
+struct NWChemMepgsStanza {
+  stride     @0 :Float64 = 0.0; # mepgs:stride step along the IRC; 0 => omit.
+  maxmep     @1 :Int32 = 0;     # mepgs:nircopt IRC points; 0 => omit.
+  maxiter    @2 :Int32 = 0;     # gsopt:nptopt per-point optimizer steps.
+  inhess     @3 :Int32 = 0;     # mepgs:inhess initial hessian source.
+  evib       @4 :Float64 = 0.0; # mepgs:evib vibrational energy step.
+  direction  @5 :Direction = both; # forward/backward selection.
+  opttol     @6 :Float64 = 0.0; # gsopt:opt_tol convergence.
+  eprec      @7 :Float64 = 0.0; # gsopt:eprec energy precision.
+  xyz        @8 :Bool = false;  # write xyz trajectory files.
+  mswg       @9 :Bool = false;  # ircgs:mswg mass-weighted coordinates.
+  directives @10 :List(NWChemDirective);
+  enum Direction {
+    both     @0;
+    forward  @1;
+    backward @2;
+  }
+}
+
+# @struct NWChemTroptStanza
+# @brief Trust-region optimizer block; tropt:* RTDB keys from
+# optim/tropt/tropt_input.F.
+struct NWChemTroptStanza {
+  opttol     @0 :Float64 = 0.0;  # tropt:opt_tol.
+  eprec      @1 :Float64 = 0.0;  # tropt:eprec.
+  trust      @2 :Float64 = 0.0;  # tropt:trust radius.
+  maxiter    @3 :Int32 = 0;      # tropt:nptopt.
+  inhess     @4 :Int32 = 0;      # tropt:inhess.
+  lbfgs      @5 :Bool = false;   # tropt:lbfgs limited-memory update.
+  mh         @6 :Int32 = 0;      # tropt:mh lbfgs history depth.
+  linopt     @7 :Int32 = 0;      # tropt:linopt line-search mode.
+  qstep      @8 :NWChemToggle = unspecified; # qstep/noqstep quadratic step.
+  moddir     @9 :Int32 = 0;      # tropt:moddir mode to follow (saddle).
+  modsad     @10 :Int32 = 0;     # tropt:modsad saddle mode count.
+  redoautoz  @11 :Bool = false;  # tropt:redoautoz rebuild internals.
+  convergence @12 :Convergence = unspecified; # loose/default/tight presets.
+  gmax       @13 :Float64 = 0.0; # explicit tropt:gmax_tol.
+  grms       @14 :Float64 = 0.0; # tropt:grms_tol.
+  xmax       @15 :Float64 = 0.0; # tropt:xmax_tol.
+  xrms       @16 :Float64 = 0.0; # tropt:xrms_tol.
+  xyz        @17 :Bool = false;  # write xyz per step.
+  directives @18 :List(NWChemDirective);
   enum Convergence {
     unspecified @0;
     loose       @1;
