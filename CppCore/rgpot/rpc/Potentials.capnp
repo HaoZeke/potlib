@@ -1101,6 +1101,9 @@ struct NWChemInputStanza {
   bq              @26 :NWChemBqStanza;
   dplot           @27 :NWChemDplotStanza;
   esp             @28 :NWChemEspStanza;
+  qmd             @29 :NWChemQmdStanza;
+  raman           @30 :NWChemRamanStanza;
+  fon             @31 :NWChemFonStanza;
 
   enum Kind {
     generic         @0;
@@ -1131,6 +1134,9 @@ struct NWChemInputStanza {
     bq              @25;
     dplot           @26;
     esp             @27;
+    qmd             @28;
+    raman           @29;
+    fon             @30;
   }
 }
 
@@ -1796,6 +1802,9 @@ struct CPMDInputSection {
     pimdParams @31 :CPMDPimdSection;     # Typed &PIMD.
     pathParams @32 :CPMDPathSection;     # Typed &PATH.
     tddftParams @33 :CPMDTddftSection;   # Typed &TDDFT.
+    respParams @34 :CPMDRespSection;     # Typed &RESP.
+    exteParams @35 :CPMDExteSection;     # Typed &EXTE.
+    vectorsParams @36 :CPMDVectorsSection; # Typed &VECTORS.
   }
 }
 
@@ -1958,6 +1967,70 @@ struct CPMDTddftSection {
   diagonalizer @2 :Text = "";     # DIAGONALIZER token (DAVIDSON, ...).
   convergence  @3 :Float64 = 0.0; # CONVERGENCE; 0 => omit.
   directives   @4 :List(CPMDDirective);
+}
+
+# @struct NWChemQmdStanza
+# @brief "qmd" block: Born-Oppenheimer molecular dynamics controls.
+struct NWChemQmdStanza {
+  nstepNucl   @0 :Int32 = 0;     # nstep_nucl; 0 => omit.
+  dtNucl      @1 :Float64 = 0.0; # dt_nucl (au); 0 => omit.
+  targTemp    @2 :Float64 = 0.0; # targ_temp (K); 0 => omit.
+  thermostat  @3 :Text = "";     # none|berendsen|langevin|svr|rescale.
+  thermostatParameter @4 :Float64 = 0.0; # tau / friction; 0 => omit.
+  randomSeed  @5 :Int32 = 0;     # rand_seed; 0 => omit.
+  comStep     @6 :Int32 = 0;     # com_step; 0 => omit.
+  printXyz    @7 :Int32 = 0;     # print_xyz cadence; 0 => omit.
+  linear      @8 :Bool = false;  # linear molecule flag.
+  directives  @9 :List(NWChemDirective);
+}
+
+# @struct NWChemRamanStanza
+# @brief "raman" block: Raman intensity controls (with task dft raman).
+struct NWChemRamanStanza {
+  normalMode  @0 :Bool = false;   # NORMAL vs resonance.
+  dynamic     @1 :Bool = false;   # DYNAMIC polarizability mode.
+  low         @2 :Float64 = 0.0;  # LOW frequency bound (cm-1); 0 => omit.
+  high        @3 :Float64 = 0.0;  # HIGH bound; 0 => omit.
+  steps       @4 :Int32 = 0;      # STEPS in the range; 0 => omit.
+  fieldFrequency @5 :Float64 = 0.0; # Incident field frequency (au); 0 => omit.
+  directives  @6 :List(NWChemDirective);
+}
+
+# @struct NWChemFonStanza
+# @brief Fractional occupation (fon) controls promoted through dft.
+struct NWChemFonStanza {
+  partial     @0 :Int32 = 0;     # Number of partially occupied orbitals.
+  electrons   @1 :Float64 = 0.0; # Electrons distributed over the partial set.
+  filled      @2 :Int32 = 0;     # Fully occupied orbitals below the set.
+  alphaOnly   @3 :Bool = false;  # Apply to alpha spin channel only.
+  temperature @4 :Float64 = 0.0; # Electronic temperature (K); 0 => omit.
+  directives  @5 :List(NWChemDirective);
+}
+
+# ---- CPMD typed long-tail batch 3 ----
+
+# @struct CPMDRespSection
+# @brief Typed &RESP: restrained electrostatic potential charges.
+struct CPMDRespSection {
+  restraintStrength @0 :Float64 = 0.0; # WEIGHT; 0 => omit.
+  hyperbolic        @1 :Bool = false;  # HYPERBOLIC restraint form.
+  tightness         @2 :Float64 = 0.0; # BETA tightness; 0 => omit.
+  directives        @3 :List(CPMDDirective);
+}
+
+# @struct CPMDExteSection
+# @brief Typed &EXTE: external field / interface controls.
+struct CPMDExteSection {
+  externalField @0 :List(Float64); # EFIELD vector components.
+  directives    @1 :List(CPMDDirective);
+}
+
+# @struct CPMDVectorsSection
+# @brief Typed &VECTORS: initial-guess and orthogonalization controls.
+struct CPMDVectorsSection {
+  newOrtho   @0 :Bool = false; # NEWORTHO.
+  overlap    @1 :Bool = false; # OVERLAP diagnostics.
+  directives @2 :List(CPMDDirective);
 }
 
 # @struct PotentialConfig
