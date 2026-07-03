@@ -1044,6 +1044,15 @@ struct NWChemTddftStanza {
   algorithm    @10 :Int32 = 0;   # Promote tddft:algorithm when >0.
   energyCutoff @11 :Float64 = 0.0; # Promote tddft:ecut + tddft:lecut when >0.
   directives   @12 :List(NWChemDirective);
+  # v1.8.0 deepening; keywords from tddft_input.F.
+  cdspectrum   @13 :Bool = false;  # tddft:cdspectrum rotatory strengths.
+  giao         @14 :Bool = false;  # tddft:giao gauge-including atomic orbitals.
+  velocity     @15 :Bool = false;  # tddft:velocity velocity-gauge dipoles.
+  civecs       @16 :Bool = false;  # tddft:lcivecs write CI vectors.
+  transden     @17 :Bool = false;  # tddft:ltransden transition densities.
+  ewinLow      @18 :Float64 = 0.0; # "ewin <low> <high>" energy window (Ha).
+  ewinHigh     @19 :Float64 = 0.0;
+  gradRoots    @20 :List(Int32);   # "grad ... root <n...> end" excited-state gradients.
 }
 
 # @struct NWChemBasisStanza
@@ -1106,6 +1115,7 @@ struct NWChemInputStanza {
   raman           @30 :NWChemRamanStanza;
   fon             @31 :NWChemFonStanza;
   neb             @32 :NWChemNebStanza;
+  stringMethod    @33 :NWChemStringStanza;
 
   enum Kind {
     generic         @0;
@@ -1140,6 +1150,7 @@ struct NWChemInputStanza {
     raman           @29;
     fon             @30;
     neb             @31;
+    stringMethod    @32;
   }
 }
 
@@ -2058,6 +2069,32 @@ struct NWChemNebStanza {
     loose       @1;
     default     @2;
     tight       @3;
+  }
+}
+
+# @struct NWChemStringStanza
+# @brief Zero-temperature string method; keys from optim/string/string_input.F.
+struct NWChemStringStanza {
+  nbeads     @0 :Int32 = 0;     # string:nbeads; 0 => omit.
+  maxiter    @1 :Int32 = 0;     # string:maxit.
+  stepsize   @2 :Float64 = 0.0; # string:stepsize.
+  tol        @3 :Float64 = 0.0; # string:tol gradient tolerance.
+  interpol   @4 :Int32 = 0;     # string:interpol interpolation order.
+  nhist      @5 :Int32 = 0;     # string:m history depth.
+  algorithm  @6 :Int32 = 0;     # string:algorithm.
+  printShift @7 :Int32 = 0;     # string:print_shift; 0 => omit.
+  freeze1    @8 :Bool = false;  # string:freeze1 pin first bead.
+  freezen    @9 :Bool = false;  # string:freezen pin last bead.
+  hasmiddle  @10 :Bool = false; # string:hasmiddle middle bead supplied.
+  impose     @11 :Bool = false; # string:impose re-impose geometry constraints.
+  reset      @12 :Bool = false; # bead_list:new restart reset.
+  xyzPath    @13 :Text = "";    # xyz_path initial path file.
+  mode       @14 :Mode = unspecified; # string:mode execution mode.
+  directives @15 :List(NWChemDirective);
+  enum Mode {
+    unspecified @0;
+    serial      @1;
+    parallel    @2;
   }
 }
 
