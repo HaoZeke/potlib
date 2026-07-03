@@ -1118,6 +1118,8 @@ struct NWChemInputStanza {
   stringMethod    @33 :NWChemStringStanza;
   gw              @34 :NWChemGwStanza;
   etrans          @35 :NWChemEtransStanza;
+  rism            @36 :NWChemRismStanza;
+  dimQm           @37 :NWChemDimQmStanza;
 
   enum Kind {
     generic         @0;
@@ -1155,6 +1157,8 @@ struct NWChemInputStanza {
     stringMethod    @32;
     gw              @33;
     etrans          @34;
+    rism            @35;
+    dimQm           @36;
   }
 }
 
@@ -2075,6 +2079,45 @@ struct NWChemNebStanza {
     loose       @1;
     default     @2;
     tight       @3;
+  }
+}
+
+# @struct NWChemRismStanza
+# @brief 3D-RISM solvation block; rism:* RTDB keys from rism/rism_input.F.
+struct NWChemRismStanza {
+  permittivity @0 :Float64 = 0.0; # rism:permittivity.
+  tau          @1 :Float64 = 0.0; # rism:tau.
+  temp         @2 :Float64 = 0.0; # rism:temp (K).
+  tol          @3 :Float64 = 0.0; # rism:tol convergence.
+  lambda       @4 :Float64 = 0.0; # rism:lambda coupling.
+  diis         @5 :Int32 = 0;     # rism:diis subspace size.
+  ngrid        @6 :Int32 = 0;     # rism:ngrid radial grid points.
+  closure      @7 :Text = "";     # rism:closure (hnc, kh, py).
+  vdwRule      @8 :Text = "";     # rism:vdw:rule combination rule.
+  vdwParameters @9 :Text = "";    # rism:vdw:parameters file.
+  directives   @10 :List(NWChemDirective); # solute/solvent subblocks stay literal.
+}
+
+# @struct NWChemDimQmStanza
+# @brief Discrete interaction model / QM block; dimqm:* keys from dimqm/dimqm_input.F.
+struct NWChemDimQmStanza {
+  frequency  @0 :Bool = false;    # frequency-dependent (complex) polarizabilities.
+  algorithm  @1 :Int32 = 0;       # dimqm:alg; 0 => engine default.
+  tolerance  @2 :Float64 = 0.0;   # dimqm:dimtol induced-dipole tolerance.
+  efield     @3 :List(Float64);   # finite field [x, y, z]; empty => none.
+  localfield @4 :Bool = false;    # local-field effects.
+  noresp     @5 :Bool = false;    # disable DIM response (dimqm:lrsp=false).
+  screen     @6 :Screen = unspecified; # dipole-interaction screening.
+  screenFactor @7 :Float64 = 0.0; # factor for exp/erf screening.
+  noseed     @8 :Bool = false;    # disable seeding.
+  debug      @9 :Bool = false;
+  printAtomicDipoles @10 :Bool = false;
+  directives @11 :List(NWChemDirective);
+  enum Screen {
+    unspecified @0;
+    none        @1;
+    exp         @2;
+    erf         @3;
   }
 }
 
