@@ -139,6 +139,116 @@ struct NWChemDftStanza {
   vectorsInput  @13 :Text = "";              # Promote dft:input vectors on embed.
   vectorsOutput @14 :Text = "";              # Promote dft:output vectors on embed.
   gridSpec      @15 :NWChemDftGridSpec;      # Logical multi-token/preset grid (typed; text on embed).
+  disp          @16 :NWChemDftDisp;          # Grimme dispersion: emit "disp vdw <n> ..." tokens.
+}
+
+# @struct NWChemDftDisp
+# @brief Grimme dispersion controls inside the dft block.
+struct NWChemDftDisp {
+  enabled @0 :Bool = false;
+  vdw     @1 :Int32 = 0;      # 1=D1, 2=D2, 3=D3, 4=D3(BJ) -> "disp vdw <n>".
+  s6      @2 :Float64 = 0.0;  # 0 => omit token.
+  s8      @3 :Float64 = 0.0;
+  sr6     @4 :Float64 = 0.0;
+  alpha   @5 :Float64 = 0.0;
+}
+
+# @struct NWChemRelativisticStanza
+# @brief "relativistic" block: ZORA / Douglas-Kroll / X2C controls.
+struct NWChemRelativisticStanza {
+  method     @0 :Method = none;
+  spinOrbit  @1 :Bool = false;    # ZORA: "so" vs "scalar".
+  atomicScf  @2 :Bool = false;    # ZORA atomic reference.
+  cutoff     @3 :Float64 = 0.0;   # zora:cutoff; 0 => omit.
+  dkOrder    @4 :Int32 = 0;       # "douglas-kroll <n>"; 0 => omit.
+  dkModifier @5 :Text = "";       # fpp | dkh | dkfull | dk3 | dk3full.
+  directives @6 :List(NWChemDirective);
+  enum Method {
+    none @0;
+    zora @1;
+    dk   @2;
+    x2c  @3;
+  }
+}
+
+# @struct NWChemCosmoStanza
+# @brief COSMO implicit-solvation block.
+struct NWChemCosmoStanza {
+  dielec       @0 :Float64 = 0.0; # Solvent dielectric; 0 => omit.
+  solvent      @1 :Text = "";     # Named solvent preset, e.g. "water".
+  rsolv        @2 :Float64 = 0.0;
+  radiusScheme @3 :Text = "";     # bondi | cosmo radii source.
+  radii        @4 :List(Float64); # Per-atom radii override.
+  iscren       @5 :Int32 = 0;
+  minbem       @6 :Int32 = 0;
+  lineq        @7 :Int32 = 0;
+  doCosmoSmd   @8 :Bool = false;  # Gateway to the smd block.
+  directives   @9 :List(NWChemDirective);
+}
+
+# @struct NWChemSmdStanza
+# @brief SMD solvation parameters (rides on cosmo).
+struct NWChemSmdStanza {
+  solvent    @0 :Text = "";     # smd:solvent name.
+  sola       @1 :Float64 = 0.0; # Abraham hydrogen-bond acidity.
+  solb       @2 :Float64 = 0.0; # Basicity.
+  soln       @3 :Float64 = 0.0; # Refractive index.
+  solg       @4 :Float64 = 0.0; # Macroscopic surface tension.
+  directives @5 :List(NWChemDirective);
+}
+
+# @struct NWChemConstraintsStanza
+# @brief "constraints" block for constrained optimization.
+struct NWChemConstraint {
+  kind   @0 :Kind;
+  atoms  @1 :List(UInt32);   # 1-based atom indices.
+  value  @2 :Float64 = 0.0;  # Target value or spring constant.
+  enum Kind {
+    fixAtom @0;
+    bond    @1;
+    angle   @2;
+    torsion @3;
+    spring  @4;
+  }
+}
+
+struct NWChemConstraintsStanza {
+  clear       @0 :Bool = false;
+  constraints @1 :List(NWChemConstraint);
+  directives  @2 :List(NWChemDirective);
+}
+
+# @struct NWChemVibStanza
+# @brief "vib" block: thermochemistry grid and mass overrides.
+struct NWChemIsotope {
+  atom @0 :UInt32; # 1-based atom index.
+  mass @1 :Float64;
+}
+
+struct NWChemVibStanza {
+  temperatures @0 :List(Float64); # "temp <n> t1 t2 ..." grid.
+  pressure     @1 :Float64 = 0.0; # atm; 0 => omit.
+  reuse        @2 :Text = "";     # "reuse <hessian file>".
+  animate      @3 :Bool = false;
+  masses       @4 :List(NWChemIsotope);
+  directives   @5 :List(NWChemDirective);
+}
+
+# @struct NWChemBqStanza
+# @brief "bq" external point charges.
+struct NWChemBqCharge {
+  x @0 :Float64;
+  y @1 :Float64;
+  z @2 :Float64;
+  q @3 :Float64;
+}
+
+struct NWChemBqStanza {
+  units      @0 :Text = "";  # angstroms | au.
+  charges    @1 :List(NWChemBqCharge);
+  loadFile   @2 :Text = "";  # "load <file> ..." alternative to inline charges.
+  forces     @3 :Bool = false;
+  directives @4 :List(NWChemDirective);
 }
 
 enum NWChemModuleName {
@@ -983,6 +1093,12 @@ struct NWChemInputStanza {
   simulationCell  @18 :NWChemSimulationCellStanza;
   mp2             @19 :NWChemMp2Stanza;
   tddft           @20 :NWChemTddftStanza;
+  relativistic    @21 :NWChemRelativisticStanza;
+  cosmo           @22 :NWChemCosmoStanza;
+  smd             @23 :NWChemSmdStanza;
+  constraints     @24 :NWChemConstraintsStanza;
+  vib             @25 :NWChemVibStanza;
+  bq              @26 :NWChemBqStanza;
 
   enum Kind {
     generic         @0;
@@ -1005,6 +1121,12 @@ struct NWChemInputStanza {
     simulationCell  @17;
     mp2             @18;
     tddft           @19;
+    relativistic    @20;
+    cosmo           @21;
+    smd             @22;
+    constraints     @23;
+    vib             @24;
+    bq              @25;
   }
 }
 
@@ -1522,12 +1644,46 @@ struct CPMDDftSection {
   correlation   @17 :Text;                # CORRELATION.
   exchange      @18 :Text;                # EXCHANGE.
   becke88       @19 :Bool = false;        # BECKE88.
+  hubbardU      @20 :List(CPMDHubbardU);  # Structured HUBBARD U (preferred over hubbard Text).
+  hfxWfcCutoff  @21 :Float64 = 0.0;       # HFX WFC cutoff; 0 => omit.
+  hfxBlock      @22 :Int32 = 0;           # HFX BLOCK size; 0 => omit.
+  hfxDistribution @23 :Text = "";         # HFX distribution scheme token.
 }
 
 struct CPMDAtomsPseudopotential {
   element @0 :Text;  # Element symbol, e.g. "H".
   path    @1 :Text;  # Pseudopotential file path or library token.
   lmax    @2 :Int32 = -1; # Optional LMAX; -1 => omit.
+  loc     @3 :Int32 = -1; # LOC= local channel; -1 => omit.
+  skip    @4 :Int32 = -1; # SKIP= channel; -1 => omit.
+  kleinmanBylander @5 :Bool = false; # KLEINMAN-BYLANDER projector form.
+  raggio  @6 :Float64 = 0.0; # RAGGIO Gaussian charge width; 0 => omit.
+  nonlinearCore @7 :Bool = false; # Per-species NLCC flag.
+}
+
+# @struct CPMDAtomConstraint
+# @brief One CONSTRAINTS-block entry inside &ATOMS.
+struct CPMDAtomConstraint {
+  kind   @0 :Text;          # FIX | DIST | BEND | TORSION | COORD | RIGID.
+  atoms  @1 :List(Int32);   # 1-based indices, CPMD convention.
+  target @2 :Float64 = 0.0; # Constraint value; 0 => current geometry.
+  growth @3 :Float64 = 0.0; # GROWTH rate; 0 => omit.
+}
+
+struct CPMDIsotope {
+  element @0 :Text;
+  mass    @1 :Float64;
+}
+
+struct CPMDAtomVelocity {
+  atom     @0 :Int32;         # 1-based index.
+  velocity @1 :List(Float64); # 3 Cartesian components.
+}
+
+struct CPMDDummyAtom {
+  type    @0 :Int32 = 1;     # DUMMY ATOMS type 1-4.
+  atoms   @1 :List(Int32);
+  weights @2 :List(Float64); # Weighted dummies (type 4).
 }
 
 struct CPMDAtomsSection {
@@ -1535,6 +1691,33 @@ struct CPMDAtomsSection {
   # Explicit Cartesian coordinates are supplied per step via ForceInput; this
   # section only carries PP and fixed &ATOMS directives for deck rendering.
   directives       @1 :List(CPMDDirective);
+  constraints      @2 :List(CPMDAtomConstraint); # CONSTRAINTS block.
+  isotopes         @3 :List(CPMDIsotope);        # ISOTOPE per-species masses.
+  velocities       @4 :List(CPMDAtomVelocity);   # VELOCITIES block.
+  dummyAtoms       @5 :List(CPMDDummyAtom);      # DUMMY ATOMS entries.
+  changeBonds      @6 :List(Text);               # CHANGE BONDS lines.
+  generate         @7 :Bool = false;             # GENERATE coordinates.
+}
+
+# @struct CPMDVdwSection
+# @brief Typed &VDW empirical dispersion controls (new union arm; the
+# directive-only vdw arm stays for wire compatibility).
+struct CPMDVdwSection {
+  empiricalCorrection @0 :Bool = false; # EMPIRICAL CORRECTION header.
+  grimme     @1 :Text = "";             # D2 | D3 | D3BJ variant token.
+  s6         @2 :Float64 = 0.0;         # Global scaling; 0 => omit.
+  vdwCutoff  @3 :Float64 = 0.0;         # VDW-CUTOFF radius; 0 => omit.
+  vdwCell    @4 :List(Int32);           # VDW-CELL replication n1 n2 n3.
+  radius     @5 :Float64 = 0.0;         # RADIUS; 0 => omit.
+  directives @6 :List(CPMDDirective);
+}
+
+# @struct CPMDHubbardU
+# @brief Per-species DFT+U entry (structured replacement for the hubbard Text blob).
+struct CPMDHubbardU {
+  element @0 :Text;
+  l       @1 :Int32 = 2;   # Angular channel.
+  u       @2 :Float64;     # U value (eV).
 }
 
 struct CPMDDirectiveSection {
@@ -1603,6 +1786,7 @@ struct CPMDInputSection {
     vdw     @25 :CPMDDirectiveSection;
     vectors @26 :CPMDDirectiveSection;
     wavefunction @27 :CPMDDirectiveSection;
+    vdwParams @28 :CPMDVdwSection; # Typed &VDW; supersedes the directive-only vdw arm.
   }
 }
 
