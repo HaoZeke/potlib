@@ -1855,8 +1855,19 @@ struct MetatomicParams {
   device               @1 :Text = "cpu";    # torch device string, e.g. "cuda:0".
   extensionsDirectory  @2 :Text = "";       # TorchScript extensions dir.
   checkConsistency     @3 :Bool = false;    # metatomic consistency checks.
-  uncertaintyThreshold @4 :Float64 = -1.0;  # <0 disables uncertainty gating.
+  uncertaintyThreshold @4 :Float64 = -1.0;  # <0 disables uncertainty gating (driver-side knob).
   dtypeOverride        @5 :Text = "";       # e.g. "float32"; empty => model dtype.
+  outputs              @6 :List(Output);    # Requested model outputs; empty => ["energy"].
+
+  # Mirrors upstream ModelOutput requests: standard names are "energy",
+  # "energy_ensemble", "energy_uncertainty", "features",
+  # "non_conservative_forces", "non_conservative_stress". Units ride on
+  # ForceInput; selected_atoms is a per-step concern, not method config.
+  struct Output {
+    name              @0 :Text;
+    perAtom           @1 :Bool = false;
+    explicitGradients @2 :List(Text); # Gradient names, e.g. "positions", "strain".
+  }
 }
 
 # @struct PotentialConfig
