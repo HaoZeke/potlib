@@ -10,10 +10,6 @@ readme = "README.md"
 keywords = ["potential-energy", "rpc", "molecular-dynamics", "dlpack", "ffi"]
 categories = ["science", "api-bindings"]
 exclude = ["Cargo.lock"]
-# Blocked on crates.io until `eindir-core` (and metatensor `dlpk` pin) are published
-# there; `cargo publish` strips `git` and requires registry versions. CI validates
-# with `cargo check -p rgpot-core --locked` instead of publish --dry-run.
-publish = false
 
 [lib]
 name = "rgpot_core"
@@ -26,14 +22,12 @@ cache = []
 gen-header = ["dep:cbindgen"]
 
 [dependencies]
-# version= satisfies cargo's publish manifest rules when publish is re-enabled;
-# development and CI resolve via git/tag (registry dlpk 0.3.x is a different crate).
-dlpk = { version = "0.1.5", git = "https://github.com/metatensor/dlpk.git", tag = "v0.1.5" }
+dlpk = { version = "0.1.5" }
 # eindir-core as a unified Cargo crate (NOT a prebuilt static lib): rgpot_potential_t
 # embeds eindir's repr(C) eindir_objective_t and resolves eindir_objective_* through
 # this one shared crate. Sharing the crate (rlib) with downstream consumers such as
 # anneal-core avoids the two-Rust-runtime conflict a separate libeindir_core.a causes.
-eindir-core = { version = "0.4.7", git = "https://github.com/HaoZeke/eindir.git", rev = "b1f12e4eab28e4f5bed19f8e3e8e12d624408497", features = ["capi"] }
+eindir-core = { version = "0.5.0", features = ["capi"] }
 capnp = { version = "0.20", optional = true }
 capnp-rpc = { version = "0.20", optional = true }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros"], optional = true }
