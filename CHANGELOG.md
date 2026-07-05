@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [2.2.0](https://github.com/OmniPotentRPC/rgpot/tree/2.2.0) - 2026-07-05
+
+### Added
+
+- A profile-driven ABI loader (`rgpot::abi::ProfileLoader`) resolves the minimum
+  potential ABI available from a single install prefix.
+
+### Changed
+
+- The canonical potentials-schema contract is pinned at v1.13.0, adding the
+  Capabilities discovery surface; the in-tree `Potentials.capnp` copies track it
+  byte-for-byte.
+
+### Fixed
+
+- `rgpot-core` publishes to crates.io again: `dlpk` (0.1.5) and `eindir-core`
+  (0.5.0, `capi`) now resolve from the registry instead of git pins, and the
+  `publish = false` guard is gone.
+
+
 ## [2.1.0](https://github.com/OmniPotentRPC/rgpot/tree/2.1.0) - 2026-07-03
 
 ### Added
