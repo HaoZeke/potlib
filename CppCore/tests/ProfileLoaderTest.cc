@@ -1,0 +1,156 @@
+// MIT License
+// Copyright 2023--present rgpot developers
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+
+#include <capnp/message.h>
+#include <capnp/serialize.h>
+#include <kj/array.h>
+
+#include <cstdlib>
+#include <string>
+#include <vector>
+
+#include "rgpot/abi/ProfileLoader.hpp"
+#include "rgpot/rpc/Potentials.capnp.h"
+
+using Catch::Matchers::WithinAbs;
+
+namespace {
+
+std::string fake_engine_path() {
+  const char *path = std::getenv("RGPOT_CPMD_ENGINE");
+  REQUIRE(path != nullptr);
+  return path;
+}
+
+std::vector<unsigned char> flat_bytes(::capnp::MallocMessageBuilder &msg) {
+  auto words = ::capnp::messageToFlatArray(msg);
+  const auto bytes = words.asBytes();
+  return std::vector<unsigned char>(bytes.begin(), bytes.end());
+}
+
+std::vector<unsigned char> make_config() {
+  ::capnp::MallocMessageBuilder msg;
+  auto config = msg.initRoot<::PotentialConfig>();
+  auto cpmd = config.initCpmd();
+  cpmd.setFunctional("BLYP");
+  cpmd.setCutOffRy(70.0);
+  return flat_bytes(msg);
+}
+
+std::vector<unsigned char> make_force_input(double cell_zz) {
+  ::capnp::MallocMessageBuilder msg;
+  auto input = msg.initRoot<::ForceInput>();
+  auto pos = input.initPos(9);
+  const double coords[9] = {0.0, 0.0, 0.0, 0.96, 0.0, 0.0, -0.24, 0.93, 0.0};
+  for (unsigned int i = 0; i < 9; ++i)
+    pos.set(i, coords[i]);
+  auto atmnrs = input.initAtmnrs(3);
+  atmnrs.set(0, 8);
+  atmnrs.set(1, 1);
+  atmnrs.set(2, 1);
+  auto box = input.initBox(9);
+  for (unsigned int i = 0; i < 9; ++i)
+    box.set(i, 0.0);
+  box.set(0, 10.0);
+  box.set(4, 10.0);
+  box.set(8, cell_zz);
+  input.setLengthUnit("angstrom");
+  input.setEnergyUnit("eV");
+  return flat_bytes(msg);
+}
+
+} // namespace
+
+TEST_CASE("ProfileLoader resolves the full minimum profile from one prefix",
+          "[abi][profile]") {
+  rgpot::abi::ProfileLoader loader;
+  loader.load("cpmdc", fake_engine_path());
+  REQUIRE(loader.loaded());
+  REQUIRE(loader.prefix() == "cpmdc");
+  REQUIRE(loader.abi_version() == 0);
+  REQUIRE(loader.available() == 1);
+  REQUIRE(std::string(loader.version()).find("fake") != std::string::npos);
+  REQUIRE(std::string(loader.last_error()).empty());
+}
+
+TEST_CASE("ProfileLoader capabilities round-trips a Capabilities message",
+          "[abi][profile]") {
+  rgpot::abi::ProfileLoader loader;
+  loader.load("cpmdc", fake_engine_path());
+
+  const auto caps_bytes = loader.capabilities();
+  REQUIRE(caps_bytes.size() % sizeof(::capnp::word) == 0);
+  auto words = kj::arrayPtr(
+      reinterpret_cast<const ::capnp::word *>(caps_bytes.data()),
+      caps_bytes.size() / sizeof(::capnp::word));
+  ::capnp::FlatArrayMessageReader reader(words);
+  auto caps = reader.getRoot<::Capabilities>();
+
+  REQUIRE(std::string(caps.getBackendName().cStr()) == "cpmdc");
+  REQUIRE(caps.getAvailable());
+  auto ops = caps.getOperations();
+  REQUIRE(ops.size() == 3);
+  REQUIRE(ops[0] == ::Capabilities::Operation::ENERGY);
+  REQUIRE(ops[1] == ::Capabilities::Operation::FORCES);
+  REQUIRE(ops[2] == ::Capabilities::Operation::GRADIENT);
+  auto kinds = caps.getConfigKinds();
+  REQUIRE(kinds.size() == 1);
+  REQUIRE(std::string(kinds[0].cStr()) == "cpmd");
+}
+
+TEST_CASE("ProfileLoader drives a config -> session -> step evaluation",
+          "[abi][profile]") {
+  rgpot::abi::ProfileLoader loader;
+  loader.load("cpmdc", fake_engine_path());
+
+  const auto config = make_config();
+  const double cell_zz = 12.5;
+  const auto step = make_force_input(cell_zz);
+
+  REQUIRE(loader.configure(config.data(), config.size()) == 0);
+
+  void *session =
+      loader.session_create_from_config(config.data(), config.size());
+  REQUIRE(session != nullptr);
+  REQUIRE(loader.session_configure(session, config.data(), config.size()) ==
+          0);
+
+  const size_t need =
+      loader.potential_result_size_for_force_input(step.data(), step.size());
+  REQUIRE(need > 0);
+  std::vector<unsigned char> out(need);
+  size_t wrote = 0;
+  auto result = loader.session_calculate_result(session, step.data(),
+                                                step.size(), out.data(),
+                                                out.size(), &wrote);
+  REQUIRE(result.ok == 1);
+  REQUIRE(wrote > 0);
+  loader.session_destroy(session);
+
+  auto words = kj::arrayPtr(
+      reinterpret_cast<const ::capnp::word *>(out.data()),
+      wrote / sizeof(::capnp::word));
+  ::capnp::FlatArrayMessageReader reader(words);
+  auto decoded = reader.getRoot<::PotentialResult>();
+  REQUIRE_THAT(decoded.getEnergy(), WithinAbs(0.75 + 0.001 * cell_zz, 1e-12));
+  REQUIRE(decoded.getForces().size() == 9);
+
+  std::vector<unsigned char> out_one_shot(need);
+  size_t wrote_one_shot = 0;
+  auto one_shot = loader.calculate_result_from_config(
+      config.data(), config.size(), step.data(), step.size(),
+      out_one_shot.data(), out_one_shot.size(), &wrote_one_shot);
+  REQUIRE(one_shot.ok == 1);
+  REQUIRE(wrote_one_shot == wrote);
+  loader.finalize();
+}
+
+TEST_CASE("ProfileLoader rejects a library missing the profile symbols",
+          "[abi][profile]") {
+  rgpot::abi::ProfileLoader loader;
+  REQUIRE_THROWS_AS(loader.load("nwchemc", fake_engine_path()),
+                    std::runtime_error);
+}

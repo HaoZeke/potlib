@@ -269,6 +269,22 @@ if get_option('with_tests')
             suite: 'cpmd',
         )
         test(
+            'ProfileLoaderTest',
+            executable(
+                'profile_loader_test',
+                sources: ['tests/ProfileLoaderTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: cpmdc_fake_env,
+            depends: cpmdc_fake_engine,
+            workdir: meson.source_root(),
+            suite: 'abi',
+        )
+        test(
             'test_cpmd_abi',
             executable(
                 'test_cpmd_abi',
