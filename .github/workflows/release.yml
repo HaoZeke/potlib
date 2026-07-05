@@ -128,6 +128,11 @@ jobs:
           echo "Re-enable publish and switch git deps to registry versions first."
           exit 0
         fi
+        ver=$(grep -m1 '^version' rgpot-core/Cargo.toml | sed -E 's/.*"(.*)".*/\1/')
+        if curl -fsS -A 'rgpot-release-ci' "https://crates.io/api/v1/crates/rgpot-core/${ver}" >/dev/null 2>&1; then
+          echo "rgpot-core ${ver} already on crates.io; nothing to upload."
+          exit 0
+        fi
         cargo publish -p rgpot-core --locked
   publish-skip-rc:
     if: needs.gate.outputs.is_prerelease == 'true'

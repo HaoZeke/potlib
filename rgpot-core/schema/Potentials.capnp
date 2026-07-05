@@ -61,6 +61,38 @@ struct PotentialResult {
   embedMdPropsSkipped @27 :Bool = true; # true when MD/PROP not harvested this eval (honest skip)
 }
 
+# @struct Capabilities
+# @brief Backend self-description returned by `<p>_capabilities_result()`.
+#
+# Loaders (rgpot) negotiate against this message before dispatching work:
+# which calculate operations the backend implements, which CommonMethodSpec
+# fields its overlay lowers, and which PotentialConfig arms it accepts.
+# Backends fill it from their compiled feature inventory, so a stub build
+# reports available = false with the same operation surface as the embed.
+struct Capabilities {
+  backendName    @0 :Text;  # ABI prefix, e.g. "nwchemc" or "cpmdc".
+  backendVersion @1 :Text;  # `<p>_version()` string.
+  abiVersion     @2 :Int32; # `<p>_abi_version()` value.
+  available      @3 :Bool;  # `<p>_available()`: embed shell linked in.
+  operations     @4 :List(Operation); # Calculate operations the ABI serves.
+  loweredCommonFields @5 :List(Text); # CommonMethodSpec field names the overlay lowers.
+  configKinds    @6 :List(Text); # PotentialConfig arms accepted, e.g. "nwchem".
+  schemaVersion  @7 :Text;  # Potentials.capnp release the backend compiled against.
+
+  enum Operation {
+    energy         @0;
+    forces         @1;
+    gradient       @2;
+    hessian        @3;
+    dipole         @4;
+    polarizability @5;
+    quadrupole     @6;
+    stress         @7;
+    optimize       @8;
+    frequencies    @9;
+  }
+}
+
 # @struct NWChemParams
 # @brief NWChem-specific knobs (one backend arm inside PotentialConfig / rgpot params).
 #

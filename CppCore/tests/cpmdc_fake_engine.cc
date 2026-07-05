@@ -313,4 +313,87 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
   return nullptr;
 }
 
+// Minimum-profile symbols (potentials-schema PROFILE.md) so the fake serves
+// as the ProfileLoader conformance target.
+
+int cpmdc_abi_version(void) { return 0; }
+
+const char *cpmdc_last_error(void) { return ""; }
+
+int cpmdc_configure(const void *config_capnp,
+                    size_t config_capnp_size_bytes) {
+  return has_flat_message(config_capnp, config_capnp_size_bytes) ? 0 : -1;
+}
+
+CPMDCSession *cpmdc_session_create_from_config(
+    const void *config_capnp, size_t config_capnp_size_bytes) {
+  if (!has_flat_message(config_capnp, config_capnp_size_bytes))
+    return nullptr;
+  auto *session = new CPMDCSession();
+  const auto *bytes = static_cast<const unsigned char *>(config_capnp);
+  session->params.assign(bytes, bytes + config_capnp_size_bytes);
+  return session;
+}
+
+int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
+                            size_t config_capnp_size_bytes) {
+  if (session == nullptr ||
+      !has_flat_message(config_capnp, config_capnp_size_bytes))
+    return -1;
+  const auto *bytes = static_cast<const unsigned char *>(config_capnp);
+  session->params.assign(bytes, bytes + config_capnp_size_bytes);
+  return 0;
+}
+
+CPMDCResult cpmdc_calculate_result_from_config(
+    const void *config_capnp, size_t config_capnp_size_bytes,
+    const void *force_input_capnp, size_t force_input_capnp_size_bytes,
+    void *potential_result_capnp,
+    size_t potential_result_capnp_capacity_bytes,
+    size_t *potential_result_capnp_size_bytes) {
+  CPMDCSession *session =
+      cpmdc_session_create_from_config(config_capnp, config_capnp_size_bytes);
+  if (session == nullptr)
+    return fail_result("invalid fake config");
+  CPMDCResult result = cpmdc_session_calculate_result(
+      session, force_input_capnp, force_input_capnp_size_bytes,
+      potential_result_capnp, potential_result_capnp_capacity_bytes,
+      potential_result_capnp_size_bytes);
+  cpmdc_session_destroy(session);
+  return result;
+}
+
+int cpmdc_capabilities_result(void *capabilities_capnp,
+                              size_t capabilities_capnp_capacity_bytes,
+                              size_t *capabilities_capnp_size_bytes) {
+  if (capabilities_capnp_size_bytes == nullptr)
+    return -1;
+  try {
+    ::capnp::MallocMessageBuilder msg;
+    auto caps = msg.initRoot<::Capabilities>();
+    caps.setBackendName("cpmdc");
+    caps.setBackendVersion(cpmdc_version());
+    caps.setAbiVersion(cpmdc_abi_version());
+    caps.setAvailable(cpmdc_available() != 0);
+    auto ops = caps.initOperations(3);
+    ops.set(0, ::Capabilities::Operation::ENERGY);
+    ops.set(1, ::Capabilities::Operation::FORCES);
+    ops.set(2, ::Capabilities::Operation::GRADIENT);
+    auto kinds = caps.initConfigKinds(1);
+    kinds.set(0, "cpmd");
+    caps.setSchemaVersion("fake");
+    auto words = ::capnp::messageToFlatArray(msg);
+    const auto bytes = words.asBytes();
+    *capabilities_capnp_size_bytes = bytes.size();
+    if (capabilities_capnp == nullptr ||
+        capabilities_capnp_capacity_bytes < bytes.size())
+      return -1;
+    std::memcpy(capabilities_capnp, bytes.begin(), bytes.size());
+    return 0;
+  } catch (const kj::Exception &) {
+    *capabilities_capnp_size_bytes = 0;
+    return -1;
+  }
+}
+
 } // extern "C"
