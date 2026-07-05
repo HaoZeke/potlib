@@ -119,6 +119,28 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   return true;
 }
 
+// NWChemPot is host-only dlopen of libnwchemc.so (no second "embed mode").
+// Cap'n Proto fields enginePath / nwchemRoot are for *this* process to find
+// and env-hint the library; the loaded ABI rejects non-empty enginePath in
+// set_params / energy_gradient (not NWChem method input). Strip them from
+// the blob passed across the dlopen boundary so multi-call SCF works.
+std::vector<::capnp::word>
+serialize_params_for_abi(const ::NWChemParams::Reader &params) {
+  // Deep-copy all schema fields, then clear host-only library paths so the
+  // loaded libnwchemc rejects non-empty enginePath/nwchemRoot in set_params.
+  ::capnp::MallocMessageBuilder msg;
+  msg.setRoot(params);
+  auto out = msg.getRoot<::NWChemParams>();
+  out.setEnginePath("");
+  out.setNwchemRoot("");
+  auto words = ::capnp::messageToFlatArray(msg);
+  std::vector<::capnp::word> flat(words.size());
+  std::memcpy(flat.data(), words.begin(),
+              words.size() * sizeof(::capnp::word));
+  return flat;
+}
+
+// Full params for getParams() / host bookkeeping (includes enginePath).
 std::vector<::capnp::word>
 serialize_params(const ::NWChemParams::Reader &params) {
   ::capnp::MallocMessageBuilder msg;
@@ -203,29 +225,41 @@ bool g_abi_probe_ok = false;
 
 struct NWChemPot::Impl {
   EngineBundle bundle;
+  // Full params for getParams() (may include enginePath / nwchemRoot).
   std::vector<::capnp::word> params_words;
+  // ABI blob (enginePath/nwchemRoot cleared) for set_params / energy_gradient.
+  std::vector<::capnp::word> abi_params_words;
   std::string engine_path;
   std::string nwchem_root;
   // Reused gradient buffer for the engine ABI; avoids a per-call heap
   // allocation in forceImpl. forceImpl is const, hence mutable.
   mutable std::vector<double> grad_scratch;
+
+  void store(const ::NWChemParams::Reader &params) {
+    params_words = serialize_params(params);
+    abi_params_words = serialize_params_for_abi(params);
+  }
 };
 
 NWChemPot::NWChemPot() : Potential(PotType::NWChem), impl_(new Impl) {
-  impl_->params_words = default_params();
+  {
+    ::capnp::MallocMessageBuilder msg;
+    auto p = msg.initRoot<::NWChemParams>();
+    impl_->store(p.asReader());
+  }
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 NWChemPot::NWChemPot(const ::NWChemParams::Reader &params)
     : Potential(PotType::NWChem), impl_(new Impl) {
-  impl_->params_words = serialize_params(params);
+  impl_->store(params);
   impl_->engine_path = params.getEnginePath().cStr();
   impl_->nwchem_root = params.getNwchemRoot().cStr();
   apply_env_hints(impl_->nwchem_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
-    (void)push_params_to_engine(impl_->bundle, impl_->params_words);
+    (void)push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 NWChemPot::~NWChemPot() { delete impl_; }
@@ -236,25 +270,20 @@ bool NWChemPot::setParams(const ::NWChemParams::Reader &params) {
 
   const std::string next_engine_path = params.getEnginePath().cStr();
   const std::string next_nwchem_root = params.getNwchemRoot().cStr();
-  const bool need_reload =
-      !impl_->bundle.loaded || next_engine_path != impl_->engine_path;
 
-  impl_->params_words = serialize_params(params);
+  impl_->store(params);
   impl_->engine_path = next_engine_path;
   impl_->nwchem_root = next_nwchem_root;
   apply_env_hints(impl_->nwchem_root);
 
-  if (need_reload) {
-    impl_->bundle = EngineBundle{};
-    if (!try_load_engine(impl_->bundle, impl_->engine_path))
-      return false;
-  } else if (!impl_->bundle.loaded) {
+  // Do not dlclose libnwchemc once loaded — NWChem/GA/MA are process-global.
+  if (!impl_->bundle.loaded) {
     if (!try_load_engine(impl_->bundle, impl_->engine_path))
       return false;
   }
   if (!impl_->bundle.loaded)
     return false;
-  return push_params_to_engine(impl_->bundle, impl_->params_words);
+  return push_params_to_engine(impl_->bundle, impl_->abi_params_words);
 }
 
 void NWChemPot::getParams(::NWChemParams::Builder out) const {
@@ -307,12 +336,23 @@ bool NWChemPot::available() const {
          impl_->bundle.set_params;
 }
 
+// Keep a process-lifetime engine handle for probes. Real libnwchemc (and NWChem
+// Fortran runtime) is not safe to dlclose and reload in the same process; a
+// temporary EngineBundle destructor would unload symbols and poison later calls.
+EngineBundle &probe_engine_bundle() {
+  static EngineBundle retained;
+  return retained;
+}
+
 bool NWChemPot::probe_available() {
   std::lock_guard<std::mutex> lock(g_probe_mu);
   if (g_probe_done)
     return g_probe_ok;
-  EngineBundle tmp;
-  g_probe_ok = try_load_engine(tmp, "");
+  EngineBundle &tmp = probe_engine_bundle();
+  if (!tmp.loaded)
+    g_probe_ok = try_load_engine(tmp, "");
+  else
+    g_probe_ok = true;
   g_probe_done = true;
   return g_probe_ok;
 }
@@ -321,8 +361,8 @@ bool NWChemPot::abi_available() {
   std::lock_guard<std::mutex> lock(g_probe_mu);
   if (g_abi_probe_done)
     return g_abi_probe_ok;
-  EngineBundle tmp;
-  if (!try_load_engine(tmp, "")) {
+  EngineBundle &tmp = probe_engine_bundle();
+  if (!tmp.loaded && !try_load_engine(tmp, "")) {
     g_abi_probe_ok = false;
   } else if (tmp.available) {
     g_abi_probe_ok = tmp.available() != 0;
@@ -348,7 +388,9 @@ void NWChemPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
   std::vector<double> &grad = impl_->grad_scratch;
   grad.assign(static_cast<size_t>(n) * 3u, 0.0);
-  const ParamsView params = params_view(impl_->params_words);
+  const ParamsView params = params_view(impl_->abi_params_words.empty()
+                                            ? impl_->params_words
+                                            : impl_->abi_params_words);
   NWChemCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
 

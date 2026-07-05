@@ -65,6 +65,7 @@ meson compile -C bbdir && meson test -C bbdir
    howto/embedding
    howto/integration
    howto/eindir-anneal
+   howto/eon-rgpot
 
 .. toctree::
    :maxdepth: 2
