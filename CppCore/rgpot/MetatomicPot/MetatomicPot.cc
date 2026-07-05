@@ -84,6 +84,14 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
 
   torch::jit::getProfilingMode() = false;
 
+  // Deterministic kernels where torch provides them (scatter/index adds
+  // in message-passing models are nondeterministic on CUDA otherwise;
+  // CUBLAS_WORKSPACE_CONFIG only pins cuBLAS). warn_only: ops without a
+  // deterministic implementation fall back with a warning instead of
+  // throwing. Run-to-run force noise at the 1e-12 level is amplified by
+  // chaotic band dynamics into divergent trajectories.
+  at::globalContext().setDeterministicAlgorithms(true, /*warn_only=*/true);
+
   // 1. Load model
   torch::optional<std::string> extensions_directory = torch::nullopt;
   if (!m_config.extensions_directory.empty()) {
