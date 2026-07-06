@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [2.2.1](https://github.com/OmniPotentRPC/rgpot/tree/2.2.1) - 2026-07-06
+
+### Fixed
+
+- Windows/MSVC builds no longer fail on unused ``cxxabi.h`` includes or nested
+  ``std::array`` box flattening in ``Potential`` (``C1083`` / ``C2676``).
+
+
 ## [2.2.0](https://github.com/OmniPotentRPC/rgpot/tree/2.2.0) - 2026-07-05
 
 ### Added
