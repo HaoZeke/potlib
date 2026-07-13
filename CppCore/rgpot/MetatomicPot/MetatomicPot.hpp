@@ -30,6 +30,26 @@
 
 namespace rgpot {
 
+// Process-global LibTorch execution policy for Metatomic/PET evaluation.
+//
+// These flags live on at::globalContext() and therefore affect every Torch
+// user in the process, not only the MetatomicPot instance that applied them.
+// Fast is the default and never mutates global state (fused CUDA attention
+// and other nondeterministic kernels remain available). Strict requests
+// deterministic algorithms without warn-only fallback and pins scaled-dot-
+// product attention to the math SDP backend only (flash, memory-efficient,
+// and cuDNN SDP disabled). Callers that need run-to-run force bit-stability
+// must opt into Strict explicitly.
+enum class TorchDeterminismPolicy {
+  Fast = 0,
+  Strict = 1,
+};
+
+// Apply a TorchDeterminismPolicy to the process-global LibTorch context.
+// Strict mutates at::globalContext(); Fast is a no-op that leaves existing
+// global flags unchanged (it does not restore a previous Strict setting).
+void apply_torch_determinism_policy(TorchDeterminismPolicy policy);
+
 struct MetatomicConfig {
   std::string model_path;
   std::string device;
@@ -57,6 +77,9 @@ struct MetatomicConfig {
   // scatter written to ForceOut::variance (an uncertainty certificate,
   // never a geometry signal).
   bool so3_probe_scatter = false;
+  // LibTorch determinism policy applied once at construction (process-global).
+  // Default Fast preserves throughput; set Strict for explicit reproducibility.
+  TorchDeterminismPolicy torch_determinism = TorchDeterminismPolicy::Fast;
 };
 
 class MetatomicPot : public Potential<MetatomicPot> {

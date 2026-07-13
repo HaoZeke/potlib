@@ -148,3 +148,115 @@ TEST_CASE("MetatomicPot missing model path throws", "[metatomic]") {
   cfg.device = "cpu";
   REQUIRE_THROWS(rgpot::MetatomicPot(cfg));
 }
+
+namespace {
+
+// Snapshot / restore process-global LibTorch flags so determinism tests do
+// not poison later cases (the flags live on at::globalContext()).
+struct TorchContextSnapshot {
+  bool deterministic = false;
+  bool deterministic_warn_only = false;
+  bool flash_sdp = true;
+  bool mem_efficient_sdp = true;
+  bool math_sdp = true;
+  bool cudnn_sdp = true;
+
+  static TorchContextSnapshot capture() {
+    auto &ctx = at::globalContext();
+    TorchContextSnapshot s;
+    s.deterministic = ctx.deterministicAlgorithms();
+    s.deterministic_warn_only = ctx.deterministicAlgorithmsWarnOnly();
+    s.flash_sdp = ctx.userEnabledFlashSDP();
+    s.mem_efficient_sdp = ctx.userEnabledMemEfficientSDP();
+    s.math_sdp = ctx.userEnabledMathSDP();
+    s.cudnn_sdp = ctx.userEnabledCuDNNSDP();
+    return s;
+  }
+
+  void restore() const {
+    auto &ctx = at::globalContext();
+    ctx.setDeterministicAlgorithms(deterministic, deterministic_warn_only);
+    ctx.setSDPUseFlash(flash_sdp);
+    ctx.setSDPUseMemEfficient(mem_efficient_sdp);
+    ctx.setSDPUseMath(math_sdp);
+    ctx.setSDPUseCuDNN(cudnn_sdp);
+  }
+};
+
+void seed_nonstrict_torch_context() {
+  auto &ctx = at::globalContext();
+  ctx.setDeterministicAlgorithms(false, /*warn_only=*/false);
+  ctx.setSDPUseFlash(true);
+  ctx.setSDPUseMemEfficient(true);
+  ctx.setSDPUseCuDNN(true);
+  ctx.setSDPUseMath(true);
+}
+
+} // namespace
+
+TEST_CASE("strict torch determinism policy enables det algorithms and math-only SDP",
+          "[metatomic][determinism]") {
+  const auto snap = TorchContextSnapshot::capture();
+  seed_nonstrict_torch_context();
+
+  rgpot::apply_torch_determinism_policy(rgpot::TorchDeterminismPolicy::Strict);
+
+  auto &ctx = at::globalContext();
+  REQUIRE(ctx.deterministicAlgorithms());
+  REQUIRE_FALSE(ctx.deterministicAlgorithmsWarnOnly());
+  REQUIRE_FALSE(ctx.userEnabledFlashSDP());
+  REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
+  REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
+  REQUIRE(ctx.userEnabledMathSDP());
+
+  snap.restore();
+}
+
+TEST_CASE("fast torch determinism policy leaves process-global state alone",
+          "[metatomic][determinism]") {
+  const auto snap = TorchContextSnapshot::capture();
+  seed_nonstrict_torch_context();
+
+  // Poison one flag so a no-op Fast path is distinguishable from a restore.
+  at::globalContext().setSDPUseFlash(false);
+  REQUIRE_FALSE(at::globalContext().userEnabledFlashSDP());
+
+  rgpot::apply_torch_determinism_policy(rgpot::TorchDeterminismPolicy::Fast);
+
+  auto &ctx = at::globalContext();
+  REQUIRE_FALSE(ctx.deterministicAlgorithms());
+  REQUIRE_FALSE(ctx.userEnabledFlashSDP());
+  REQUIRE(ctx.userEnabledMemEfficientSDP());
+  REQUIRE(ctx.userEnabledMathSDP());
+
+  snap.restore();
+}
+
+TEST_CASE("MetatomicConfig defaults to Fast torch determinism",
+          "[metatomic][determinism]") {
+  rgpot::MetatomicConfig cfg;
+  REQUIRE(cfg.torch_determinism == rgpot::TorchDeterminismPolicy::Fast);
+}
+
+TEST_CASE("MetatomicPot construction applies configured torch determinism policy",
+          "[metatomic][determinism]") {
+  const auto snap = TorchContextSnapshot::capture();
+  seed_nonstrict_torch_context();
+
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "data/lj38/lennard-jones.pt";
+  cfg.device = "cpu";
+  cfg.length_unit = "angstrom";
+  cfg.torch_determinism = rgpot::TorchDeterminismPolicy::Strict;
+  rgpot::MetatomicPot pot(cfg);
+
+  auto &ctx = at::globalContext();
+  REQUIRE(ctx.deterministicAlgorithms());
+  REQUIRE_FALSE(ctx.deterministicAlgorithmsWarnOnly());
+  REQUIRE_FALSE(ctx.userEnabledFlashSDP());
+  REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
+  REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
+  REQUIRE(ctx.userEnabledMathSDP());
+
+  snap.restore();
+}

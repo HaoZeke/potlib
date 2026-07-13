@@ -77,6 +77,10 @@ std::vector<torch::Tensor> rotation_group(long n, torch::Device device,
 
 } // namespace
 
+// Intentionally empty in the RED (test-first) commit: Strict tests must fail
+// until the GREEN implementation lands. Do not call production code paths here.
+void apply_torch_determinism_policy(TorchDeterminismPolicy /*policy*/) {}
+
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)
     : Potential(PotType::Metatomic), m_config(config),
       m_model(torch::jit::Module()),
@@ -90,6 +94,8 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
   // deterministic implementation fall back with a warning instead of
   // throwing. Run-to-run force noise at the 1e-12 level is amplified by
   // chaotic band dynamics into divergent trajectories.
+  // NOTE: still unconditional (pre-policy). GREEN moves this under
+  // MetatomicConfig::torch_determinism via apply_torch_determinism_policy.
   at::globalContext().setDeterministicAlgorithms(true, /*warn_only=*/true);
 
   // 1. Load model
