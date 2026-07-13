@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
+#include "rgpot/MetatomicPot/vesin_compat.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
 using Catch::Matchers::WithinAbs;
@@ -152,6 +153,53 @@ TEST_CASE("MetatomicPot missing model path throws", "[metatomic]") {
   cfg.model_path = "data/lj38/does-not-exist.pt";
   cfg.device = "cpu";
   REQUIRE_THROWS(rgpot::MetatomicPot(cfg));
+}
+
+// Compile-time coverage of vesin_compat traits with synthetic shapes matching
+// both historical vesin ABIs. The installed vesin.h is exercised by the
+// MetatomicPot LJ energy/forces case (and by parent gpu-scalapack builds).
+TEST_CASE("vesin_compat traits distinguish enum vs struct device layouts",
+          "[metatomic][vesin_compat]") {
+  struct StructDevice {
+    int type = 0;
+    int device_id = 0;
+  };
+  enum EnumDevice { EnumCPU = 1 };
+
+  STATIC_REQUIRE(rgpot::vesin_compat::is_device_struct<StructDevice>::value);
+  STATIC_REQUIRE_FALSE(rgpot::vesin_compat::is_device_struct<EnumDevice>::value);
+
+  struct OptionsWithAlgorithm {
+    int algorithm = 99;
+  };
+  struct OptionsWithoutAlgorithm {
+    double cutoff = 0.0;
+  };
+
+  STATIC_REQUIRE(
+      rgpot::vesin_compat::has_algorithm_member<OptionsWithAlgorithm>::value);
+  STATIC_REQUIRE_FALSE(
+      rgpot::vesin_compat::has_algorithm_member<OptionsWithoutAlgorithm>::value);
+
+  OptionsWithAlgorithm with_alg{};
+  with_alg.algorithm = 7;
+  rgpot::vesin_compat::set_algorithm_default(with_alg);
+  REQUIRE(with_alg.algorithm == 0);
+
+  OptionsWithoutAlgorithm without_alg{};
+  without_alg.cutoff = 3.5;
+  rgpot::vesin_compat::set_algorithm_default(without_alg);
+  REQUIRE_THAT(without_alg.cutoff, WithinAbs(3.5, 1e-15));
+
+  // Live VesinDevice from the build's vesin.h must construct without error.
+  VesinDevice cpu = rgpot::vesin_compat::make_cpu_device();
+  (void)cpu;
+  if constexpr (rgpot::vesin_compat::is_device_struct<VesinDevice>::value) {
+    REQUIRE(cpu.type == VesinCPU);
+    REQUIRE(cpu.device_id == 0);
+  } else {
+    REQUIRE(cpu == VesinCPU);
+  }
 }
 
 namespace {

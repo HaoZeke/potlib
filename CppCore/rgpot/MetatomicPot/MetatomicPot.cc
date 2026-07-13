@@ -2,6 +2,7 @@
 // Copyright 2023--present rgpot developers
 
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
+#include "rgpot/MetatomicPot/vesin_compat.hpp"
 #include <ATen/CPUGeneratorImpl.h>
 #include "vesin.h"
 
@@ -437,25 +438,22 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
 
   auto cutoff = request->engine_cutoff(m_config.length_unit);
 
-  // vesin 0.5+: VesinOptions gained `sorted` and `algorithm` (default zero =
-  // VesinAutoAlgorithm). Zero-init then set only the fields we care about so
-  // newer fields stay at safe defaults.
+  // Zero-init VesinOptions so unknown/newer fields stay at safe defaults.
+  // algorithm (vesin 0.5+) is set via type-trait helper so older headers
+  // without that member still compile — never names VesinAutoAlgorithm.
   VesinOptions options{};
   options.cutoff = cutoff;
   options.full = request->full_list();
   options.sorted = false;
-#ifdef RGPOT_VESIN_HAS_ALGORITHM
-  options.algorithm = VesinAutoAlgorithm;
-#endif
+  vesin_compat::set_algorithm_default(options);
   options.return_shifts = true;
   options.return_distances = false;
   options.return_vectors = true;
 
   VesinNeighborList *vesin_nl = new VesinNeighborList();
 
-  // vesin 0.5+: VesinDevice is struct { VesinDeviceKind type; int device_id; }.
-  // (0.3–0.4 briefly used an enum typedef; pixi metatomic pins >=0.5.2.)
-  VesinDevice cpu{VesinCPU, /*device_id=*/0};
+  // enum VesinDevice (0.3.x) vs struct VesinDevice (0.5+) — type traits.
+  VesinDevice cpu = vesin_compat::make_cpu_device();
   const char *error_message = nullptr;
   int status = vesin_neighbors(
       reinterpret_cast<const double (*)[3]>(positions),

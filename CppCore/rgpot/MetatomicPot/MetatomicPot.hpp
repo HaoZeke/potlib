@@ -2,9 +2,11 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 //
-// Requires vesin >= 0.5 (VesinDevice is a struct {type, device_id};
-// VesinOptions includes algorithm/sorted). Pin via pixi feature.metatomic
-// (vesin>=0.5.2,<0.6).
+// Neighbor lists use vesin. Source is compatible with both vesin 0.3.x
+// (enum VesinDevice, no Options.algorithm) and 0.5+ (struct VesinDevice
+// {type, device_id}, Options.algorithm) via type traits in vesin_compat.hpp.
+// The pixi metatomic feature pins vesin>=0.5.2,<0.6; parent consumers may
+// still ship older headers.
 
 #include <mutex>
 #include <string>
