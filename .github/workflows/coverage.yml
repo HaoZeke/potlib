@@ -108,7 +108,7 @@ jobs:
         with:
           pixi-version: ${{ env.PIXi_VERSION }}
           cache: true
-          environments: devbld rpctest
+          environments: devbld
           activate-environment: true
 
       - name: Generate C++ (Meson) coverage
@@ -117,7 +117,7 @@ jobs:
         run: |
           bash scripts/run_coverage_cpp.sh cpp_lcov.info
           test -s cpp_lcov.info
-          # Also emit fortcuh2 extract for the fortran job artifact reuse
+          # fortcuh2 hits from the same tree (CuH2 tests link it)
           bash scripts/run_coverage_fortran.sh fortran_lcov.info || true
           ls -la cpp_lcov.info fortran_lcov.info 2>/dev/null || true
 
