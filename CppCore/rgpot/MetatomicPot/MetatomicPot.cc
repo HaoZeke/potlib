@@ -88,14 +88,18 @@ void apply_torch_determinism_policy(TorchDeterminismPolicy policy) {
   // deterministic implementation) and pin scaled-dot-product attention to the
   // math SDP backend. Flash / memory-efficient / cuDNN SDP are fused CUDA
   // kernels with nondeterministic backward paths; math SDP remains enabled so
-  // attention still runs. These settings live on at::globalContext() and
-  // affect every Torch user in the process.
+  // attention still runs. Also disable TF32 cuBLAS/cuDNN paths: on Ampere+
+  // they quantize fp32 to a 10-bit mantissa, so the same model returns
+  // different forces on CUDA vs CPU. These settings live on
+  // at::globalContext() and affect every Torch user in the process.
   auto &ctx = at::globalContext();
   ctx.setDeterministicAlgorithms(true, /*warn_only=*/false);
   ctx.setSDPUseFlash(false);
   ctx.setSDPUseMemEfficient(false);
   ctx.setSDPUseCuDNN(false);
   ctx.setSDPUseMath(true);
+  ctx.setAllowTF32CuBLAS(false);
+  ctx.setAllowTF32CuDNN(false);
 }
 
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)

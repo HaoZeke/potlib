@@ -36,10 +36,11 @@ namespace rgpot {
 // user in the process, not only the MetatomicPot instance that applied them.
 // Fast is the default and never mutates global state (fused CUDA attention
 // and other nondeterministic kernels remain available). Strict requests
-// deterministic algorithms without warn-only fallback and pins scaled-dot-
+// deterministic algorithms without warn-only fallback, pins scaled-dot-
 // product attention to the math SDP backend only (flash, memory-efficient,
-// and cuDNN SDP disabled). Callers that need run-to-run force bit-stability
-// must opt into Strict explicitly.
+// and cuDNN SDP disabled), and disables TF32 for cuBLAS and cuDNN so Ampere+
+// matmul paths keep full fp32 mantissa width (CPU/GPU force parity). Callers
+// that need run-to-run force bit-stability must opt into Strict explicitly.
 enum class TorchDeterminismPolicy {
   Fast = 0,
   Strict = 1,
