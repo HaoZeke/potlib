@@ -165,6 +165,8 @@ struct TorchContextSnapshot {
   bool mem_efficient_sdp = true;
   bool math_sdp = true;
   bool cudnn_sdp = true;
+  bool tf32_cublas = true;
+  bool tf32_cudnn = true;
 
   static TorchContextSnapshot capture() {
     auto &ctx = at::globalContext();
@@ -175,6 +177,8 @@ struct TorchContextSnapshot {
     s.mem_efficient_sdp = ctx.userEnabledMemEfficientSDP();
     s.math_sdp = ctx.userEnabledMathSDP();
     s.cudnn_sdp = ctx.userEnabledCuDNNSDP();
+    s.tf32_cublas = ctx.allowTF32CuBLAS();
+    s.tf32_cudnn = ctx.allowTF32CuDNN();
     return s;
   }
 
@@ -185,6 +189,8 @@ struct TorchContextSnapshot {
     ctx.setSDPUseMemEfficient(mem_efficient_sdp);
     ctx.setSDPUseMath(math_sdp);
     ctx.setSDPUseCuDNN(cudnn_sdp);
+    ctx.setAllowTF32CuBLAS(tf32_cublas);
+    ctx.setAllowTF32CuDNN(tf32_cudnn);
   }
 };
 
@@ -195,6 +201,9 @@ void seed_nonstrict_torch_context() {
   ctx.setSDPUseMemEfficient(true);
   ctx.setSDPUseCuDNN(true);
   ctx.setSDPUseMath(true);
+  // Enable TF32 so Strict must clearly clear both cuBLAS and cuDNN flags.
+  ctx.setAllowTF32CuBLAS(true);
+  ctx.setAllowTF32CuDNN(true);
 }
 
 } // namespace
@@ -213,6 +222,8 @@ TEST_CASE("strict torch determinism policy enables det algorithms and math-only 
   REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
   REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
   REQUIRE(ctx.userEnabledMathSDP());
+  REQUIRE_FALSE(ctx.allowTF32CuBLAS());
+  REQUIRE_FALSE(ctx.allowTF32CuDNN());
 
   snap.restore();
 }
@@ -225,6 +236,8 @@ TEST_CASE("fast torch determinism policy leaves process-global state alone",
   // Poison one flag so a no-op Fast path is distinguishable from a restore.
   at::globalContext().setSDPUseFlash(false);
   REQUIRE_FALSE(at::globalContext().userEnabledFlashSDP());
+  REQUIRE(at::globalContext().allowTF32CuBLAS());
+  REQUIRE(at::globalContext().allowTF32CuDNN());
 
   rgpot::apply_torch_determinism_policy(rgpot::TorchDeterminismPolicy::Fast);
 
@@ -233,6 +246,9 @@ TEST_CASE("fast torch determinism policy leaves process-global state alone",
   REQUIRE_FALSE(ctx.userEnabledFlashSDP());
   REQUIRE(ctx.userEnabledMemEfficientSDP());
   REQUIRE(ctx.userEnabledMathSDP());
+  // Fast must not clear TF32 either (still the seeded-true values).
+  REQUIRE(ctx.allowTF32CuBLAS());
+  REQUIRE(ctx.allowTF32CuDNN());
 
   snap.restore();
 }
@@ -262,6 +278,8 @@ TEST_CASE("MetatomicPot construction applies configured torch determinism policy
   REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
   REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
   REQUIRE(ctx.userEnabledMathSDP());
+  REQUIRE_FALSE(ctx.allowTF32CuBLAS());
+  REQUIRE_FALSE(ctx.allowTF32CuDNN());
 
   snap.restore();
 }
