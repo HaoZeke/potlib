@@ -170,8 +170,14 @@ Uses [[https://github.com/Luthaf/vesin][vesin]] *0.5+* for neighbor lists and
 PyTorch autograd for forces. Pass CPU as =VesinDevice{VesinCPU, 0}= (=struct
 { VesinDeviceKind type; int device_id; }=; =VesinCPU= alone is only the kind
 enum). Thread-safe via internal mutex; caches the atomic-types tensor across
-geometry steps. Configurable device (CPU/CUDA), dtype override, length unit, and
-consistency checks via =MetatomicConfig=.
+geometry steps. Configurable device (CPU/CUDA), dtype override, length unit,
+consistency checks, and =torch_determinism= via =MetatomicConfig=.
+=TorchDeterminismPolicy::Fast= (default) does not touch process-global LibTorch
+state. =Strict= calls =apply_torch_determinism_policy=, which sets
+=at::globalContext()= deterministic algorithms (no warn-only fallback) and pins
+scaled-dot-product attention to the math SDP backend (flash, memory-efficient,
+and cuDNN SDP off). Those flags are process-global: they affect every Torch
+user in the process, and Fast does not restore a previous Strict setting.
 On the RPC server pass =Metatomic:/path/to/model.pt=.
 Build with the =metatomicbld= pixi env (linux-64; pulls torch, metatomic-torch,
 and vesin =>=0.5.2,<0.6= from PyPI). CI job =potentials_metatomic= in =ci-
