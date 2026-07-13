@@ -208,32 +208,28 @@ TEST_CASE("vesin_compat traits distinguish enum vs struct device layouts",
 
 namespace {
 
-// Snapshot / restore process-global LibTorch flags so determinism tests do
-// not poison later cases (the flags live on at::globalContext()).
+// RAII snapshot of process-global LibTorch flags. Captures on construction
+// and restores on destruction so REQUIRE failures, constructor throws, and
+// early returns cannot leak deterministic/SDP/TF32 settings into later cases.
 struct TorchContextSnapshot {
-  bool deterministic = false;
-  bool deterministic_warn_only = false;
-  bool flash_sdp = true;
-  bool mem_efficient_sdp = true;
-  bool math_sdp = true;
-  bool cudnn_sdp = true;
-  bool tf32_cublas = true;
-  bool tf32_cudnn = true;
-
-  static TorchContextSnapshot capture() {
+  TorchContextSnapshot() {
     auto &ctx = at::globalContext();
-    TorchContextSnapshot s;
-    s.deterministic = ctx.deterministicAlgorithms();
-    s.deterministic_warn_only = ctx.deterministicAlgorithmsWarnOnly();
-    s.flash_sdp = ctx.userEnabledFlashSDP();
-    s.mem_efficient_sdp = ctx.userEnabledMemEfficientSDP();
-    s.math_sdp = ctx.userEnabledMathSDP();
-    s.cudnn_sdp = ctx.userEnabledCuDNNSDP();
-    s.tf32_cublas = ctx.allowTF32CuBLAS();
-    s.tf32_cudnn = ctx.allowTF32CuDNN();
-    return s;
+    deterministic = ctx.deterministicAlgorithms();
+    deterministic_warn_only = ctx.deterministicAlgorithmsWarnOnly();
+    flash_sdp = ctx.userEnabledFlashSDP();
+    mem_efficient_sdp = ctx.userEnabledMemEfficientSDP();
+    math_sdp = ctx.userEnabledMathSDP();
+    cudnn_sdp = ctx.userEnabledCuDNNSDP();
+    tf32_cublas = ctx.allowTF32CuBLAS();
+    tf32_cudnn = ctx.allowTF32CuDNN();
   }
 
+  ~TorchContextSnapshot() { restore(); }
+
+  TorchContextSnapshot(const TorchContextSnapshot &) = delete;
+  TorchContextSnapshot &operator=(const TorchContextSnapshot &) = delete;
+
+private:
   void restore() const {
     auto &ctx = at::globalContext();
     ctx.setDeterministicAlgorithms(deterministic, deterministic_warn_only);
@@ -244,6 +240,15 @@ struct TorchContextSnapshot {
     ctx.setAllowTF32CuBLAS(tf32_cublas);
     ctx.setAllowTF32CuDNN(tf32_cudnn);
   }
+
+  bool deterministic = false;
+  bool deterministic_warn_only = false;
+  bool flash_sdp = true;
+  bool mem_efficient_sdp = true;
+  bool math_sdp = true;
+  bool cudnn_sdp = true;
+  bool tf32_cublas = true;
+  bool tf32_cudnn = true;
 };
 
 void seed_nonstrict_torch_context() {
@@ -262,7 +267,7 @@ void seed_nonstrict_torch_context() {
 
 TEST_CASE("strict torch determinism policy enables det algorithms and math-only SDP",
           "[metatomic][determinism]") {
-  const auto snap = TorchContextSnapshot::capture();
+  TorchContextSnapshot snap;
   seed_nonstrict_torch_context();
 
   rgpot::apply_torch_determinism_policy(rgpot::TorchDeterminismPolicy::Strict);
@@ -276,13 +281,11 @@ TEST_CASE("strict torch determinism policy enables det algorithms and math-only 
   REQUIRE(ctx.userEnabledMathSDP());
   REQUIRE_FALSE(ctx.allowTF32CuBLAS());
   REQUIRE_FALSE(ctx.allowTF32CuDNN());
-
-  snap.restore();
 }
 
 TEST_CASE("fast torch determinism policy leaves process-global state alone",
           "[metatomic][determinism]") {
-  const auto snap = TorchContextSnapshot::capture();
+  TorchContextSnapshot snap;
   seed_nonstrict_torch_context();
 
   // Poison one flag so a no-op Fast path is distinguishable from a restore.
@@ -301,8 +304,6 @@ TEST_CASE("fast torch determinism policy leaves process-global state alone",
   // Fast must not clear TF32 either (still the seeded-true values).
   REQUIRE(ctx.allowTF32CuBLAS());
   REQUIRE(ctx.allowTF32CuDNN());
-
-  snap.restore();
 }
 
 TEST_CASE("MetatomicConfig defaults to Fast torch determinism",
@@ -313,7 +314,7 @@ TEST_CASE("MetatomicConfig defaults to Fast torch determinism",
 
 TEST_CASE("MetatomicPot construction applies configured torch determinism policy",
           "[metatomic][determinism]") {
-  const auto snap = TorchContextSnapshot::capture();
+  TorchContextSnapshot snap;
   seed_nonstrict_torch_context();
 
   rgpot::MetatomicConfig cfg;
@@ -332,6 +333,4 @@ TEST_CASE("MetatomicPot construction applies configured torch determinism policy
   REQUIRE(ctx.userEnabledMathSDP());
   REQUIRE_FALSE(ctx.allowTF32CuBLAS());
   REQUIRE_FALSE(ctx.allowTF32CuDNN());
-
-  snap.restore();
 }
