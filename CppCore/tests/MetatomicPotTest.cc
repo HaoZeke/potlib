@@ -192,14 +192,18 @@ TEST_CASE("vesin_compat traits distinguish enum vs struct device layouts",
   REQUIRE_THAT(without_alg.cutoff, WithinAbs(3.5, 1e-15));
 
   // Live VesinDevice from the build's vesin.h must construct without error.
-  VesinDevice cpu = rgpot::vesin_compat::make_cpu_device();
-  (void)cpu;
-  if constexpr (rgpot::vesin_compat::is_device_struct<VesinDevice>::value) {
-    REQUIRE(cpu.type == VesinCPU);
-    REQUIRE(cpu.device_id == 0);
-  } else {
-    REQUIRE(cpu == VesinCPU);
-  }
+  // Branch via a function template so if constexpr can discard the inactive
+  // arm (plain if constexpr in this non-template TEST_CASE type-checks both).
+  auto check_live_cpu = [](auto device) {
+    using Device = decltype(device);
+    if constexpr (rgpot::vesin_compat::is_device_struct<Device>::value) {
+      REQUIRE(device.type == VesinCPU);
+      REQUIRE(device.device_id == 0);
+    } else {
+      REQUIRE(device == static_cast<Device>(VesinCPU));
+    }
+  };
+  check_live_cpu(rgpot::vesin_compat::make_cpu_device());
 }
 
 namespace {
