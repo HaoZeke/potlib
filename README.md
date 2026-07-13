@@ -4,6 +4,8 @@
 
 ![img](https://raw.githubusercontent.com/OmniPotentRPC/rgpot/refs/heads/main/branding/logo/rgpot_logo.webp)
 
+[![codecov](https://codecov.io/gh/OmniPotentRPC/rgpot/graph/badge.svg)](https://app.codecov.io/gh/OmniPotentRPC/rgpot)
+
 `rgpot` is a potential-energy library and Cap'n Proto RPC server for atomistic
 simulation codes.
 It gives clients one geometry carrier, one result carrier, and one extensible

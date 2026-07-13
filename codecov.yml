@@ -1,0 +1,78 @@
+# Codecov multi-language coverage for rgpot.
+# Dashboard: https://app.codecov.io/gh/OmniPotentRPC/rgpot
+# Uploads: OIDC via .github/workflows/coverage.yml (soft-fail).
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: false
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        informational: true
+        target: auto
+        threshold: 2%
+
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: auto
+        threshold: 2%
+        informational: true
+      - type: patch
+        target: auto
+        threshold: 2%
+        informational: true
+  individual_flags:
+    - name: rust
+      paths:
+        - rgpot-core/src/**
+      carryforward: true
+    - name: cpp
+      paths:
+        - CppCore/rgpot/**
+        - include/**
+      carryforward: true
+    - name: python
+      paths:
+        - tests/**
+      carryforward: true
+    - name: fortran
+      paths:
+        - subprojects/fortcuh2/**
+      carryforward: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+  show_carryforward_flags: true
+
+ignore:
+  - "CppCore/tests/**"
+  - "CppCore/examples/**"
+  - "docs/**"
+  - "ci/**"
+  - "scripts/**"
+  - "potctl/**"
+  - "branding/**"
+  - "third_party/**"
+  - "target/**"
+  - "bbdir*/**"
+  - "build*/**"
+  - "subprojects/packagefiles/**"
+  - "rgpot-core/tests/**"
+  # Demo / landscape drivers (not the Cap'n Proto contract helpers).
+  - "tests/ase_vs_anneal.py"
+  - "tests/con_relax_demo.py"
+  - "tests/eon_min_landscape.py"
+  - "tests/pes_double_well.py"

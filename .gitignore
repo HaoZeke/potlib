@@ -344,3 +344,12 @@ third_party/
 fort.*
 LocalError-*.log
 .lycheecache
+
+# Coverage (scripts/run_coverage_*.sh)
+/lcov.info
+/rust_codecov.json
+/cpp_lcov.info
+/fortran_lcov.info
+/python_coverage.xml
+/bbdir-cov/
+*.profraw
