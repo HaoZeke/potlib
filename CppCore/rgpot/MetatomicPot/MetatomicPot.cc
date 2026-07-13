@@ -77,9 +77,26 @@ std::vector<torch::Tensor> rotation_group(long n, torch::Device device,
 
 } // namespace
 
-// Intentionally empty in the RED (test-first) commit: Strict tests must fail
-// until the GREEN implementation lands. Do not call production code paths here.
-void apply_torch_determinism_policy(TorchDeterminismPolicy /*policy*/) {}
+void apply_torch_determinism_policy(TorchDeterminismPolicy policy) {
+  // Fast: leave process-global LibTorch flags alone so the default path keeps
+  // fused CUDA attention and other high-throughput kernels available.
+  if (policy != TorchDeterminismPolicy::Strict) {
+    return;
+  }
+
+  // Strict: request deterministic algorithms (throw when an op has no
+  // deterministic implementation) and pin scaled-dot-product attention to the
+  // math SDP backend. Flash / memory-efficient / cuDNN SDP are fused CUDA
+  // kernels with nondeterministic backward paths; math SDP remains enabled so
+  // attention still runs. These settings live on at::globalContext() and
+  // affect every Torch user in the process.
+  auto &ctx = at::globalContext();
+  ctx.setDeterministicAlgorithms(true, /*warn_only=*/false);
+  ctx.setSDPUseFlash(false);
+  ctx.setSDPUseMemEfficient(false);
+  ctx.setSDPUseCuDNN(false);
+  ctx.setSDPUseMath(true);
+}
 
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)
     : Potential(PotType::Metatomic), m_config(config),
@@ -88,15 +105,8 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
 
   torch::jit::getProfilingMode() = false;
 
-  // Deterministic kernels where torch provides them (scatter/index adds
-  // in message-passing models are nondeterministic on CUDA otherwise;
-  // CUBLAS_WORKSPACE_CONFIG only pins cuBLAS). warn_only: ops without a
-  // deterministic implementation fall back with a warning instead of
-  // throwing. Run-to-run force noise at the 1e-12 level is amplified by
-  // chaotic band dynamics into divergent trajectories.
-  // NOTE: still unconditional (pre-policy). GREEN moves this under
-  // MetatomicConfig::torch_determinism via apply_torch_determinism_policy.
-  at::globalContext().setDeterministicAlgorithms(true, /*warn_only=*/true);
+  // Optional process-global determinism (default Fast = no mutation).
+  apply_torch_determinism_policy(m_config.torch_determinism);
 
   // 1. Load model
   torch::optional<std::string> extensions_directory = torch::nullopt;
