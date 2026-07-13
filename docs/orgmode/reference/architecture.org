@@ -174,10 +174,11 @@ geometry steps. Configurable device (CPU/CUDA), dtype override, length unit,
 consistency checks, and =torch_determinism= via =MetatomicConfig=.
 =TorchDeterminismPolicy::Fast= (default) does not touch process-global LibTorch
 state. =Strict= calls =apply_torch_determinism_policy=, which sets
-=at::globalContext()= deterministic algorithms (no warn-only fallback) and pins
+=at::globalContext()= deterministic algorithms (no warn-only fallback), pins
 scaled-dot-product attention to the math SDP backend (flash, memory-efficient,
-and cuDNN SDP off). Those flags are process-global: they affect every Torch
-user in the process, and Fast does not restore a previous Strict setting.
+and cuDNN SDP off), and disables TF32 for cuBLAS and cuDNN (full fp32 mantissas
+on Ampere+). Those flags are process-global: they affect every Torch user in
+the process, and Fast does not restore a previous Strict setting.
 On the RPC server pass =Metatomic:/path/to/model.pt=.
 Build with the =metatomicbld= pixi env (linux-64; pulls torch, metatomic-torch,
 and vesin =>=0.5.2,<0.6= from PyPI). CI job =potentials_metatomic= in =ci-
