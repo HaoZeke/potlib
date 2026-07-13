@@ -51,7 +51,8 @@ TEST_CASE("MetatomicPot LJ energy and forces", "[metatomic]") {
   std::array<std::array<double, 3>, 3> box = {
       {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   // Reference values from eOn MetatomicTest (lennard-jones.pt model)
   double expected_energy = 98374.87753058573;
@@ -99,7 +100,9 @@ TEST_CASE("MetatomicPot forces sum to zero", "[metatomic]") {
   std::array<std::array<double, 3>, 3> box = {
       {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)energy;
+  (void)variance;
 
   // Newton's third law: force sum should be near zero
   double fx_sum = 0.0, fy_sum = 0.0, fz_sum = 0.0;
@@ -131,8 +134,10 @@ TEST_CASE("MetatomicPot is deterministic across repeated calls",
       {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
 
   // Second call exercises the cached atomic_types tensor path
-  auto [e1, f1] = pot(positions, atmtypes, box);
-  auto [e2, f2] = pot(positions, atmtypes, box);
+  auto [e1, f1, v1] = pot(positions, atmtypes, box);
+  auto [e2, f2, v2] = pot(positions, atmtypes, box);
+  (void)v1;
+  (void)v2;
 
   REQUIRE_THAT(e1, WithinAbs(e2, 1e-8));
   for (int i = 0; i < N_ATOMS; ++i) {

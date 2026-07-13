@@ -440,13 +440,8 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
   VesinNeighborList *vesin_nl = new VesinNeighborList();
 
   // vesin 0.5+: VesinDevice is struct { VesinDeviceKind type; int device_id; }.
-  // (0.3–0.4 briefly used an enum typedef; we require >=0.5 for the struct
-  // API.)
-#ifdef RGPOT_VESIN_DEVICE_STRUCT
+  // (0.3–0.4 briefly used an enum typedef; pixi metatomic pins >=0.5.2.)
   VesinDevice cpu{VesinCPU, /*device_id=*/0};
-#else
-  VesinDevice cpu = VesinCPU;  // older vesin: VesinDevice is an enum
-#endif
   const char *error_message = nullptr;
   int status = vesin_neighbors(
       reinterpret_cast<const double (*)[3]>(positions),
