@@ -176,9 +176,14 @@ consistency checks, and =torch_determinism= via =MetatomicConfig=.
 state. =Strict= calls =apply_torch_determinism_policy=, which sets
 =at::globalContext()= deterministic algorithms (no warn-only fallback), pins
 scaled-dot-product attention to the math SDP backend (flash, memory-efficient,
-and cuDNN SDP off), and disables TF32 for cuBLAS and cuDNN (full fp32 mantissas
-on Ampere+). Those flags are process-global: they affect every Torch user in
-the process, and Fast does not restore a previous Strict setting.
+and cuDNN SDP off), disables TF32 for cuBLAS and cuDNN (full fp32 mantissas
+on Ampere+), forces deterministic cuDNN algorithms with benchmarking off, and
+fills uninitialized memory deterministically. Those flags are process-global:
+they affect every Torch user in the process, and Fast does not restore a
+previous Strict setting. CUDA host processes that need bit-stable cuBLAS must
+also export =CUBLAS_WORKSPACE_CONFIG=:4096:8= (or =:16:8=) *before* the first
+cuBLAS call — that is process environment, not =at::globalContext()= (see
+NVIDIA cuBLAS reproducibility and =alertCuBLASConfigNotDeterministic=).
 On the RPC server pass =Metatomic:/path/to/model.pt=.
 Build with the =metatomicbld= pixi env (linux-64; pulls torch, metatomic-torch,
 and vesin =>=0.5.2,<0.6= from PyPI). CI job =potentials_metatomic= in =ci-

@@ -91,10 +91,29 @@ void apply_torch_determinism_policy(TorchDeterminismPolicy policy) {
   // kernels with nondeterministic backward paths; math SDP remains enabled so
   // attention still runs. Also disable TF32 cuBLAS/cuDNN paths: on Ampere+
   // they quantize fp32 to a 10-bit mantissa, so the same model returns
-  // different forces on CUDA vs CPU. These settings live on
-  // at::globalContext() and affect every Torch user in the process.
+  // different forces on CUDA vs CPU.
+  //
+  // Additional CUDA/cuDNN process flags that are NOT covered by
+  // setDeterministicAlgorithms alone:
+  //   - deterministicCuDNN: forces deterministic convolution algorithms
+  //   - benchmarkCuDNN=false: auto-tuner picks different kernels run-to-run
+  //   - deterministicFillUninitializedMemory: no garbage from uninitialized
+  //     tensor storage under autograd
+  //
+  // CUBLAS_WORKSPACE_CONFIG is process *environment*, not at::globalContext.
+  // For CUDA >= 10.2 bit-stable cuBLAS, the host must set
+  // CUBLAS_WORKSPACE_CONFIG to ":4096:8" or ":16:8" *before* the first
+  // cuBLAS call (see NVIDIA cuBLAS reproducibility docs and
+  // at::Context::alertCuBLASConfigNotDeterministic). rgpot cannot inject that
+  // into a parent process that already touched cuBLAS.
+  //
+  // These settings live on at::globalContext() and affect every Torch user
+  // in the process.
   auto &ctx = at::globalContext();
   ctx.setDeterministicAlgorithms(true, /*warn_only=*/false);
+  ctx.setDeterministicFillUninitializedMemory(true);
+  ctx.setDeterministicCuDNN(true);
+  ctx.setBenchmarkCuDNN(false);
   ctx.setSDPUseFlash(false);
   ctx.setSDPUseMemEfficient(false);
   ctx.setSDPUseCuDNN(false);

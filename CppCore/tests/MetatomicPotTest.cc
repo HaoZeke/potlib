@@ -5,6 +5,8 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <array>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
@@ -210,12 +212,16 @@ namespace {
 
 // RAII snapshot of process-global LibTorch flags. Captures on construction
 // and restores on destruction so REQUIRE failures, constructor throws, and
-// early returns cannot leak deterministic/SDP/TF32 settings into later cases.
+// early returns cannot leak deterministic/SDP/TF32/cuDNN settings into later
+// cases.
 struct TorchContextSnapshot {
   TorchContextSnapshot() {
     auto &ctx = at::globalContext();
     deterministic = ctx.deterministicAlgorithms();
     deterministic_warn_only = ctx.deterministicAlgorithmsWarnOnly();
+    fill_uninit = ctx.deterministicFillUninitializedMemory();
+    det_cudnn = ctx.deterministicCuDNN();
+    benchmark_cudnn = ctx.benchmarkCuDNN();
     flash_sdp = ctx.userEnabledFlashSDP();
     mem_efficient_sdp = ctx.userEnabledMemEfficientSDP();
     math_sdp = ctx.userEnabledMathSDP();
@@ -233,6 +239,9 @@ private:
   void restore() const {
     auto &ctx = at::globalContext();
     ctx.setDeterministicAlgorithms(deterministic, deterministic_warn_only);
+    ctx.setDeterministicFillUninitializedMemory(fill_uninit);
+    ctx.setDeterministicCuDNN(det_cudnn);
+    ctx.setBenchmarkCuDNN(benchmark_cudnn);
     ctx.setSDPUseFlash(flash_sdp);
     ctx.setSDPUseMemEfficient(mem_efficient_sdp);
     ctx.setSDPUseMath(math_sdp);
@@ -243,6 +252,9 @@ private:
 
   bool deterministic = false;
   bool deterministic_warn_only = false;
+  bool fill_uninit = false;
+  bool det_cudnn = false;
+  bool benchmark_cudnn = false;
   bool flash_sdp = true;
   bool mem_efficient_sdp = true;
   bool math_sdp = true;
@@ -254,6 +266,9 @@ private:
 void seed_nonstrict_torch_context() {
   auto &ctx = at::globalContext();
   ctx.setDeterministicAlgorithms(false, /*warn_only=*/false);
+  ctx.setDeterministicFillUninitializedMemory(false);
+  ctx.setDeterministicCuDNN(false);
+  ctx.setBenchmarkCuDNN(true);
   ctx.setSDPUseFlash(true);
   ctx.setSDPUseMemEfficient(true);
   ctx.setSDPUseCuDNN(true);
@@ -275,6 +290,9 @@ TEST_CASE("strict torch determinism policy enables det algorithms and math-only 
   auto &ctx = at::globalContext();
   REQUIRE(ctx.deterministicAlgorithms());
   REQUIRE_FALSE(ctx.deterministicAlgorithmsWarnOnly());
+  REQUIRE(ctx.deterministicFillUninitializedMemory());
+  REQUIRE(ctx.deterministicCuDNN());
+  REQUIRE_FALSE(ctx.benchmarkCuDNN());
   REQUIRE_FALSE(ctx.userEnabledFlashSDP());
   REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
   REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
@@ -327,10 +345,115 @@ TEST_CASE("MetatomicPot construction applies configured torch determinism policy
   auto &ctx = at::globalContext();
   REQUIRE(ctx.deterministicAlgorithms());
   REQUIRE_FALSE(ctx.deterministicAlgorithmsWarnOnly());
+  REQUIRE(ctx.deterministicFillUninitializedMemory());
+  REQUIRE(ctx.deterministicCuDNN());
+  REQUIRE_FALSE(ctx.benchmarkCuDNN());
   REQUIRE_FALSE(ctx.userEnabledFlashSDP());
   REQUIRE_FALSE(ctx.userEnabledMemEfficientSDP());
   REQUIRE_FALSE(ctx.userEnabledCuDNNSDP());
   REQUIRE(ctx.userEnabledMathSDP());
   REQUIRE_FALSE(ctx.allowTF32CuBLAS());
   REQUIRE_FALSE(ctx.allowTF32CuDNN());
+}
+
+// Matched provider-level reproducer: same MetatomicConfig (Strict, fixed SO3
+// Monte-Carlo set n=4), same geometry, two successive force evaluations on one
+// pot. Seeds are pass-index based (0x50333A5EED + i_rot), so the orientation
+// set is identical call-to-call. Any force/energy drift is provider
+// nondeterminism, not SO3 RNG. Do NOT cite mismatched CLI (different
+// n_symmetry_rotations or torch_determinism) as provider nondeterminism.
+TEST_CASE("Strict MetatomicPot SO3 n=4 is bit-stable across matched force calls",
+          "[metatomic][determinism][provider]") {
+  TorchContextSnapshot snap;
+
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "data/lj38/lennard-jones.pt";
+  cfg.device = "cpu";
+  cfg.length_unit = "angstrom";
+  cfg.torch_determinism = rgpot::TorchDeterminismPolicy::Strict;
+  cfg.n_symmetry_rotations = 4;
+  cfg.random_rotation = true;
+  cfg.so3_probe_scatter = false;
+  rgpot::MetatomicPot pot(cfg);
+
+  AtomMatrix positions(N_ATOMS, 3);
+  for (int i = 0; i < N_ATOMS; ++i)
+    for (int j = 0; j < 3; ++j)
+      positions(i, j) = lj13_pos[i * 3 + j];
+
+  std::vector<int> atmtypes(lj13_atmnrs, lj13_atmnrs + N_ATOMS);
+  std::array<std::array<double, 3>, 3> box = {
+      {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
+
+  auto [e1, f1, v1] = pot(positions, atmtypes, box);
+  auto [e2, f2, v2] = pot(positions, atmtypes, box);
+  (void)v1;
+  (void)v2;
+
+  // Bit-stable on CPU under Strict: energies and forces must match exactly.
+  REQUIRE(e1 == e2);
+  for (int i = 0; i < N_ATOMS; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      REQUIRE(f1(i, j) == f2(i, j));
+    }
+  }
+}
+
+TEST_CASE("Strict MetatomicPot SO3 n=4 CUDA matched forces when available",
+          "[metatomic][determinism][provider][cuda]") {
+  if (!torch::cuda::is_available()) {
+    SKIP("CUDA not available");
+  }
+
+  TorchContextSnapshot snap;
+
+  // Matched env requirement for cuBLAS bit-stability (CUDA >= 10.2).
+  // Setting here only helps if no prior cuBLAS use in this process.
+  // Catch tests that run before other CUDA cases can still validate.
+  if (const char *existing = std::getenv("CUBLAS_WORKSPACE_CONFIG");
+      existing == nullptr ||
+      (std::string(existing) != ":4096:8" &&
+       std::string(existing) != ":16:8")) {
+    // Prefer the larger workspace; process-local for this test process.
+    setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8", /*overwrite=*/1);
+  }
+
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "data/lj38/lennard-jones.pt";
+  cfg.device = "cuda";
+  cfg.length_unit = "angstrom";
+  cfg.torch_determinism = rgpot::TorchDeterminismPolicy::Strict;
+  cfg.n_symmetry_rotations = 4;
+  cfg.random_rotation = true;
+  cfg.so3_probe_scatter = false;
+
+  // LJ TorchScript may be CPU-only; skip cleanly if device pick fails.
+  try {
+    rgpot::MetatomicPot pot(cfg);
+
+    AtomMatrix positions(N_ATOMS, 3);
+    for (int i = 0; i < N_ATOMS; ++i)
+      for (int j = 0; j < 3; ++j)
+        positions(i, j) = lj13_pos[i * 3 + j];
+
+    std::vector<int> atmtypes(lj13_atmnrs, lj13_atmnrs + N_ATOMS);
+    std::array<std::array<double, 3>, 3> box = {
+        {{101.9424, 0.0, 0.0}, {0.0, 103.1426, 0.0}, {0.0, 0.0, 102.6055}}};
+
+    auto [e1, f1, v1] = pot(positions, atmtypes, box);
+    auto [e2, f2, v2] = pot(positions, atmtypes, box);
+    (void)v1;
+    (void)v2;
+
+    REQUIRE(e1 == e2);
+    for (int i = 0; i < N_ATOMS; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        REQUIRE(f1(i, j) == f2(i, j));
+      }
+    }
+  } catch (const c10::Error &) {
+    SKIP("CUDA Metatomic load/eval not supported for this model/build");
+  } catch (const std::exception &) {
+    SKIP("CUDA Metatomic load/eval not supported for this model/build");
+  }
 }

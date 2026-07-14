@@ -40,9 +40,15 @@ namespace rgpot {
 // and other nondeterministic kernels remain available). Strict requests
 // deterministic algorithms without warn-only fallback, pins scaled-dot-
 // product attention to the math SDP backend only (flash, memory-efficient,
-// and cuDNN SDP disabled), and disables TF32 for cuBLAS and cuDNN so Ampere+
-// matmul paths keep full fp32 mantissa width (CPU/GPU force parity). Callers
-// that need run-to-run force bit-stability must opt into Strict explicitly.
+// and cuDNN SDP disabled), disables TF32 for cuBLAS and cuDNN, forces
+// deterministic cuDNN algorithms with benchmarking off, and fills
+// uninitialized memory deterministically. Callers that need run-to-run force
+// bit-stability must opt into Strict explicitly.
+//
+// CUDA host process requirement (not settable via at::globalContext after
+// cuBLAS has been used): export CUBLAS_WORKSPACE_CONFIG=:4096:8 (or :16:8)
+// before the first cuBLAS call, or Strict cannot guarantee cuBLAS bit-
+// stability on CUDA >= 10.2.
 enum class TorchDeterminismPolicy {
   Fast = 0,
   Strict = 1,
