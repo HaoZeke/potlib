@@ -19,7 +19,7 @@ int main(void) {
   atomTypes << 0, 0, 0;
   Eigen::Matrix3d boxMatrix;
   boxMatrix << 15, 0, 0, 0, 20, 0, 0, 0, 30;
-  auto [energy, forces] =
+  auto [energy, forces, variance] =
       ljpot(convertToAtomMatrix(positions), convertToVector<int>(atomTypes),
             convertToEigen3d(boxMatrix));
   fmt::print("Got energy {}\n Forces:\n{}", energy, fmt::streamed(forces));

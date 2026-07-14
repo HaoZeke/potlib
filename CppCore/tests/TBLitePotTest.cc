@@ -31,7 +31,8 @@ TEST_CASE("TBLitePot GFN2 water energy", "[tblite]") {
   std::array<std::array<double, 3>, 3> box = {
       {{100.0, 0.0, 0.0}, {0.0, 100.0, 0.0}, {0.0, 0.0, 100.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   // GFN2-xTB water energy is approximately -5.07 Hartree = -137.9 eV
   REQUIRE(energy < 0.0);
@@ -62,7 +63,8 @@ TEST_CASE("TBLitePot GFN1 water energy", "[tblite]") {
   std::array<std::array<double, 3>, 3> box = {
       {{100.0, 0.0, 0.0}, {0.0, 100.0, 0.0}, {0.0, 0.0, 100.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   // GFN1-xTB energy should be negative for a bound molecule
   REQUIRE(energy < 0.0);

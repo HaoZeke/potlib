@@ -24,7 +24,7 @@ int main(void) {
   Eigen::Matrix3d boxMatrix{{15, 0, 0}, //
                             {0, 20, 0}, //
                             {0, 0, 30}};
-  auto [energy, forces] =
+  auto [energy, forces, variance] =
       cuh2pot(convertToAtomMatrix(positions), convertToVector<int>(atomTypes),
               convertToEigen3d(boxMatrix));
   fmt::print("Got energy {}\n Forces:\n{}", energy, fmt::streamed(forces));

@@ -42,7 +42,8 @@ TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
   std::array<std::array<double, 3>, 3> box = {
       {{20.0, 0.0, 0.0}, {0.0, 20.0, 0.0}, {0.0, 0.0, 20.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   REQUIRE(std::isfinite(energy));
   REQUIRE(energy != 0.0);

@@ -122,8 +122,9 @@ public:
     }
 
     // Potential always computes in eV/angstrom
-    auto [energy, forces] =
+    auto [energy, forces, variance] =
         (*m_potential)(nativePositions, nativeAtomTypes, nativeBoxMatrix);
+    (void)variance;
 
     // Convert results to caller's units
     auto result = context.getResults();
