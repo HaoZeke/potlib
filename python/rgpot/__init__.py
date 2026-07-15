@@ -6,6 +6,9 @@ Core: Lennard-Jones. Metatomic path uses **dlopen** of a portable
   ``rgpot/lib/torch-X.Y/libmetatomic_engine.so``
 
 selected from the installed ``torch`` major (same layout as metatomic-torch).
+
+Supported torch majors for bundled engines: **2.7 and newer**. Older torch
+builds may still import LJ, but Metatomic dlopen needs a matching engine.
 """
 
 from __future__ import annotations
@@ -68,7 +71,10 @@ def default_metatomic_engine_path() -> str | None:
 
 
 def available_metatomic_engine_abis() -> list[str]:
-    """List torch-X.Y majors for which a bundled engine is present."""
+    """List torch-X.Y majors for which a bundled engine is present.
+
+    PyPI wheels ship engines for torch 2.7+ (see package README).
+    """
     here = Path(__file__).resolve().parent / "lib"
     out: list[str] = []
     if not here.is_dir():

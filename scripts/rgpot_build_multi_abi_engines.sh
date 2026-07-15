@@ -1,31 +1,48 @@
 #!/usr/bin/env bash
-# Build libmetatomic_engine.so for every torch major metatomic ships.
+# Build libmetatomic_engine.so for supported torch majors (product floor: 2.7+).
 # Stages: build/multi-abi-engines/torch-X.Y/libmetatomic_engine.so
 #
 # Links against isolated libtorch per major (CPU). When the build CPython has
-# no torch wheel for an old major, downloads a manylinux wheel for cp312 and
+# no torch wheel for a major, downloads a manylinux wheel for cp312 and
 # extracts libtorch (C++ ABI is per torch major, not per CPython tag).
+#
+# Default majors: intersection of metatomic-torch's torch-* layout with >= 2.7.
+# Override with RGPOT_TORCH_MAJORS="2.7 2.9 2.13".
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PY="${RGPOT_BUILD_PYTHON:-python3}"
 ABI_ROOT="${RGPOT_ABI_ROOT:-$HOME/tmp/rgpot-multi-abi}"
 STAGING="${RGPOT_ABI_STAGING:-$ROOT/build/multi-abi-engines}"
+# Skip libtorch older than this (incomplete CPU wheels / link failures).
+MIN_TORCH_MAJOR="${RGPOT_MIN_TORCH_MAJOR:-2.7}"
 mkdir -p "$ABI_ROOT" "$STAGING"
 
 HOST_PURE=$("$PY" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 [[ -d "$HOST_PURE/metatomic/torch" ]] || { echo "ERROR: need metatomic-torch in $HOST_PURE" >&2; exit 1; }
 
 if [[ -z "${RGPOT_TORCH_MAJORS:-}" ]]; then
-  RGPOT_TORCH_MAJORS=$("$PY" - <<'PY'
+  RGPOT_TORCH_MAJORS=$("$PY" - <<PY
 from pathlib import Path
 import sysconfig
+min_maj = tuple(int(x) for x in "$MIN_TORCH_MAJOR".split("."))
 p = Path(sysconfig.get_paths()["purelib"]) / "metatomic" / "torch"
-print(" ".join(sorted(d.name.removeprefix("torch-") for d in p.glob("torch-*") if d.is_dir())))
+out = []
+for d in sorted(p.glob("torch-*")):
+    if not d.is_dir():
+        continue
+    ver = d.name.removeprefix("torch-")
+    try:
+        maj = tuple(int(x) for x in ver.split(".")[:2])
+    except ValueError:
+        continue
+    if maj >= min_maj:
+        out.append(ver)
+print(" ".join(out))
 PY
 )
 fi
-echo "MAJORS=$RGPOT_TORCH_MAJORS"
+echo "MAJORS=$RGPOT_TORCH_MAJORS (floor $MIN_TORCH_MAJOR)"
 echo "STAGING=$STAGING ABI_ROOT=$ABI_ROOT"
 
 ensure_torch_prefix() {

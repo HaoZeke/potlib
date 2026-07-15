@@ -33,8 +33,9 @@ Changelog = "https://github.com/OmniPotentRPC/rgpot/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 # Runtime Python stack for the Metatomic engine (torch + metatomic from PyPI).
 # The engine .so is built into the wheel; these packages provide the NEEDED libs.
+# Bundled multi-ABI engines cover torch 2.7+ (see README).
 metatomic = [
-  "torch>=2.3",
+  "torch>=2.7",
   "metatensor-core>=0.1.0",
   "metatensor-torch>=0.6.0",
   "metatomic-torch>=0.1.0",
@@ -50,8 +51,9 @@ requires = [
   "ninja",
   "nanobind>=2.2",
   "numpy>=1.24",
-  # Build-time for libmetatomic_engine.so (same purelib layout at runtime)
-  "torch>=2.3",
+  # Build-time for libmetatomic_engine.so (same purelib layout at runtime).
+  # Multi-ABI pack targets torch 2.7+; older majors are not shipped.
+  "torch>=2.7",
   "metatensor-core",
   "metatensor-torch",
   "metatomic-torch",

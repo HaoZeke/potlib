@@ -2,15 +2,17 @@
 # Build libmetatomic_engine.so for each torch major and inject into a wheel as
 #   rgpot/lib/torch-X.Y/libmetatomic_engine.so
 #
+# Product support floor: torch 2.7+. Defaults cover 2.7–2.13.
+#
 # Usage:
-#   RGPOT_TORCH_MAJORS="2.9 2.13" ./scripts/rgpot_pack_multi_abi_engines.sh dist/rgpot-*.whl
+#   RGPOT_TORCH_MAJORS="2.7 2.9 2.13" ./scripts/rgpot_pack_multi_abi_engines.sh dist/rgpot-*.whl
 #
 # Requires: existing wheel, compilers, patchelf, pip network (or pre-seeded
 # torch CPU wheels). Builds each ABI in an isolated prefix under $RGPOT_ABI_ROOT.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WHL="${1:?path to rgpot wheel}"
-MAJORS="${RGPOT_TORCH_MAJORS:-2.9 2.10 2.11 2.12 2.13}"
+MAJORS="${RGPOT_TORCH_MAJORS:-2.7 2.8 2.9 2.10 2.11 2.12 2.13}"
 ABI_ROOT="${RGPOT_ABI_ROOT:-$HOME/tmp/rgpot-multi-abi}"
 PY="${RGPOT_BUILD_PYTHON:-python3}"
 mkdir -p "$ABI_ROOT"
