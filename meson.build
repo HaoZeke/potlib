@@ -201,8 +201,12 @@ print(api_inc)
         link_args: [
             '-L' + _torch_libdir,
             '-Wl,-rpath-link,' + _torch_libdir,
+            # Older libtorch splits symbols across libtorch + libtorch_cpu + libc10.
+            '-Wl,--no-as-needed',
+            '-ltorch',
             '-ltorch_cpu',
             '-lc10',
+            '-Wl,--as-needed',
         ],
     )
     _deps += torch_dep
