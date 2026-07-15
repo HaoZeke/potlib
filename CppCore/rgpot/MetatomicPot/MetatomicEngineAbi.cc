@@ -82,7 +82,12 @@ int rgpot_mta_force(RgpotMtaPot *pot, long nAtoms, const double *positions,
       *variance = out.variance;
     std::memcpy(forces, Fbuf.data(), Fbuf.size() * sizeof(double));
     return 0;
+  } catch (const std::exception &e) {
+    // Best-effort: stderr so nanobind/dlopen callers can diagnose.
+    std::fprintf(stderr, "rgpot_mta_force: %s\n", e.what());
+    return 2;
   } catch (...) {
+    std::fprintf(stderr, "rgpot_mta_force: unknown exception\n");
     return 2;
   }
 }

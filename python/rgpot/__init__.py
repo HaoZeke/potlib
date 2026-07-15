@@ -89,6 +89,12 @@ def evaluate_metatomic(
     device: str = "cpu",
 ):
     """Force evaluation through MetatomicDlopen (real engine plugin)."""
+    # Load torch via the Python extension first so the engine's DT_NEEDED
+    # libtorch resolves to the same process image (avoids dual-load races).
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        pass
     eng = engine_path or default_metatomic_engine_path() or ""
     return evaluate_metatomic_dlopen(
         positions, atom_types, box, model_path, eng, device
