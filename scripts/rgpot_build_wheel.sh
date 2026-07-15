@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Build + multi-ABI engine layout + RPATH repair.
-# Nanobind abi3 when build Python >= 3.12.
+# Build nanobind abi3 wheel + multi-torch engines + RPATH repair.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -15,4 +14,9 @@ else
 fi
 WHL=$(ls -1 dist/rgpot-*.whl | head -1)
 bash "$ROOT/scripts/rgpot_finalize_wheel.sh" "$WHL"
+if [[ "${RGPOT_SKIP_MULTI_ABI:-0}" != "1" ]]; then
+  bash "$ROOT/scripts/rgpot_build_multi_abi_engines.sh"
+  bash "$ROOT/scripts/rgpot_inject_multi_abi_engines.sh" "$WHL"
+fi
 echo "WHEEL_OK $WHL"
+ls -la "$ROOT/build/multi-abi-engines"/torch-*/libmetatomic_engine.so 2>/dev/null || true

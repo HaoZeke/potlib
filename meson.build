@@ -137,19 +137,43 @@ if get_option('with_metatomic')
     )
     _deps += torch_dep
 
-    # PyTorch package paths are discovered without importing torch. Importing
-    # torch loads compiled NumPy extensions during configure, so the probe must
-    # only use Python's standard library and the installed package metadata.
+    # Discover torch without importing it (import can load NumPy C extensions
+    # during meson configure). Supports multi-ABI builds via:
+    #   RGPOT_TORCH_ROOT=/path/to/site-packages/torch  (isolated major)
+    #   or first torch/version.py on sys.path (PYTHONPATH prefixes).
+    # Metatomic multi-ABI headers always come from the host purelib.
     _py_probe = run_command(
         find_program('python3'),
         '-c',
         '''
+import os
 import re
+import sys
 import sysconfig
 from pathlib import Path
 
 purelib = Path(sysconfig.get_paths()["purelib"])
-version_file = purelib / "torch" / "version.py"
+
+def torch_root() -> Path:
+    env = os.environ.get("RGPOT_TORCH_ROOT", "").strip()
+    if env:
+        p = Path(env)
+        if (p / "version.py").is_file():
+            return p
+        if (p / "torch" / "version.py").is_file():
+            return p / "torch"
+        raise SystemExit(f"RGPOT_TORCH_ROOT has no version.py: {env}")
+    for entry in sys.path:
+        cand = Path(entry) / "torch" / "version.py"
+        if cand.is_file():
+            return cand.parent
+    host = purelib / "torch" / "version.py"
+    if host.is_file():
+        return host.parent
+    raise SystemExit("torch not found (set RGPOT_TORCH_ROOT or install torch)")
+
+troot = torch_root()
+version_file = troot / "version.py"
 match = re.search(
     r"^__version__\s*=\s*['\"]([^'\"]+)",
     version_file.read_text(),
@@ -160,12 +184,13 @@ if match is None:
 version = ".".join(match.group(1).split("+")[0].split(".")[:2])
 print(purelib)
 print(version)
+print(troot / "lib")
 ''',
         check: true,
     ).stdout().strip().split('\n')
     _py_purelib = _py_probe[0]
     _torch_major = _py_probe[1]
-    _torch_libdir = _py_purelib / 'torch' / 'lib'
+    _torch_libdir = _py_probe[2]
     # -L only for link; never embed absolute purelib RUNPATH (breaks portable wheels).
     # Runtime resolution: install_rpath / repair script uses $ORIGIN/../torch/lib etc.
     _deps += declare_dependency(
