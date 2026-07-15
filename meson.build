@@ -352,3 +352,11 @@ rgpot_dep = declare_dependency(
     compile_args: _args,
     dependencies: _deps,
 )
+
+# --------------------- Python package (pip install rgpot)
+if get_option('with_python')
+    if get_option('with_rpc_client_only')
+        error('with_python requires the full pot library (not with_rpc_client_only)')
+    endif
+    subdir('python')
+endif
