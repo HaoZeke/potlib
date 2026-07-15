@@ -114,10 +114,18 @@ MetatomicDlopen::MetatomicDlopen(const MetatomicConfig &config) {
     if (m_lib)
       break;
   }
-  if (!m_lib)
-    throw std::runtime_error(
+  if (!m_lib) {
+    std::string msg =
         "MetatomicDlopen: libmetatomic_engine.so not found "
-        "(set RGPOT_METATOMIC_ENGINE / engine_path / EON_POTENTIALS_PATH)");
+        "(set RGPOT_METATOMIC_ENGINE / engine_path / EON_POTENTIALS_PATH)";
+#ifndef _WIN32
+    if (const char *e = dlerror()) {
+      msg += "; last dlerror: ";
+      msg += e;
+    }
+#endif
+    throw std::runtime_error(msg);
+  }
 
   auto abi = reinterpret_cast<int (*)(void)>(sym(m_lib, "rgpot_mta_abi_version"));
   m_create = reinterpret_cast<create_fn>(sym(m_lib, "rgpot_mta_create"));

@@ -166,10 +166,11 @@ print(version)
     _py_purelib = _py_probe[0]
     _torch_major = _py_probe[1]
     _torch_libdir = _py_purelib / 'torch' / 'lib'
+    # -L only for link; never embed absolute purelib RUNPATH (breaks portable wheels).
+    # Runtime resolution: install_rpath / repair script uses $ORIGIN/../torch/lib etc.
     _deps += declare_dependency(
         link_args: [
             '-L' + _torch_libdir,
-            '-Wl,-rpath,' + _torch_libdir,
             '-ltorch_cpu',
         ],
     )
@@ -251,12 +252,12 @@ print(version)
         )
     endif
     _deps += mta_dep
-    # Explicit rpath into pip torch/metatomic libs for the engine plugin
+    # Link search paths only (-L); portable RUNPATH is install_rpath / repair.
     _deps += declare_dependency(
         link_args: [
-            '-Wl,-rpath,' + (_mts_torch_root / 'lib'),
-            '-Wl,-rpath,' + (_mta_torch_root / 'lib'),
-            '-Wl,-rpath,' + (_py_purelib / 'metatensor' / 'lib'),
+            '-L' + (_mts_torch_root / 'lib'),
+            '-L' + (_mta_torch_root / 'lib'),
+            '-L' + (_py_purelib / 'metatensor' / 'lib'),
         ],
     )
 
@@ -271,7 +272,7 @@ print(version)
     endif
     _deps += vesin_dep
     _deps += declare_dependency(
-        link_args: ['-Wl,-rpath,' + _vesin_libdir],
+        link_args: ['-L' + _vesin_libdir],
     )
 
     _args += ['-DRGPOT_HAS_METATOMIC=TRUE']

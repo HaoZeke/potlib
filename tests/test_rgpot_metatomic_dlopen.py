@@ -18,7 +18,6 @@ def _engine_path() -> Path | None:
     p = rgpot.default_metatomic_engine_path()
     if p:
         return Path(p)
-    # also search site-packages mesonpy.libs
     root = Path(rgpot.__file__).resolve().parent
     for c in (
         root.parent / ".rgpot.mesonpy.libs" / "libmetatomic_engine.so",
@@ -36,7 +35,6 @@ def _model_path() -> Path | None:
     env = os.environ.get("RGPOT_METATOMIC_MODEL")
     if env and Path(env).is_file():
         return Path(env)
-    # common local locations (terra cookbook)
     candidates = [
         Path.home()
         / "Git/Github/lab-cosmo/atomistic-cookbook/examples/eon-pet-neb/models/pet-mad-xs-v1.5.0.pt",
@@ -49,6 +47,15 @@ def _model_path() -> Path | None:
     return None
 
 
+def _rpath_lines(so: Path) -> list[str]:
+    out = subprocess.check_output(["readelf", "-d", str(so)], text=True)
+    return [
+        ln
+        for ln in out.splitlines()
+        if "runpath" in ln.lower() or "rpath" in ln.lower()
+    ]
+
+
 def test_has_dlopen_frontend():
     assert rgpot.has_metatomic_dlopen is True
     assert callable(rgpot.evaluate_metatomic_dlopen)
@@ -58,8 +65,7 @@ def test_has_dlopen_frontend():
 def test_engine_plugin_in_install_or_env():
     eng = _engine_path()
     assert eng is not None and eng.is_file(), (
-        "libmetatomic_engine.so missing from package/env — "
-        "wheel must install the engine plugin (not LJ-only packaging)"
+        "libmetatomic_engine.so missing from package — not LJ-only packaging"
     )
 
 
@@ -69,15 +75,16 @@ def test_engine_is_portable_plugin():
     if not shutil.which("readelf"):
         pytest.skip("readelf missing")
     out = subprocess.check_output(["readelf", "-d", str(eng)], text=True)
-    # Must not need eOn client
     assert "libeonclib" not in out
     assert "eonclib" not in out
-    for line in out.splitlines():
-        low = line.lower()
-        if "runpath" not in low and "rpath" not in low:
-            continue
-        for bad in ("/bbdir", "/.mesonpy", "/build-pyeon", "eOn-pyeon"):
-            assert bad not in line, line
+    for line in _rpath_lines(eng):
+        # No absolute host paths — only $ORIGIN peers
+        assert "/home/" not in line, line
+        assert "/Users/" not in line, line
+        assert "/bbdir" not in line, line
+        assert ".mesonpy-" not in line, line
+        assert "eOn-pyeon" not in line, line
+        assert "$ORIGIN" in line or "Library runpath" in line
 
 
 def test_dlopen_force_evaluation():
@@ -86,24 +93,15 @@ def test_dlopen_force_evaluation():
     assert eng is not None, "engine required"
     if model is None:
         pytest.fail(
-            "No metatomic model file; set RGPOT_METATOMIC_MODEL to a .pt path "
-            "(cannot skip — plan requires real force through dlopen)"
+            "No metatomic model file; set RGPOT_METATOMIC_MODEL to a .pt path"
         )
 
-    # Ensure engine loadable without build-tree LD_LIBRARY_PATH
     os.environ.pop("LD_LIBRARY_PATH", None)
     os.environ.pop("LIBRARY_PATH", None)
     os.environ["RGPOT_METATOMIC_ENGINE"] = str(eng)
 
-    # Minimal H2-like geometry (Angstrom); PET-MAD accepts H/C/N/O/…
-    positions = np.array(
-        [
-            [0.0, 0.0, 0.0],
-            [0.74, 0.0, 0.0],
-        ],
-        dtype=np.float64,
-    )
-    atom_types = np.array([1, 1], dtype=np.int32)  # H, H
+    positions = np.array([[0.0, 0.0, 0.0], [0.74, 0.0, 0.0]], dtype=np.float64)
+    atom_types = np.array([1, 1], dtype=np.int32)
     box = np.eye(3, dtype=np.float64) * 20.0
 
     energy, forces, variance = rgpot.evaluate_metatomic(

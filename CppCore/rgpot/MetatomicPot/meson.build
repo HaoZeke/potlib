@@ -25,7 +25,6 @@ metatomic_dlopen_dep = declare_dependency(
 
 # Fat linked pot + portable engine plugin only when torch/metatomic are available
 if has_metatomic
-    # Linked pot (fast) — optional scientific path
     metatomicpot = library(
         'metatomicpot',
         'MetatomicPot.cc',
@@ -41,27 +40,33 @@ if has_metatomic
         compile_args: ['-DRGPOT_METATOMIC_LINKED=1'],
     )
 
-    # Engine plugin for dlopen: torch/metatomic only — do NOT link LJ/CuH2/_linkto
-    # (portable plugin; consumers: pip rgpot, eOn RGPOT host).
-    _engine_rpath = []
+    # Portable plugin RUNPATH: $ORIGIN peers under site-packages.
+    # Single torch major only — multi-ABI packages install every torch-X.Y
+    # directory; listing many makes ld.so load the first hit (wrong ABI).
+    _engine_rpath_parts = [
+        '$ORIGIN',
+        '$ORIGIN/../torch/lib',
+        '$ORIGIN/../metatensor/lib',
+        '$ORIGIN/../vesin/lib',
+        '$ORIGIN/../metatensor_torch/torch-' + _torch_major + '/lib',
+        '$ORIGIN/../metatomic/torch/torch-' + _torch_major + '/lib',
+        '$ORIGIN/../metatensor/torch/torch-' + _torch_major + '/lib',
+    ]
+    _engine_install_rpath = ':'.join(_engine_rpath_parts)
+    # build_rpath: absolute purelib so ninja link/tests find libs during build only
+    _engine_build_rpath = ''
     if is_variable('_torch_libdir')
-        _engine_rpath += [_torch_libdir]
+        _engine_build_rpath = _torch_libdir
+        if is_variable('_py_purelib')
+            _engine_build_rpath = ':'.join([
+                _torch_libdir,
+                _py_purelib / 'metatensor' / 'lib',
+                _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major) / 'lib',
+                _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
+                _py_purelib / 'vesin' / 'lib',
+            ])
+        endif
     endif
-    if is_variable('_py_purelib')
-        _engine_rpath += [
-            _py_purelib / 'metatensor' / 'lib',
-            _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major) / 'lib',
-            _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major) / 'lib',
-            _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
-            _py_purelib / 'vesin' / 'lib',
-        ]
-    endif
-    _engine_rpath_args = []
-    foreach d : _engine_rpath
-        _engine_rpath_args += ['-Wl,-rpath,' + d]
-    endforeach
-    # Also $ORIGIN for same-dir / mesonpy.libs layout after install
-    _engine_rpath_args += ['-Wl,-rpath,$ORIGIN', '-Wl,-rpath,$ORIGIN/../.rgpot.mesonpy.libs']
 
     metatomic_engine = library(
         'metatomic_engine',
@@ -73,9 +78,9 @@ if has_metatomic
         cpp_args: _args + ['-DRGPOT_MTA_ENGINE_BUILD'],
         # No link_with: _linkto — engine must not NEEDED host pot libs
         include_directories: _incdirs + [mta_inc],
-        link_args: _engine_rpath_args,
         install: not meson.is_subproject(),
-        install_rpath: '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs',
+        build_rpath: _engine_build_rpath,
+        install_rpath: _engine_install_rpath,
         gnu_symbol_visibility: 'default',
     )
 
