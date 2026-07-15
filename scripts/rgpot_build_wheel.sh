@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build + multi-ABI engine pack + RPATH repair for portable rgpot wheels.
+# Build + multi-ABI engine layout + RPATH repair.
 # Nanobind abi3 when build Python >= 3.12.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,10 +14,5 @@ else
   python -m build --wheel
 fi
 WHL=$(ls -1 dist/rgpot-*.whl | head -1)
-bash "$ROOT/scripts/rgpot_repair_wheel.sh" "$WHL"
-if [[ "${RGPOT_SKIP_MULTI_ABI:-0}" != "1" ]]; then
-  bash "$ROOT/scripts/rgpot_pack_multi_abi_engines.sh" "$WHL" || {
-    echo "WARN multi-ABI pack failed; wheel keeps primary engine only" >&2
-  }
-fi
+bash "$ROOT/scripts/rgpot_finalize_wheel.sh" "$WHL"
 echo "WHEEL_OK $WHL"
