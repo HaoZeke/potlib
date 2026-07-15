@@ -1,21 +1,67 @@
-# Python package: rgpot (LJ + MetatomicDlopen frontend; engine when built)
+# Python package: rgpot — nanobind-only bindings (no pybind11).
+#
+# Policy (match pyeonclient):
+#   * Nanobind only for the public extension.
+#   * Stable ABI (abi3 / Py_LIMITED_API 3.12) on GIL builds with Python >= 3.12.
+#   * Free-threaded (NB_FREE_THREADED) when Py_GIL_DISABLED; no abi3 then.
+#
+# Layout:
+#   rgpot/__init__.py
+#   rgpot/_core*.so | _core*.abi3.so
+#   rgpot/lib/torch-X.Y/libmetatomic_engine.so  (multi-ABI engines, post-pack)
 
 py_mod = import('python')
 py = py_mod.find_installation(pure: false)
 py_dep = py.dependency()
 
-pybind11_dep = dependency('pybind11', required: false)
-if not pybind11_dep.found()
-  _pyb11_inc = run_command(
-    py,
-    '-c',
-    'import pybind11; print(pybind11.get_include())',
-    check: true,
-  ).stdout().strip()
-  pybind11_dep = declare_dependency(
-    include_directories: include_directories(_pyb11_inc, is_system: true),
+_nb_probe = run_command(
+  py,
+  '-c',
+  '''
+import nanobind, pathlib, sys, sysconfig
+p = pathlib.Path(nanobind.__file__).resolve().parent
+cands = [p / "src" / "nb_combined.cpp", p / "nb_combined.cpp"]
+comb = next(c for c in cands if c.is_file())
+robin = p / "ext" / "robin_map" / "include"
+if not (robin / "tsl" / "robin_map.h").is_file():
+    for alt in (p / "include", pathlib.Path(nanobind.include_dir())):
+        if (alt / "tsl" / "robin_map.h").is_file():
+            robin = alt
+            break
+ft = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
+ver = sys.version_info
+print(nanobind.include_dir())
+print(robin)
+print(comb)
+print("1" if ft else "0")
+print(f"{ver.major}.{ver.minor}")
+print(nanobind.__version__)
+''',
+  check: false,
+)
+if _nb_probe.returncode() != 0
+  error(
+    'with_python requires nanobind>=2.2 in the build Python '
+    + '(pip/pixi install nanobind)',
   )
 endif
+_nb_lines = _nb_probe.stdout().strip().split('\n')
+_nb_include = _nb_lines[0]
+_nb_robin = _nb_lines[1]
+_nb_combined = _nb_lines[2]
+_nb_free_threaded = _nb_lines[3] == '1'
+_nb_version = _nb_lines[5]
+
+message('rgpot python: nanobind @0@'.format(_nb_version))
+message('rgpot python: free-threaded interpreter = @0@'.format(_nb_free_threaded))
+
+# -isystem so abs paths under .pixi/site-packages are allowed
+nanobind_dep = declare_dependency(
+  compile_args: [
+    '-isystem' + _nb_include,
+    '-isystem' + _nb_robin,
+  ],
+)
 
 if not is_variable('rgpot')
   error('with_python requires the full rgpot library (disable with_rpc_client_only)')
@@ -25,40 +71,77 @@ if not is_variable('metatomic_dlopen')
 endif
 
 _py_incs = _incdirs
-_numpy_inc = run_command(
-  py,
-  '-c',
-  'import numpy; print(numpy.get_include())',
-  check: false,
-)
-if _numpy_inc.returncode() == 0
-  _py_incs += include_directories(_numpy_inc.stdout().strip(), is_system: true)
-endif
-
 _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
-
 _py_link = [rgpot, lennard_jones, metatomic_dlopen]
-if is_variable('cuh2')
-  _py_link += [cuh2]
-endif
+# Do not link cuh2 into the pip extension (fortcuh2 subproject not in wheel
+# when install --skip-subprojects; LJ + metatomic dlopen are the product).
 
 dl_dep = dependency('dl', required: false)
 if not dl_dep.found()
   dl_dep = meson.get_compiler('cpp').find_library('dl', required: false)
 endif
 
-py.extension_module(
-  '_core',
-  sources: files('bind/bind_module.cpp'),
-  dependencies: [py_dep, pybind11_dep, dl_dep] + _deps,
-  include_directories: _py_incs,
-  link_with: _py_link,
-  cpp_args: _args,
-  install: true,
-  install_rpath: _py_rpath,
-  build_rpath: _py_rpath,
-  subdir: 'rgpot',
-)
+_nb_cpp_args = _args + [
+  '-DNB_DOMAIN=rgpot',
+  '-Wno-unused-parameter',
+]
+
+_core_sources = files('bind/bind_module.cpp') + [_nb_combined]
+
+if _nb_free_threaded
+  _nb_cpp_args += ['-DNB_FREE_THREADED']
+  message('rgpot python: FREE_THREADED build; stable ABI skipped')
+  py.extension_module(
+    '_core',
+    sources: _core_sources,
+    dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+    include_directories: _py_incs,
+    link_with: _py_link,
+    cpp_args: _nb_cpp_args,
+    install: true,
+    install_rpath: _py_rpath,
+    build_rpath: _py_rpath,
+    subdir: 'rgpot',
+    gnu_symbol_visibility: 'hidden',
+  )
+else
+  _use_abi3 = py.language_version().version_compare('>=3.12')
+  if _use_abi3
+    message('rgpot python: STABLE_ABI build (abi3, Py_LIMITED_API=3.12)')
+    py.extension_module(
+      '_core',
+      sources: _core_sources,
+      dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+      include_directories: _py_incs,
+      link_with: _py_link,
+      cpp_args: _nb_cpp_args,
+      install: true,
+      install_rpath: _py_rpath,
+      build_rpath: _py_rpath,
+      subdir: 'rgpot',
+      gnu_symbol_visibility: 'hidden',
+      limited_api: '3.12',
+    )
+  else
+    warning(
+      'rgpot python: Python < 3.12 — version-specific extension '
+      + '(stable ABI requires 3.12+)',
+    )
+    py.extension_module(
+      '_core',
+      sources: _core_sources,
+      dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+      include_directories: _py_incs,
+      link_with: _py_link,
+      cpp_args: _nb_cpp_args,
+      install: true,
+      install_rpath: _py_rpath,
+      build_rpath: _py_rpath,
+      subdir: 'rgpot',
+      gnu_symbol_visibility: 'hidden',
+    )
+  endif
+endif
 
 py.install_sources(
   files('rgpot/__init__.py'),
@@ -66,10 +149,6 @@ py.install_sources(
   subdir: 'rgpot',
 )
 
-# Install portable engine plugin next to package when built
 if is_variable('metatomic_engine')
-  # meson-python already installs library targets with install: true into
-  # .rgpot.mesonpy.libs; also expose a stable rgpot/lib/ path via custom install
-  # of a copy is hard — document mesonpy.libs + default_metatomic_engine_path().
-  message('metatomic_engine will install into the wheel (portable plugin)')
+  message('metatomic_engine installs into the wheel; multi-ABI pack via scripts/rgpot_pack_multi_abi_engines.sh')
 endif

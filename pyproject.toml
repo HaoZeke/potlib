@@ -1,7 +1,7 @@
 [project]
 name = "rgpot"
-version = "2.2.1"
-description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic dlopen engine)"
+version = "2.3.0"
+description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic multi-ABI dlopen; nanobind abi3)"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -17,10 +17,12 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: C++",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: Implementation :: CPython",
   "Topic :: Scientific/Engineering :: Chemistry",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-keywords = ["potential", "Lennard-Jones", "metatomic", "rgpot", "potlib", "dlopen"]
+keywords = ["potential", "Lennard-Jones", "metatomic", "rgpot", "potlib", "dlopen", "nanobind", "abi3"]
 
 [project.urls]
 Homepage = "https://github.com/OmniPotentRPC/rgpot"
@@ -46,7 +48,7 @@ requires = [
   "meson-python>=0.16",
   "meson>=1.3",
   "ninja",
-  "pybind11>=2.11",
+  "nanobind>=2.2",
   "numpy>=1.24",
   # Build-time for libmetatomic_engine.so (same purelib layout at runtime)
   "torch>=2.3",

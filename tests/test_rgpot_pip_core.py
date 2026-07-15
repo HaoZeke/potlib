@@ -102,3 +102,18 @@ def test_import_with_empty_ld_library_path():
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "RGPOT_FORCE_OK" in proc.stdout
+
+
+def test_core_is_abi3_or_free_threaded():
+    """On CPython >= 3.12 GIL builds the extension must be abi3-tagged."""
+    import sys
+    import sysconfig
+
+    parent = Path(rgpot.__file__).resolve().parent
+    cores = list(parent.glob("_core*.so")) + list(parent.glob("_core*.pyd"))
+    assert cores, f"missing _core under {parent}"
+    name = cores[0].name
+    gil_disabled = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
+    if sys.version_info >= (3, 12) and not gil_disabled:
+        assert "abi3" in name, f"expected abi3 extension, got {name}"
+

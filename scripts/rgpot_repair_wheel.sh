@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Rewrite absolute purelib RUNPATHs to $ORIGIN-relative site-packages paths.
 #
-# metatensor-torch / metatomic-torch ship *every* torch-X.Y ABI dir in one
-# install. RUNPATH is searched in order and the first existing dir that
-# contains the SONAME wins — listing 2.3..2.15 therefore loads the wrong ABI
-# (undefined symbols). Keep a single torch major: the one the engine was
-# linked against (from prior absolute RUNPATH, DT_NEEDED layout, or env).
+# Engines live at either:
+#   .rgpot.mesonpy.libs/libmetatomic_engine.so          (legacy single)
+#   rgpot/lib/torch-X.Y/libmetatomic_engine.so          (multi-ABI)
+# Each engine gets RUNPATH for *its* torch-X.Y only (never list all ABIs).
 set -euo pipefail
 WHL="${1:?wheel path}"
 command -v patchelf >/dev/null
@@ -13,31 +12,40 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 python3 -m zipfile -e "$WHL" "$WORK"
 
-ENG_SO=$(find "$WORK" -name 'libmetatomic_engine.so' -print -quit)
-TORCH_MAJ="${RGPOT_TORCH_MAJOR:-}"
-if [[ -z "$TORCH_MAJ" && -n "$ENG_SO" ]]; then
-  # Prefer torch-X.Y already present in the engine RUNPATH from the build.
-  TORCH_MAJ=$(readelf -d "$ENG_SO" 2>/dev/null \
-    | sed -n 's/.*torch-\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1 || true)
-fi
-if [[ -z "$TORCH_MAJ" ]]; then
-  TORCH_MAJ=$(python3 -c 'import torch; print(".".join(torch.__version__.split("+")[0].split(".")[:2]))' 2>/dev/null || true)
-fi
-TORCH_MAJ=${TORCH_MAJ:-2.9}
-echo "repair torch ABI major: $TORCH_MAJ"
+engine_rpath_for_maj() {
+  local maj="$1"
+  # From rgpot/lib/torch-X.Y/ → site-packages peers are ../../../
+  # From .rgpot.mesonpy.libs/ → site-packages peers are ../
+  local origin_to_site="$2"
+  echo "\$ORIGIN:\${origin_to_site}torch/lib:\${origin_to_site}metatensor/lib:\${origin_to_site}vesin/lib:\${origin_to_site}metatensor_torch/torch-${maj}/lib:\${origin_to_site}metatomic/torch/torch-${maj}/lib:\${origin_to_site}metatensor/torch/torch-${maj}/lib"
+}
 
-# Peer paths from .rgpot.mesonpy.libs/ — single ABI only (see header comment).
-ENG_RPATH="\$ORIGIN:\$ORIGIN/../torch/lib:\$ORIGIN/../metatensor/lib:\$ORIGIN/../vesin/lib"
-ENG_RPATH+=":\$ORIGIN/../metatensor_torch/torch-${TORCH_MAJ}/lib"
-ENG_RPATH+=":\$ORIGIN/../metatomic/torch/torch-${TORCH_MAJ}/lib"
-ENG_RPATH+=":\$ORIGIN/../metatensor/torch/torch-${TORCH_MAJ}/lib"
-CORE_RPATH='$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs'
+CORE_RPATH='$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
 POT_RPATH='$ORIGIN'
 
 while IFS= read -r -d '' so; do
   base=$(basename "$so")
+  rel=${so#"$WORK/"}
   if [[ "$base" == *metatomic_engine* ]]; then
-    echo "patchelf engine $(basename "$so")"
+    maj=""
+    if [[ "$rel" =~ torch-([0-9]+\.[0-9]+)/ ]]; then
+      maj="${BASH_REMATCH[1]}"
+      # rgpot/lib/torch-X.Y/lib.so → three levels up to site-packages
+      peer='$ORIGIN/../../../'
+    else
+      maj="${RGPOT_TORCH_MAJOR:-}"
+      if [[ -z "$maj" ]]; then
+        maj=$(readelf -d "$so" 2>/dev/null | sed -n 's/.*torch-\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1 || true)
+      fi
+      maj=${maj:-2.9}
+      peer='$ORIGIN/../'
+    fi
+    # Build rpath string without nested expansion bugs
+    ENG_RPATH="\$ORIGIN:${peer}torch/lib:${peer}metatensor/lib:${peer}vesin/lib"
+    ENG_RPATH+=":${peer}metatensor_torch/torch-${maj}/lib"
+    ENG_RPATH+=":${peer}metatomic/torch/torch-${maj}/lib"
+    ENG_RPATH+=":${peer}metatensor/torch/torch-${maj}/lib"
+    echo "patchelf engine $rel (torch-$maj)"
     patchelf --set-rpath "$ENG_RPATH" "$so"
   elif [[ "$base" == _core* ]]; then
     echo "patchelf core $(basename "$so")"

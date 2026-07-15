@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Build + repair rgpot wheel so install is portable ($ORIGIN purelib peers).
-# Usage: ./scripts/rgpot_build_wheel.sh
-# Requires torch/metatomic for engine link; sets CMAKE_PREFIX_PATH from torch.
+# Build + multi-ABI engine pack + RPATH repair for portable rgpot wheels.
+# Nanobind abi3 when build Python >= 3.12.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-python -m pip install -U build meson ninja meson-python pybind11 numpy wheel 2>/dev/null || true
+python -m pip install -U build meson ninja meson-python nanobind numpy wheel 2>/dev/null || true
 rm -rf dist build .mesonpy*
 if python -c "import torch, metatomic.torch" 2>/dev/null; then
   export CMAKE_PREFIX_PATH="$(python -c 'import torch; print(torch.utils.cmake_prefix_path)')${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
@@ -16,4 +15,9 @@ else
 fi
 WHL=$(ls -1 dist/rgpot-*.whl | head -1)
 bash "$ROOT/scripts/rgpot_repair_wheel.sh" "$WHL"
+if [[ "${RGPOT_SKIP_MULTI_ABI:-0}" != "1" ]]; then
+  bash "$ROOT/scripts/rgpot_pack_multi_abi_engines.sh" "$WHL" || {
+    echo "WARN multi-ABI pack failed; wheel keeps primary engine only" >&2
+  }
+fi
 echo "WHEEL_OK $WHL"

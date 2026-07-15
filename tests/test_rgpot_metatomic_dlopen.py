@@ -116,3 +116,20 @@ def test_dlopen_force_evaluation():
     assert forces.shape == (2, 3), forces.shape
     assert np.all(np.isfinite(forces)), forces
     print("RGPOT_DLOPEN_FORCE_OK", float(energy), forces.shape)
+
+
+def test_available_engine_abis_and_torch_match():
+    """Picker prefers lib/torch-X.Y matching installed torch when present."""
+    abis = rgpot.available_metatomic_engine_abis()
+    eng = rgpot.default_metatomic_engine_path()
+    assert eng is not None
+    # If multi-ABI pack is present, path should mention torch-X.Y
+    if abis:
+        assert "torch-" in eng or Path(eng).name == "libmetatomic_engine.so"
+        try:
+            import torch
+            maj = ".".join(torch.__version__.split("+")[0].split(".")[:2])
+            if maj in abis:
+                assert f"torch-{maj}" in eng, (maj, eng, abis)
+        except ImportError:
+            pass

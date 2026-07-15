@@ -1,8 +1,11 @@
 """rgpot — potential energy surfaces for atomistic simulation.
 
-Core: Lennard-Jones. Metatomic path uses **dlopen** of ``libmetatomic_engine.so``
-(not a fat-only link): install the engine next to the package or set
-``RGPOT_METATOMIC_ENGINE`` / pass ``engine_path=``.
+Core: Lennard-Jones. Metatomic path uses **dlopen** of a portable
+``libmetatomic_engine.so`` (stable C ABI). Engines are multi-ABI:
+
+  ``rgpot/lib/torch-X.Y/libmetatomic_engine.so``
+
+selected from the installed ``torch`` major (same layout as metatomic-torch).
 """
 
 from __future__ import annotations
@@ -19,23 +22,61 @@ from rgpot._core import (
 )
 
 
+def _torch_major() -> str | None:
+    """Return installed torch X.Y, or None if torch is not importable."""
+    try:
+        import torch
+
+        v = torch.__version__.split("+", 1)[0]
+        parts = v.split(".")
+        return f"{parts[0]}.{parts[1]}"
+    except Exception:
+        return None
+
+
 def default_metatomic_engine_path() -> str | None:
-    """Return package-bundled libmetatomic_engine.so if present."""
+    """Return package-bundled engine matching installed torch ABI if possible."""
     here = Path(__file__).resolve().parent
-    candidates = [
-        here / "lib" / "libmetatomic_engine.so",
-        here.parent / ".rgpot.mesonpy.libs" / "libmetatomic_engine.so",
-        here / "libmetatomic_engine.so",
-    ]
+    maj = _torch_major()
+    candidates: list[Path] = []
+    if maj:
+        candidates.append(here / "lib" / f"torch-{maj}" / "libmetatomic_engine.so")
+    # Legacy single-engine layouts
+    candidates.extend(
+        [
+            here / "lib" / "libmetatomic_engine.so",
+            here.parent / ".rgpot.mesonpy.libs" / "libmetatomic_engine.so",
+            here / "libmetatomic_engine.so",
+        ]
+    )
+    # Any multi-ABI install if torch major unknown: first present
+    lib_root = here / "lib"
+    if lib_root.is_dir():
+        for d in sorted(lib_root.glob("torch-*")):
+            candidates.append(d / "libmetatomic_engine.so")
+
     for c in candidates:
         if c.is_file():
             return str(c)
+
     env = os.environ.get("RGPOT_METATOMIC_ENGINE") or os.environ.get(
         "METATOMIC_ENGINE"
     )
     if env and Path(env).is_file():
         return env
     return None
+
+
+def available_metatomic_engine_abis() -> list[str]:
+    """List torch-X.Y majors for which a bundled engine is present."""
+    here = Path(__file__).resolve().parent / "lib"
+    out: list[str] = []
+    if not here.is_dir():
+        return out
+    for d in sorted(here.glob("torch-*")):
+        if (d / "libmetatomic_engine.so").is_file():
+            out.append(d.name.removeprefix("torch-"))
+    return out
 
 
 def evaluate_metatomic(
@@ -60,6 +101,7 @@ __all__ = [
     "evaluate_metatomic",
     "evaluate_metatomic_dlopen",
     "default_metatomic_engine_path",
+    "available_metatomic_engine_abis",
     "has_metatomic_dlopen",
     "__version__",
 ]
