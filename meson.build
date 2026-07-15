@@ -236,56 +236,34 @@ print(api_inc)
         _mts_inc_args += ['-isystem', d]
     endforeach
 
-    # metatensor-torch: try pkg-config, then cmake, then find_library
-    mts_dep = dependency('metatensor_torch', required: false)
-    if not mts_dep.found()
-        mts_dep = dependency('metatensor-torch', required: false)
-    endif
-    if not mts_dep.found()
-        mts_dep = dependency(
-            'metatensor_torch',
-            method: 'cmake',
-            required: false,
-        )
-    endif
-    if not mts_dep.found()
-        _mts_lib_dirs = [
-            _mts_torch_root / 'lib',
-            _mts_torch_legacy / 'lib',
-            _py_purelib / 'metatensor' / 'lib',
-        ]
-        mts_dep = declare_dependency(
-            dependencies: [
-                cppc.find_library(
-                    'metatensor',
-                    dirs: [_py_purelib / 'metatensor' / 'lib'],
-                ),
-                cppc.find_library(
-                    'metatensor_torch',
-                    dirs: _mts_lib_dirs,
-                ),
-            ],
-            compile_args: _mts_inc_args,
-        )
-    endif
+    # Always use purelib find_library + -isystem (no pkg-config/cmake): multi-ABI
+    # builds must not pull host Torch cmake includes (dtype symbol conflicts).
+    _mts_lib_dirs = [
+        _mts_torch_root / 'lib',
+        _mts_torch_legacy / 'lib',
+        _py_purelib / 'metatensor' / 'lib',
+    ]
+    mts_dep = declare_dependency(
+        dependencies: [
+            cppc.find_library(
+                'metatensor',
+                dirs: [_py_purelib / 'metatensor' / 'lib'],
+            ),
+            cppc.find_library(
+                'metatensor_torch',
+                dirs: _mts_lib_dirs,
+            ),
+        ],
+        compile_args: _mts_inc_args,
+    )
     _deps += mts_dep
-    # Always inject purelib includes (vesin/metatomic/metatensor torch-X.Y).
-    # pkg-config/cmake deps may find libs without those -isystem paths.
-    _deps += declare_dependency(compile_args: _mts_inc_args)
 
-    # metatomic-torch: try pkg-config, then cmake, then find_library
-    mta_dep = dependency('metatomic_torch', required: false)
-    if not mta_dep.found()
-        mta_dep = dependency('metatomic-torch', required: false)
-    endif
-    if not mta_dep.found()
-        mta_dep = cppc.find_library(
-            'metatomic_torch',
-            dirs: [
-                _mta_torch_root / 'lib',
-            ],
-        )
-    endif
+    mta_dep = cppc.find_library(
+        'metatomic_torch',
+        dirs: [
+            _mta_torch_root / 'lib',
+        ],
+    )
     _deps += mta_dep
     # Link search paths only (-L); portable RUNPATH is install_rpath / repair.
     _deps += declare_dependency(

@@ -119,7 +119,9 @@ build_one() {
     export PATH="$(dirname "$PY"):/usr/bin:$PATH"
     export PYTHONPATH="$prefix${PYTHONPATH:+:$PYTHONPATH}"
     export RGPOT_TORCH_ROOT="$prefix/torch"
-    export CMAKE_PREFIX_PATH="$prefix/torch/share/cmake${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+    # Do not inherit host Torch cmake (pollutes multi-ABI includes)
+    unset CMAKE_PREFIX_PATH || true
+    unset Torch_DIR || true
     "$PY" -c "from pathlib import Path; import os; r=Path(os.environ['RGPOT_TORCH_ROOT']); print('torch_root', r, 'cpu', (r/'lib'/'libtorch_cpu.so').is_file())"
     meson setup "$bdir" \
       -Dbuildtype=release \
