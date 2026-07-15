@@ -146,10 +146,11 @@ MetatomicDlopen::MetatomicDlopen(const MetatomicConfig &config) {
 }
 
 MetatomicDlopen::~MetatomicDlopen() {
+  // Keep the engine mapped: torch/metatomic static teardown after dlclose
+  // routinely SEGV at process exit.
   if (m_pot && m_destroy)
     m_destroy(m_pot);
   m_pot = nullptr;
-  close_lib(m_lib);
   m_lib = nullptr;
 }
 
