@@ -128,7 +128,12 @@ nb::tuple evaluate_metatomic_dlopen(const NpF64 &positions,
   flat_box(cell, flat);
   rgpot::ForceInput in{n, pos.data(), types.data(), flat};
   rgpot::ForceOut out{forces.data(), 0.0, 0.0};
-  front.forceImpl(in, &out);
+  // Torch autograd must not run while the Python GIL is held once
+  // libtorch_python is loaded (nanobind keeps the GIL by default).
+  {
+    nb::gil_scoped_release release;
+    front.forceImpl(in, &out);
+  }
   return nb::make_tuple(out.energy, atom_matrix_to_numpy(forces), out.variance);
 }
 
