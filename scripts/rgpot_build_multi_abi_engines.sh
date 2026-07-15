@@ -46,7 +46,8 @@ ensure_torch_prefix() {
   else
     # 2) download a manylinux wheel for an older CPython tag and extract
     echo "  pip install failed; trying wheel download for cp312"
-    if ! "$PY" -m pip download -q "torch==${maj}.*" \
+    # Prefer +cpu wheels (CUDA wheels break cmake / need nvcc)
+    if ! "$PY" -m pip download -q "torch==${maj}.*+cpu" \
         --index-url https://download.pytorch.org/whl/cpu \
         --only-binary=:all: \
         --python-version 312 --abi cp312 \
@@ -55,13 +56,17 @@ ensure_torch_prefix() {
         --platform manylinux_2_28_x86_64 \
         -d "$ABI_ROOT/wheels-$maj" 2>>"$ABI_ROOT/pip-$maj.log"; then
       "$PY" -m pip download -q "torch==${maj}.*" \
+        --index-url https://download.pytorch.org/whl/cpu \
         --only-binary=:all: \
         --python-version 312 --abi cp312 \
         --platform manylinux2014_x86_64 \
+        --platform manylinux_2_28_x86_64 \
         -d "$ABI_ROOT/wheels-$maj" 2>>"$ABI_ROOT/pip-$maj.log" || true
     fi
     local whl
-    whl=$(ls "$ABI_ROOT/wheels-$maj"/torch-*.whl 2>/dev/null | head -1 || true)
+    # Prefer +cpu filenames when both exist
+    whl=$(ls "$ABI_ROOT/wheels-$maj"/torch-*cpu*.whl 2>/dev/null | head -1 || true)
+    [[ -n "$whl" ]] || whl=$(ls "$ABI_ROOT/wheels-$maj"/torch-*.whl 2>/dev/null | head -1 || true)
     if [[ -n "$whl" ]]; then
       echo "  extract $whl"
       "$PY" -m zipfile -e "$whl" "$prefix"
@@ -117,6 +122,7 @@ build_one() {
     export CMAKE_PREFIX_PATH="$prefix/torch/share/cmake${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
     "$PY" -c "from pathlib import Path; import os; r=Path(os.environ['RGPOT_TORCH_ROOT']); print('torch_root', r, 'cpu', (r/'lib'/'libtorch_cpu.so').is_file())"
     meson setup "$bdir" \
+      -Dbuildtype=release \
       -Dwith_python=false -Dwith_rpc=false -Dwith_tests=false -Dwith_examples=false \
       -Dwith_metatomic=true -Dwith_xtb=false -Dwith_tblite=false -Dwith_rust_core=false \
       -Dwith_cache=false -Dwith_eigen=false -Db_lto=false \

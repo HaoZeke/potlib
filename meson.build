@@ -126,21 +126,12 @@ endif
 
 has_metatomic = false
 if get_option('with_metatomic')
-    # PyTorch C++ API (libtorch) -- found via cmake.
-    # Meson's cmake trace often fails to resolve the full linker flags for
-    # libtorch_cpu.so. We supplement with an explicit rpath + link_args.
-    torch_dep = dependency(
-        'Torch',
-        method: 'cmake',
-        modules: ['torch'],
-        required: true,
-    )
-    _deps += torch_dep
-
     # Discover torch without importing it (import can load NumPy C extensions
     # during meson configure). Supports multi-ABI builds via:
     #   RGPOT_TORCH_ROOT=/path/to/site-packages/torch  (isolated major)
     #   or first torch/version.py on sys.path (PYTHONPATH prefixes).
+    # Prefer manual -isystem/-L over cmake Torch: old/CUDA wheels break cmake
+    # with missing nvcc; libtorch_cpu.so is enough for the engine plugin.
     # Metatomic multi-ABI headers always come from the host purelib.
     _py_probe = run_command(
         find_program('python3'),
@@ -182,23 +173,39 @@ match = re.search(
 if match is None:
     raise SystemExit(f"torch version not found in {version_file}")
 version = ".".join(match.group(1).split("+")[0].split(".")[:2])
+libdir = troot / "lib"
+inc = troot / "include"
+api_inc = troot / "include" / "torch" / "csrc" / "api" / "include"
+if not (libdir / "libtorch_cpu.so").is_file() and not (libdir / "libtorch_cpu.dylib").is_file():
+    raise SystemExit(f"libtorch_cpu not under {libdir}")
 print(purelib)
 print(version)
-print(troot / "lib")
+print(libdir)
+print(inc)
+print(api_inc)
 ''',
         check: true,
     ).stdout().strip().split('\n')
     _py_purelib = _py_probe[0]
     _torch_major = _py_probe[1]
     _torch_libdir = _py_probe[2]
-    # -L only for link; never embed absolute purelib RUNPATH (breaks portable wheels).
-    # Runtime resolution: install_rpath / repair script uses $ORIGIN/../torch/lib etc.
-    _deps += declare_dependency(
+    _torch_inc = _py_probe[3]
+    _torch_api_inc = _py_probe[4]
+    # Manual torch dep (no cmake): includes + link search paths only.
+    # Portable RUNPATH is install_rpath / repair script.
+    torch_dep = declare_dependency(
+        compile_args: [
+            '-isystem', _torch_inc,
+            '-isystem', _torch_api_inc,
+        ],
         link_args: [
             '-L' + _torch_libdir,
+            '-Wl,-rpath-link,' + _torch_libdir,
             '-ltorch_cpu',
+            '-lc10',
         ],
     )
+    _deps += torch_dep
 
     # metatensor-torch / metatomic-torch headers live in the
     # python interpreter's site-packages under
@@ -262,6 +269,9 @@ print(troot / "lib")
         )
     endif
     _deps += mts_dep
+    # Always inject purelib includes (vesin/metatomic/metatensor torch-X.Y).
+    # pkg-config/cmake deps may find libs without those -isystem paths.
+    _deps += declare_dependency(compile_args: _mts_inc_args)
 
     # metatomic-torch: try pkg-config, then cmake, then find_library
     mta_dep = dependency('metatomic_torch', required: false)
