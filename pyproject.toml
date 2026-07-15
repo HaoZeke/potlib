@@ -1,7 +1,7 @@
 [project]
 name = "rgpot"
 version = "2.2.1"
-description = "Potential energy surfaces for atomistic simulation (Lennard-Jones core; optional RPC/engines)"
+description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic dlopen engine)"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -20,7 +20,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Chemistry",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-keywords = ["potential", "Lennard-Jones", "atomistic", "rgpot", "potlib"]
+keywords = ["potential", "Lennard-Jones", "metatomic", "rgpot", "potlib", "dlopen"]
 
 [project.urls]
 Homepage = "https://github.com/OmniPotentRPC/rgpot"
@@ -29,6 +29,15 @@ Issues = "https://github.com/OmniPotentRPC/rgpot/issues"
 Changelog = "https://github.com/OmniPotentRPC/rgpot/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
+# Runtime Python stack for the Metatomic engine (torch + metatomic from PyPI).
+# The engine .so is built into the wheel; these packages provide the NEEDED libs.
+metatomic = [
+  "torch>=2.3",
+  "metatensor-core>=0.1.0",
+  "metatensor-torch>=0.6.0",
+  "metatomic-torch>=0.1.0",
+  "vesin>=0.1.0",
+]
 ase = ["ase>=3.22"]
 test = ["pytest>=7", "numpy>=1.24"]
 
@@ -39,10 +48,16 @@ requires = [
   "ninja",
   "pybind11>=2.11",
   "numpy>=1.24",
+  # Build-time for libmetatomic_engine.so (same purelib layout at runtime)
+  "torch>=2.3",
+  "metatensor-core",
+  "metatensor-torch",
+  "metatomic-torch",
+  "vesin",
 ]
 build-backend = "mesonpy"
 
-# Default wheel: always-on LJ (no Cap'n Proto, no torch, no potserv).
+# Wheel keeps dlopen Metatomic path: engine plugin + thin frontend (not LJ-only).
 [tool.meson-python.args]
 setup = [
   "-Dwith_python=true",
@@ -50,7 +65,7 @@ setup = [
   "-Dwith_rpc_client_only=false",
   "-Dwith_tests=false",
   "-Dwith_examples=false",
-  "-Dwith_metatomic=false",
+  "-Dwith_metatomic=true",
   "-Dwith_xtb=false",
   "-Dwith_tblite=false",
   "-Dwith_rust_core=false",

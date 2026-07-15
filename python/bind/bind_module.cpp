@@ -1,11 +1,11 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 //
-// Thin pybind11 surface for the always-on core (Lennard-Jones).
-// Optional heavy backends (RPC, Metatomic, NWChem, …) are not required.
+// Python surface: always-on LJ + MetatomicDlopen frontend (engine .so optional).
 
 #include <array>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -14,6 +14,8 @@
 #include <pybind11/stl.h>
 
 #include "rgpot/LennardJones/LJPot.hpp"
+#include "rgpot/MetatomicPot/MetatomicConfig.hpp"
+#include "rgpot/MetatomicPot/MetatomicDlopen.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
 namespace py = pybind11;
@@ -74,6 +76,12 @@ py::array_t<double> atom_matrix_to_numpy(const AtomMatrix &mat) {
   return out;
 }
 
+void flat_box(const std::array<std::array<double, 3>, 3> &box, double out[9]) {
+  for (int i = 0; i < 3; ++i)
+    for (int j = 0; j < 3; ++j)
+      out[i * 3 + j] = box[i][j];
+}
+
 py::tuple evaluate_lj(const py::array_t<double> &positions,
                       const py::array_t<int> &atom_types,
                       const py::array_t<double> &box) {
@@ -89,34 +97,64 @@ py::tuple evaluate_lj(const py::array_t<double> &positions,
   return py::make_tuple(energy, atom_matrix_to_numpy(forces), variance);
 }
 
+py::tuple evaluate_metatomic_dlopen(const py::array_t<double> &positions,
+                                    const py::array_t<int> &atom_types,
+                                    const py::array_t<double> &box,
+                                    const std::string &model_path,
+                                    const std::string &engine_path,
+                                    const std::string &device) {
+  if (positions.ndim() != 2 || atom_types.ndim() != 1 || box.ndim() != 2) {
+    throw std::invalid_argument(
+        "evaluate_metatomic_dlopen expects positions (n,3), atom_types (n,), "
+        "box (3,3)");
+  }
+  if (model_path.empty()) {
+    throw std::invalid_argument("model_path is required");
+  }
+  auto pos = numpy_to_atom_matrix(positions);
+  auto types = numpy_to_types(atom_types, pos.rows());
+  auto cell = numpy_to_box(box);
+
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = model_path;
+  cfg.engine_path = engine_path;
+  cfg.device = device.empty() ? "cpu" : device;
+
+  rgpot::MetatomicDlopen front(cfg);
+  if (!front.available()) {
+    throw std::runtime_error("MetatomicDlopen: engine not available");
+  }
+
+  const size_t n = pos.rows();
+  AtomMatrix forces = AtomMatrix::Zero(n, 3);
+  double flat[9];
+  flat_box(cell, flat);
+  rgpot::ForceInput in{n, pos.data(), types.data(), flat};
+  rgpot::ForceOut out{forces.data(), 0.0, 0.0};
+  front.forceImpl(in, &out);
+  return py::make_tuple(out.energy, atom_matrix_to_numpy(forces), out.variance);
+}
+
 } // namespace
 
 PYBIND11_MODULE(_core, m) {
-  m.doc() = "rgpot core Python bindings (Lennard-Jones and related)";
+  m.doc() = "rgpot Python bindings (LJ core + Metatomic dlopen frontend)";
   m.attr("__version__") = "2.2.1";
+  m.attr("has_metatomic_dlopen") = true;
 
   m.def("evaluate_lj", &evaluate_lj, py::arg("positions"),
-        py::arg("atom_types"), py::arg("box"),
-        R"pbdoc(
-Evaluate the always-on shifted 12-6 Lennard-Jones potential.
+        py::arg("atom_types"), py::arg("box"));
 
-Parameters
-----------
-positions : ndarray, shape (n_atoms, 3)
-    Cartesian coordinates (Angstrom).
-atom_types : ndarray, shape (n_atoms,), dtype int
-    Integer type ids (LJ uses type for identity; 0 is fine for pure LJ).
-box : ndarray, shape (3, 3)
-    Cell matrix (row vectors).
+  m.def(
+      "evaluate_metatomic_dlopen", &evaluate_metatomic_dlopen,
+      py::arg("positions"), py::arg("atom_types"), py::arg("box"),
+      py::arg("model_path"), py::arg("engine_path") = "",
+      py::arg("device") = "cpu",
+      R"pbdoc(
+Evaluate forces via MetatomicDlopen (dlopen libmetatomic_engine.so).
 
-Returns
--------
-energy : float
-    Potential energy.
-forces : ndarray, shape (n_atoms, 3)
-    Forces.
-variance : float
-    Unused for LJ (always 0).
+engine_path may be empty to use RGPOT_METATOMIC_ENGINE / package-bundled
+libmetatomic_engine.so on the library path.
 )pbdoc");
 
   py::class_<rgpot::LJPot>(m, "LJPot")

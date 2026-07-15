@@ -52,11 +52,11 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [tblitepot]
     endif
 
+    # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
+    subdir('rgpot/MetatomicPot')
+    _linkto += [metatomic_dlopen]
     if has_metatomic
-        subdir('rgpot/MetatomicPot')  # metatomicpot + engine + dlopen frontend
         rgpotentials += [metatomicpot]
-        # Prefer linking dlopen frontend into librgpot for thin consumers
-        _linkto += [metatomic_dlopen]
     endif
 
     if _rpc_stack

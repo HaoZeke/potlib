@@ -181,10 +181,21 @@ print(version)
     # pkg-config dependency lookups don't see those, and
     # find_library() doesn't add include paths. Ask sysconfig for
     # the right purelib and propagate -isystem includes manually.
+    # Layout (current PyPI wheels):
+    #   metatensor/lib/libmetatensor.so
+    #   metatensor_torch/torch-X.Y/{lib,include}
+    #   metatomic/torch/torch-X.Y/{lib,include}
+    #   vesin/lib/libvesin.so
+    _mts_torch_root = _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major)
+    _mta_torch_root = _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major)
+    # Legacy layout fallback
+    _mts_torch_legacy = _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major)
+
     _mts_inc_dirs = [
         _py_purelib / 'metatensor' / 'include',
-        _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major) / 'include',
-        _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'include',
+        _mts_torch_root / 'include',
+        _mts_torch_legacy / 'include',
+        _mta_torch_root / 'include',
         _py_purelib / 'vesin' / 'include',
     ]
     _mts_inc_args = []
@@ -205,6 +216,11 @@ print(version)
         )
     endif
     if not mts_dep.found()
+        _mts_lib_dirs = [
+            _mts_torch_root / 'lib',
+            _mts_torch_legacy / 'lib',
+            _py_purelib / 'metatensor' / 'lib',
+        ]
         mts_dep = declare_dependency(
             dependencies: [
                 cppc.find_library(
@@ -213,11 +229,7 @@ print(version)
                 ),
                 cppc.find_library(
                     'metatensor_torch',
-                    dirs: [
-                        _py_purelib / 'metatensor' / 'torch' / (
-                            'torch-' + _torch_major
-                        ) / 'lib',
-                    ],
+                    dirs: _mts_lib_dirs,
                 ),
             ],
             compile_args: _mts_inc_args,
@@ -234,11 +246,19 @@ print(version)
         mta_dep = cppc.find_library(
             'metatomic_torch',
             dirs: [
-                _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
+                _mta_torch_root / 'lib',
             ],
         )
     endif
     _deps += mta_dep
+    # Explicit rpath into pip torch/metatomic libs for the engine plugin
+    _deps += declare_dependency(
+        link_args: [
+            '-Wl,-rpath,' + (_mts_torch_root / 'lib'),
+            '-Wl,-rpath,' + (_mta_torch_root / 'lib'),
+            '-Wl,-rpath,' + (_py_purelib / 'metatensor' / 'lib'),
+        ],
+    )
 
     # vesin neighbor list library
     _vesin_libdir = _py_purelib / 'vesin' / 'lib'
