@@ -39,9 +39,14 @@ def default_metatomic_engine_path() -> str | None:
     here = Path(__file__).resolve().parent
     maj = _torch_major()
     candidates: list[Path] = []
+    # Multi-ABI layout first (rgpot/lib/torch-X.Y/) — preferred product path
     if maj:
         candidates.append(here / "lib" / f"torch-{maj}" / "libmetatomic_engine.so")
-    # Legacy single-engine layouts
+    lib_root = here / "lib"
+    if lib_root.is_dir():
+        for d in sorted(lib_root.glob("torch-*")):
+            candidates.append(d / "libmetatomic_engine.so")
+    # Legacy single-engine layouts (last resort)
     candidates.extend(
         [
             here / "lib" / "libmetatomic_engine.so",
@@ -49,11 +54,6 @@ def default_metatomic_engine_path() -> str | None:
             here / "libmetatomic_engine.so",
         ]
     )
-    # Any multi-ABI install if torch major unknown: first present
-    lib_root = here / "lib"
-    if lib_root.is_dir():
-        for d in sorted(lib_root.glob("torch-*")):
-            candidates.append(d / "libmetatomic_engine.so")
 
     for c in candidates:
         if c.is_file():
