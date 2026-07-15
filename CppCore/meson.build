@@ -53,8 +53,10 @@ if not get_option('with_rpc_client_only')
     endif
 
     if has_metatomic
-        subdir('rgpot/MetatomicPot')  # 'metatomicpot'
+        subdir('rgpot/MetatomicPot')  # metatomicpot + engine + dlopen frontend
         rgpotentials += [metatomicpot]
+        # Prefer linking dlopen frontend into librgpot for thin consumers
+        _linkto += [metatomic_dlopen]
     endif
 
     if _rpc_stack
@@ -77,6 +79,12 @@ if not get_option('with_rpc_client_only')
         link_with: _linkto,
         install: not meson.is_subproject(),
     )
+endif
+
+# Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
+# Thin host links metatomic_dlopen_dep; optional libmetatomic_engine.so holds torch.
+if get_option('with_rpc_client_only') and has_metatomic
+    subdir('rgpot/MetatomicPot')
 endif
 
 # ------------------------ Server

@@ -5,8 +5,6 @@
 // Neighbor lists use vesin. Source is compatible with both vesin 0.3.x
 // (enum VesinDevice, no Options.algorithm) and 0.5+ (struct VesinDevice
 // {type, device_id}, Options.algorithm) via type traits in vesin_compat.hpp.
-// The pixi metatomic feature pins vesin>=0.5.2,<0.6; parent consumers may
-// still ship older headers.
 
 #include <mutex>
 #include <string>
@@ -28,68 +26,10 @@
 
 #pragma GCC diagnostic pop
 
+#include "rgpot/MetatomicPot/MetatomicConfig.hpp"
 #include "rgpot/Potential.hpp"
 
 namespace rgpot {
-
-// Process-global LibTorch execution policy for Metatomic/PET evaluation.
-//
-// These flags live on at::globalContext() and therefore affect every Torch
-// user in the process, not only the MetatomicPot instance that applied them.
-// Fast is the default and never mutates global state (fused CUDA attention
-// and other nondeterministic kernels remain available). Strict requests
-// deterministic algorithms without warn-only fallback, pins scaled-dot-
-// product attention to the math SDP backend only (flash, memory-efficient,
-// and cuDNN SDP disabled), disables TF32 for cuBLAS and cuDNN, forces
-// deterministic cuDNN algorithms with benchmarking off, and fills
-// uninitialized memory deterministically. Callers that need run-to-run force
-// bit-stability must opt into Strict explicitly.
-//
-// CUDA host process requirement (not settable via at::globalContext after
-// cuBLAS has been used): export CUBLAS_WORKSPACE_CONFIG=:4096:8 (or :16:8)
-// before the first cuBLAS call, or Strict cannot guarantee cuBLAS bit-
-// stability on CUDA >= 10.2.
-enum class TorchDeterminismPolicy {
-  Fast = 0,
-  Strict = 1,
-};
-
-// Apply a TorchDeterminismPolicy to the process-global LibTorch context.
-// Strict mutates at::globalContext(); Fast is a no-op that leaves existing
-// global flags unchanged (it does not restore a previous Strict setting).
-void apply_torch_determinism_policy(TorchDeterminismPolicy policy);
-
-struct MetatomicConfig {
-  std::string model_path;
-  std::string device;
-  std::string length_unit = "angstrom";
-  std::string extensions_directory;
-  bool check_consistency = false;
-  // If > 0, request per-atom energy_uncertainty (when the model exposes it)
-  // and write the mean into ForceOut::variance; also log atoms above threshold.
-  double uncertainty_threshold = -1.0;
-  std::string dtype_override;
-  // eOn #287 / #292: multi-orientation handling for models that are not
-  // exactly rotationally invariant.
-  // n_symmetry_rotations snaps to a rotation GROUP orbit: >=24 -> chiral
-  // octahedral (24), >=12 -> tetrahedral (12). Group averaging makes the
-  // averaged energy exactly G-invariant and keeps F_avg = -grad E_avg as an
-  // exact finite-sum identity (residual SO(3) non-invariance starts at l=4
-  // for O, l=3 kept for T). 1 < n < 12 falls back to that many seeded
-  // Haar-random orientations (Monte Carlo; 1/sqrt(N) damping only).
-  // random_rotation alone is a single rotated evaluation.
-  bool random_rotation = false;
-  long n_symmetry_rotations = 0;
-  // Probe-scatter mode: output E/F come from the UNROTATED evaluation only
-  // (one coherent surface steers geometry); n_symmetry_rotations extra
-  // orientations are evaluated solely to measure the force-RMS orientation
-  // scatter written to ForceOut::variance (an uncertainty certificate,
-  // never a geometry signal).
-  bool so3_probe_scatter = false;
-  // LibTorch determinism policy applied once at construction (process-global).
-  // Default Fast preserves throughput; set Strict for explicit reproducibility.
-  TorchDeterminismPolicy torch_determinism = TorchDeterminismPolicy::Fast;
-};
 
 class MetatomicPot : public Potential<MetatomicPot> {
 public:
@@ -117,8 +57,8 @@ private:
   double m_uncertainty_threshold = -1.0;
 
   mutable std::mutex m_mutex;
-  mutable torch::Tensor m_cached_types; //!< Cached atomic types tensor.
-  mutable size_t m_cached_natoms = 0;   //!< Atom count for cached types.
+  mutable torch::Tensor m_cached_types;
+  mutable size_t m_cached_natoms = 0;
 
   metatensor_torch::TensorBlock
   computeNeighbors(metatomic_torch::NeighborListOptions request, long nAtoms,

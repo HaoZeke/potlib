@@ -457,3 +457,36 @@ TEST_CASE("Strict MetatomicPot SO3 n=4 CUDA matched forces when available",
     SKIP("CUDA Metatomic load/eval not supported for this model/build");
   }
 }
+
+#include "rgpot/MetatomicPot/MetatomicDlopen.hpp"
+#include "rgpot/MetatomicPot/metatomic_c_abi.h"
+#include <dlfcn.h>
+
+TEST_CASE("MetatomicDlopen loads engine and matches linked pot energy",
+          "[metatomic][dlopen]") {
+  const char *eng = std::getenv("RGPOT_METATOMIC_ENGINE");
+  if (!eng || !*eng) {
+    WARN("RGPOT_METATOMIC_ENGINE unset; skip dlopen parity");
+    return;
+  }
+  rgpot::MetatomicConfig cfg;
+  cfg.model_path = "lennard-jones.pt";
+  cfg.device = "cpu";
+  cfg.engine_path = eng;
+
+  rgpot::MetatomicPot linked(cfg);
+  rgpot::MetatomicDlopen plugin(cfg);
+
+  // 2-atom toy positions
+  double pos[6] = {0, 0, 0, 1.5, 0, 0};
+  int z[2] = {1, 1};
+  double box[9] = {10, 0, 0, 0, 10, 0, 0, 0, 10};
+  double F1[6]{}, F2[6]{};
+  rgpot::ForceOut o1{F1, 0, 0}, o2{F2, 0, 0};
+  rgpot::ForceInput in{2, pos, z, box};
+  linked.forceImpl(in, &o1);
+  plugin.forceImpl(in, &o2);
+  REQUIRE(std::isfinite(o1.energy));
+  REQUIRE(std::isfinite(o2.energy));
+  REQUIRE(o1.energy == Approx(o2.energy).margin(1e-5));
+}
