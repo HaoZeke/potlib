@@ -195,7 +195,12 @@ It =dlopen=s a portable =libmetatomic_engine.so= chosen from
 =rgpot/lib/torch-X.Y/= for the installed torch major.
 Supported torch majors for bundled engines start at *2.7* (wheels ship
 2.7–2.13).
-See [[file:../howto/pip-python.org][Python package (PyPI)]].
+See:
+
+#+begin_export rst
+:doc:`../howto/pip-python`
+#+end_export
+
 
 All feature-gated potentials are detected via =pkg-config= / =cmake= and
 controlled by Meson options.

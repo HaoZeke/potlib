@@ -78,12 +78,11 @@ NWCHEMC_LIBRARY=/path/to/libnwchemc.so ./bbdir/CppCore/potserv 12345 NWChem
 
 ** Next steps
 
-- [[file:../howto/pip-python.org][Python package (PyPI)]] for =pip install rgpot=
-(LJ + Metatomic multi-ABI engines, torch 2.7+)
-- [[file:../reference/architecture.org][Architecture overview]] for the layer
-diagram and design rationale
-- [[file:../howto/integration.org][Integration guide]] for embedding rgpot into
-external projects (e.g. eOn)
-- [[file:../howto/embedding.org][Embedding as a subproject]] for using rgpot as a
-meson/cmake dependency
-- [[file:../changelog.org][Changelog]] for release history
+#+begin_export rst
+- :doc:`../howto/pip-python` — ``pip install rgpot`` (LJ + Metatomic multi-ABI
+  engines, torch 2.7+)
+- :doc:`../reference/architecture` — architecture overview
+- :doc:`../howto/integration` — embedding into external projects
+- :doc:`../howto/embedding` — meson/cmake subproject
+- :doc:`../changelog` — release history
+#+end_export

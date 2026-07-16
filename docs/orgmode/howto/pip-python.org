@@ -36,8 +36,8 @@ matches the installed =torch= major (same multi-ABI idea as metatomic-torch).
 
 | Torch major | Bundled engine (typical wheel) |
 |-------------+--------------------------------|
-| *2.7 and newer* | *Supported* (wheels ship 2.7–2.13) |
-| 2.6 and older | *Not supported* for Metatomic dlopen |
+| 2.7 and newer | Supported (wheels ship 2.7–2.13) |
+| 2.6 and older | Not supported for Metatomic dlopen |
 
 Optional dependency pins match the floor (=torch>=2.7=).
 List what the installed wheel actually contains:
@@ -84,6 +84,8 @@ Override the engine with =RGPOT_METATOMIC_ENGINE= / =METATOMIC_ENGINE= if needed
 
 ** Related
 
-- In-tree C++ =MetatomicPot= (Meson =-Dwith_metatomic=true=): see
-  [[file:embedding.org][Embedding]] and [[file:../reference/architecture.org][Architecture]]
-- RPC server path remains =potserv=; this page is the pip product only
+#+begin_export rst
+- In-tree C++ ``MetatomicPot`` (Meson ``-Dwith_metatomic=true``):
+  :doc:`embedding` and :doc:`../reference/architecture`
+- RPC server path remains ``potserv``; this page is the pip product only
+#+end_export
