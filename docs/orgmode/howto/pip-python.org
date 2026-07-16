@@ -6,9 +6,9 @@
 
 The =rgpot= package on [[https://pypi.org/project/rgpot/][PyPI]] ships manylinux wheels with:
 
-- Lennard-Jones via a **nanobind** extension (=_core.abi3.so=, stable ABI /
+- Lennard-Jones via a *nanobind* extension (=_core.abi3.so=, stable ABI /
   =Py_LIMITED_API= 3.12 when built on CPython >= 3.12)
-- Metatomic force evaluation via **dlopen** of a portable C-ABI engine plugin
+- Metatomic force evaluation via *dlopen* of a portable C-ABI engine plugin
 
 This is separate from the Cap'n Proto RPC path (=potserv=).
 LJ needs only =numpy=; Metatomic needs the optional dependency stack below.

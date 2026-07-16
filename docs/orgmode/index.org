@@ -44,7 +44,7 @@ Both quantum frontends keep geometry on ~ForceInput~ and carry method options in
 the matching ~PotentialConfig~ arm.
 
 The pip package (~pip install rgpot~) ships nanobind abi3 bindings and multi-ABI
-Metatomic engines for **torch 2.7+**.
+Metatomic engines for *torch 2.7+*.
 See [[file:howto/pip-python.org][Python package (PyPI)]].
 
 #+begin_src bash
