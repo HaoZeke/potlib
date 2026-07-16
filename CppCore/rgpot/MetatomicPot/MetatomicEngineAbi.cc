@@ -7,10 +7,39 @@
 
 #include <cstdio>
 #include <cstring>
+#include <dlfcn.h>
 #include <exception>
 #include <memory>
 #include <string>
 #include <vector>
+
+// When this engine is called from a Python host (pyeonclient / nanobind) the
+// GIL is often still held. Torch autograd refuses that. Soft-resolve CPython
+// thread APIs so pure C++ hosts (eonclient binary) need no libpython link.
+namespace {
+struct SoftGilRelease {
+  using SaveFn = void *(*)();
+  using RestoreFn = void (*)(void *);
+  void *tstate = nullptr;
+  RestoreFn restore = nullptr;
+  SoftGilRelease() {
+    auto *save = reinterpret_cast<SaveFn>(
+        dlsym(RTLD_DEFAULT, "PyEval_SaveThread"));
+    restore = reinterpret_cast<RestoreFn>(
+        dlsym(RTLD_DEFAULT, "PyEval_RestoreThread"));
+    if (save && restore) {
+      tstate = save();
+    }
+  }
+  ~SoftGilRelease() {
+    if (tstate && restore) {
+      restore(tstate);
+    }
+  }
+  SoftGilRelease(const SoftGilRelease &) = delete;
+  SoftGilRelease &operator=(const SoftGilRelease &) = delete;
+};
+} // namespace
 
 struct RgpotMtaPot {
   std::unique_ptr<rgpot::MetatomicPot> impl;
@@ -72,6 +101,7 @@ int rgpot_mta_force(RgpotMtaPot *pot, long nAtoms, const double *positions,
       !box || nAtoms <= 0)
     return 1;
   try {
+    SoftGilRelease no_gil;
     std::vector<double> Fbuf(static_cast<size_t>(nAtoms) * 3);
     rgpot::ForceOut out{Fbuf.data(), 0.0, 0.0};
     rgpot::ForceInput in{static_cast<size_t>(nAtoms), positions, atomicNrs,
