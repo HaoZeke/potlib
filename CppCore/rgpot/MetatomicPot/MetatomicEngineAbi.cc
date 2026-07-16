@@ -16,18 +16,26 @@
 // When this engine is called from a Python host (pyeonclient / nanobind) the
 // GIL is often still held. Torch autograd refuses that. Soft-resolve CPython
 // thread APIs so pure C++ hosts (eonclient binary) need no libpython link.
+//
+// Only SaveThread when PyGILState_Check() is true — nested release (Job.run
+// already dropped the GIL) must not call SaveThread again.
 namespace {
 struct SoftGilRelease {
+  using CheckFn = int (*)();
   using SaveFn = void *(*)();
   using RestoreFn = void (*)(void *);
   void *tstate = nullptr;
   RestoreFn restore = nullptr;
   SoftGilRelease() {
+    auto *check = reinterpret_cast<CheckFn>(
+        dlsym(RTLD_DEFAULT, "PyGILState_Check"));
     auto *save = reinterpret_cast<SaveFn>(
         dlsym(RTLD_DEFAULT, "PyEval_SaveThread"));
     restore = reinterpret_cast<RestoreFn>(
         dlsym(RTLD_DEFAULT, "PyEval_RestoreThread"));
-    if (save && restore) {
+    // check==nullptr: not in a Python process (or old CPython); skip.
+    // check()==0: GIL already released by the host (e.g. nanobind).
+    if (check && check() && save && restore) {
       tstate = save();
     }
   }
