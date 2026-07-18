@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="teal" data-content_root="../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Global Namespace - rgpot documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="namespace rgpot" href="namespace_rgpot.html" /><link rel="prev" title="class rgpot::RpcClient" href="class_rgpot_RpcClient.html" />
+      <link rel="canonical" href="https://rgpot.rgoswami.me/api/global.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=44020203" />
+    <link rel="stylesheet" type="text/css" href="../_static/doxyrest-pygments.css?v=ff3f4257" />
+    <link rel="stylesheet" type="text/css" href="../_static/doxyrest-shibuya.css" />
+    <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=23824103" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://rgpot.rgoswami.me/api/global.html"/>
+  <meta property="og:title" content="Global Namespace"/>
+    <meta name="twitter:card" content="summary"/>
+  <!-- Manual favicon handling with favicon.io -->
+<!-- since sphinx-favicon doesn't work with shibuya -->
+<link rel="icon" type="image/png" sizes="16x16" href="../_static/favicons/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../_static/favicons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../_static/favicons/android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../_static/favicons/android-chrome-512x512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../_static/favicons/apple-touch-icon.png">
+<link rel="shortcut icon" href="../_static/favicons/favicon.ico">
+<link rel="manifest" href="../_static/favicons/site.webmanifest">
+<!-- Umami analytics -->
+<script defer src="https://analytics.turtletech.us/script.js" data-website-id="2a881f07-4e2d-4463-a396-b9b2e868aecb"></script>
+<script>window.umami=window.umami||{track:function(){}};document.addEventListener('click',function(e){var a=e.target.closest('a');if(a&&a.hostname!==location.hostname)umami.track('Outbound Link',{url:a.href})});</script>
+<script defer src="https://antics-api.turtletech.us/antics.js"></script></head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../index.html">
+      <img class="light-logo" src="../_static/rgpot_notext_light.webp" alt="rgpot" height="28" loading="lazy" />
+      <img class="dark-logo" src="../_static/rgpot_notext_dark.webp" alt="rgpot" height="28" loading="lazy" />
+      <strong>rgpot</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"><ul>
+      <li class="link"><button class="js-menu" type="button" id="nav-trigger-1" aria-controls="nav-children-1">
+            <span>Ecosystem</span>
+            <i class="i-lucide chevron-down"></i>
+          </button>
+        <ul id="nav-children-1" aria-labelledby="nav-trigger-1"><li><a href="https://eondocs.org">
+                <span>eOn</span>
+                <small>Saddle point finding on potential energy surfaces</small>
+              </a></li><li><a href="https://rgpycrumbs.rgoswami.me">
+                <span>rgpycrumbs</span>
+                <small>Python bindings for rgpot</small>
+              </a></li></ul>
+      </li></ul></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/OmniPotentRPC/rgpot" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="1"><p class="caption" role="heading" aria-level="3"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../tutorials/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../tutorials/molecular-global-optimization.html">Find the Ground State of an EON Structure</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">How-To Guides</span></p>
+<ul>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/pip-python.html">Python package (PyPI)</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/embedding.html">Embedding as a Subproject</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/integration.html">External Integration Guide</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eindir-anneal.html">rgpot Potentials as eindir Objectives</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eon-rgpot.html">eOn Potentials Over rgpot</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eon-rgpot.html#why-this-shape">Why This Shape</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eon-rgpot.html#landed-work-items">Landed Work Items</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eon-rgpot.html#operator-cheatsheet-rgpot-side">Operator Cheatsheet (rgpot side)</a></li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../howto/eon-rgpot.html#related">Related</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 _expand"><a class="reference internal" href="../reference/architecture.html">Architecture Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="group_rgpot_cpp.html">C++ RAII Wrappers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="class_rgpot_CalcResult.html">class rgpot::CalcResult</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_rgpot_Error.html">class rgpot::Error</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_rgpot_InputSpec.html">class rgpot::InputSpec</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_rgpot_PotentialHandle.html">class rgpot::PotentialHandle</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_rgpot_RpcClient.html">class rgpot::RpcClient</a><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Global Namespace</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot.html">namespace rgpot</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_abi.html">namespace rgpot::abi</a></li>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_cache.html">namespace rgpot::cache</a></li>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_details.html">namespace rgpot::details</a></li>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_types.html">namespace rgpot::types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_units.html">namespace rgpot::units</a></li>
+<li class="toctree-l4"><a class="reference internal" href="namespace_rgpot_vesin_compat.html">namespace rgpot::vesin_compat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="enum_rgpot_GFNMethod.html">enum rgpot::GFNMethod</a></li>
+<li class="toctree-l4"><a class="reference internal" href="enum_rgpot_TBLiteMethod.html">enum rgpot::TBLiteMethod</a></li>
+<li class="toctree-l4"><a class="reference internal" href="enum_rgpot_TorchDeterminismPolicy.html">enum rgpot::TorchDeterminismPolicy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_ForceInput.html">struct rgpot::ForceInput</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_ForceOut.html">struct rgpot::ForceOut</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_MetatomicConfig.html">struct rgpot::MetatomicConfig</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_TBLiteConfig.html">struct rgpot::TBLiteConfig</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_XTBConfig.html">struct rgpot::XTBConfig</a></li>
+<li class="toctree-l4"><a class="reference internal" href="struct_rgpot_XTBDlopenConfig.html">struct rgpot::XTBDlopenConfig</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_CPMDPot.html">class rgpot::CPMDPot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_CuH2Pot.html">class rgpot::CuH2Pot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_DynLib.html">class rgpot::DynLib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_LJPot.html">class rgpot::LJPot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_MetatomicDlopen.html">class rgpot::MetatomicDlopen</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_MetatomicPot.html">class rgpot::MetatomicPot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_NWChemPot.html">class rgpot::NWChemPot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_PotentialBase.html">class rgpot::PotentialBase</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_TBLitePot.html">class rgpot::TBLitePot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_XTBDlopen.html">class rgpot::XTBDlopen</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_XTBPot.html">class rgpot::XTBPot</a></li>
+<li class="toctree-l4"><a class="reference internal" href="class_rgpot_registry.html">template class rgpot::registry</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot-2.html">namespace rgpot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot-3.html">namespace rgpot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot-4.html">namespace rgpot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot-5.html">namespace rgpot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_rgpot-6.html">namespace rgpot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_std.html">namespace std</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="namespace_string_literals.html">namespace string_literals</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="enum_CPMDCFeatureKind.html">enum CPMDCFeatureKind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="struct_CPMDCFeatureEntry.html">struct CPMDCFeatureEntry</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_CPMDCResult.html">struct CPMDCResult</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_NWChemCResult.html">struct NWChemCResult</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_RgpotMtaConfig.html">struct RgpotMtaConfig</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_RgpotMtaPot.html">struct RgpotMtaPot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_RgpotXtbConfig.html">struct RgpotXtbConfig</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="struct_RgpotXtbPot.html">struct RgpotXtbPot</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_AtomMatrix.html">class AtomMatrix</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_GenericPotImpl.html">class GenericPotImpl</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="class_PotClient.html">class PotClient</a><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../crates/rgpot_core/lib.html">Crate <code class="docutils literal notranslate"><span class="pre">rgpot_core</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/types.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">types</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/tensor.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">tensor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/status.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/potential.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">potential</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/eindir.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">eindir</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/c_api.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">c_api</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../crates/rgpot_core/c_api/types.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">types</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../crates/rgpot_core/c_api/potential.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">potential</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../crates/rgpot_core/c_api/rpc.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">rpc</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/Potentials_capnp.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">Potentials_capnp</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crates/rgpot_core/rpc.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">rpc</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../crates/rgpot_core/rpc/client.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../crates/rgpot_core/rpc/server.html"><code class="docutils literal notranslate"><span class="pre">mod</span> <span class="pre">server</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../contributing/index.html">Contributing to <code class="docutils literal notranslate"><span class="pre">rgpot</span></code></a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../contributing/developer/index.html">Developer Guide</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing/developer/testing.html">Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing/developer/release.html">Release Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing/developer/faq.html">Developer FAQ</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../code_of_conduct.html">Code of Conduct</a></li>
+</ul>
+</li>
+<li class="toctree-l1 _expand"><a class="reference internal" href="../code_of_conduct.html">Code of Conduct</a></li>
+</ul>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#detailed-documentation">Detailed Documentation</a><ul>
+<li><a class="reference internal" href="#typedefs">Typedefs</a></li>
+<li><a class="reference internal" href="#global-functions">Global Functions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+</ul>
+</div><a class="js-repo-stats repo-stats flex items-center" href="https://github.com/OmniPotentRPC/rgpot"
+  data-type="github" data-user="OmniPotentRPC" data-repo="rgpot">
+  <span class="w-8 flex items-center justify-around shrink-0 text-3xl">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </span>
+  <span class="flex-grow px-2 break-all">
+    
+    
+      <span>rgpot</span>
+    
+    <span class="flex text-sm repo-stats-count">
+      <span class="flex items-center pr-3">
+        <iconify-icon icon="lucide:star"></iconify-icon>
+        <strong class="js-repo-stars ml-1">0</strong>
+      </span>
+      <span class="flex items-center">
+        <iconify-icon icon="lucide:git-fork"></iconify-icon>
+        <strong class="js-repo-forks ml-1">0</strong>
+      </span>
+    </span>
+  </span>
+</a><div class="edit-this-page">
+  <a href="https://github.com/OmniPotentRPC/rgpot/blob/main/docs/source/api/global.rst">Edit this page</a>
+</div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">rgpot</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="index.html"><span itemprop="name">API Reference</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">Global Namespace</strong>
+        <meta itemprop="position" content="3" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  <div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="https://rgpot.rgoswami.me/_sources/api/global.rst.txt"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>Copy page</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="More actions"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem"
+          data-url="https://rgpot.rgoswami.me/_sources/api/global.rst.txt">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>Copy page</span>
+        </button>
+        <a role="menuitem" href="https://rgpot.rgoswami.me/_sources/api/global.rst.txt" target="_blank" rel="nofollow"><iconify-icon icon="bi:code-slash"></iconify-icon>
+            <span>View Source</span></a><a role="menuitem" href="https://chatgpt.com/?hints=search&q=Read%20https%3A//rgpot.rgoswami.me/_sources/api/global.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:openai"></iconify-icon>
+          <span>Open in ChatGPT</span>
+        </a><a role="menuitem" href="https://claude.ai/new?q=Read%20https%3A//rgpot.rgoswami.me/_sources/api/global.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:claude"></iconify-icon>
+          <span>Open in Claude</span>
+        </a></div>
+    </div>
+  </div>
+</div><article class="yue dark-code" role="main">
+          <section id="global-namespace">
+<span id="index-0"></span><span id="global"></span><h1>Global Namespace<a class="headerlink" href="#global-namespace" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<div class="doxyrest-overview-code-block highlight">
+<pre><span data-line="1"><span class="c1">// namespaces</span></span>
+<span data-line="2"> </span>
+<span data-line="3"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot.html#doxid-namespacergpot"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="4">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_abi.html#doxid-namespacergpot-1-1abi"><span class="std std-ref">rgpot::abi</span></a><span class="p">;</span></span>
+<span data-line="5">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_cache.html#doxid-namespacergpot-1-1cache"><span class="std std-ref">rgpot::cache</span></a><span class="p">;</span></span>
+<span data-line="6">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_details.html#doxid-namespacergpot-1-1details"><span class="std std-ref">rgpot::details</span></a><span class="p">;</span></span>
+<span data-line="7">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_types.html#doxid-namespacergpot-1-1types"><span class="std std-ref">rgpot::types</span></a><span class="p">;</span></span>
+<span data-line="8">        <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_types_adapt.html#doxid-namespacergpot-1-1types-1-1adapt"><span class="std std-ref">rgpot::types::adapt</span></a><span class="p">;</span></span>
+<span data-line="9">            <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_types_adapt_capnp.html#doxid-namespacergpot-1-1types-1-1adapt-1-1capnp"><span class="std std-ref">rgpot::types::adapt::capnp</span></a><span class="p">;</span></span>
+<span data-line="10">            <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_types_adapt_eigen.html#doxid-namespacergpot-1-1types-1-1adapt-1-1eigen"><span class="std std-ref">rgpot::types::adapt::eigen</span></a><span class="p">;</span></span>
+<span data-line="11">            <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_types_adapt_xtensor.html#doxid-namespacergpot-1-1types-1-1adapt-1-1xtensor"><span class="std std-ref">rgpot::types::adapt::xtensor</span></a><span class="p">;</span></span>
+<span data-line="12">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_units.html#doxid-namespacergpot-1-1units"><span class="std std-ref">rgpot::units</span></a><span class="p">;</span></span>
+<span data-line="13">    <span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot_vesin_compat.html#doxid-namespacergpot-1-1vesin-compat"><span class="std std-ref">rgpot::vesin_compat</span></a><span class="p">;</span></span>
+<span data-line="14"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot-2.html#doxid-namespacergpot-1-1-0d364340043037035135215131234013203140115136056347"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="15"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot-3.html#doxid-namespacergpot-1-1-0d337352007255267004147224254224242242326302051001"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="16"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot-4.html#doxid-namespacergpot-1-1-0d313044231245255167144270007377336063024373151375"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="17"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot-5.html#doxid-namespacergpot-1-1-0d074056026306035374365244261052156153150246157020"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="18"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_rgpot-6.html#doxid-namespacergpot-1-1-0d073250274327216307175236064132335300352057017020"><span class="std std-ref">rgpot</span></a><span class="p">;</span></span>
+<span data-line="19"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_std.html#doxid-namespacestd"><span class="std std-ref">std</span></a><span class="p">;</span></span>
+<span data-line="20"><span class="k">namespace</span> <a class="doxyrest-code-link reference internal" href="namespace_string_literals.html#doxid-namespacestd-1-1string-literals"><span class="std std-ref">string_literals</span></a><span class="p">;</span></span>
+<span data-line="21"> </span>
+<span data-line="22"><span class="c1">// typedefs</span></span>
+<span data-line="23"> </span>
+<span data-line="24"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">CPMDCResult</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a624f3d7d040e783aef1536f49e2a43ca"><span class="std std-ref">CPMDCResult</span></a><span class="p">;</span></span>
+<span data-line="25"><span class="k">typedef</span> <span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="p">;</span></span>
+<span data-line="26"><span class="k">typedef</span> <span class="k">enum</span> <span class="n">CPMDCFeatureKind</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1ab8efa8b96095d9bcb86951f47cdf3ddd"></span><span class="n">CPMDCFeatureKind</span><span class="p">;</span></span>
+<span data-line="27"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">CPMDCFeatureEntry</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1a78e933e2bdea5d5a752302a384a3137b"></span><span class="n">CPMDCFeatureEntry</span><span class="p">;</span></span>
+<span data-line="28"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">RgpotMtaPot</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a0b390572334b63f7e4a35cee4c75df64"></span><span class="n">RgpotMtaPot</span><span class="p">;</span></span>
+<span data-line="29"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">RgpotMtaConfig</span> <a class="doxyrest-code-link reference internal" href="#doxid-metatomic-c-abi-8h-1a5f3ddc99188390e16bcefecd044cd132"><span class="std std-ref">RgpotMtaConfig</span></a><span class="p">;</span></span>
+<span data-line="30"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">NWChemCResult</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-8h-1a7ebd0cbe28327ac32f7726770f826961"><span class="std std-ref">NWChemCResult</span></a><span class="p">;</span></span>
+<span data-line="31"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">PotClient</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8h-1ad15494aa275bd98047b204d29533f6ba"><span class="std std-ref">PotClient</span></a><span class="p">;</span></span>
+<span data-line="32"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">RgpotXtbPot</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a37b502b1326e503b40aced0b4726dffb"></span><span class="n">RgpotXtbPot</span><span class="p">;</span></span>
+<span data-line="33"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">RgpotXtbConfig</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a1786d9f1df089ee1d5b41e1389567afe"></span><span class="n">RgpotXtbConfig</span><span class="p">;</span></span>
+<span data-line="34"> </span>
+<span data-line="35"><span class="c1">// enums</span></span>
+<span data-line="36"> </span>
+<span data-line="37"><span class="k">enum</span> <span class="p">{</span></span>
+<span data-line="38">    <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a2b1a168a9da41fa63b7bcaf53e9872fea08d7c287ff5a1e4d66e1e91afa31a251"></span><span class="n">RGPOT_XTB_METHOD_GFNFF</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span></span>
+<span data-line="39">    <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a2b1a168a9da41fa63b7bcaf53e9872fead7612a0284242d4a93795ee24a14fa8d"></span><span class="n">RGPOT_XTB_METHOD_GFN0</span>  <span class="o">=</span> <span class="mi">1</span><span class="p">,</span></span>
+<span data-line="40">    <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a2b1a168a9da41fa63b7bcaf53e9872fea2311c7e1404180d7eb1d8ef0c8249e2a"></span><span class="n">RGPOT_XTB_METHOD_GFN1</span>  <span class="o">=</span> <span class="mi">2</span><span class="p">,</span></span>
+<span data-line="41">    <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a2b1a168a9da41fa63b7bcaf53e9872fead259bae7d981be9a386a4a73e098b70f"></span><span class="n">RGPOT_XTB_METHOD_GFN2</span>  <span class="o">=</span> <span class="mi">3</span><span class="p">,</span></span>
+<span data-line="42"><span class="p">};</span></span>
+<span data-line="43"> </span>
+<span data-line="44"><span class="k">enum</span> <a class="doxyrest-code-link reference internal" href="enum_CPMDCFeatureKind.html#doxid-cpmd-c-abi-8h-1af730055345a93286960ba9ef1a3f05b2"><span class="std std-ref">CPMDCFeatureKind</span></a><span class="p">;</span></span>
+<span data-line="45"> </span>
+<span data-line="46"><span class="c1">// structs</span></span>
+<span data-line="47"> </span>
+<span data-line="48"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a><span class="p">;</span></span>
+<span data-line="49"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a><span class="p">;</span></span>
+<span data-line="50"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_NWChemCResult.html#doxid-struct-n-w-chem-c-result"><span class="std std-ref">NWChemCResult</span></a><span class="p">;</span></span>
+<span data-line="51"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotMtaConfig.html#doxid-struct-rgpot-mta-config"><span class="std std-ref">RgpotMtaConfig</span></a><span class="p">;</span></span>
+<span data-line="52"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotMtaPot.html#doxid-struct-rgpot-mta-pot"><span class="std std-ref">RgpotMtaPot</span></a><span class="p">;</span></span>
+<span data-line="53"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotXtbConfig.html#doxid-struct-rgpot-xtb-config"><span class="std std-ref">RgpotXtbConfig</span></a><span class="p">;</span></span>
+<span data-line="54"><span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotXtbPot.html#doxid-struct-rgpot-xtb-pot"><span class="std std-ref">RgpotXtbPot</span></a><span class="p">;</span></span>
+<span data-line="55"> </span>
+<span data-line="56"><span class="c1">// classes</span></span>
+<span data-line="57"> </span>
+<span data-line="58"><span class="k">class</span> <a class="doxyrest-code-link reference internal" href="class_AtomMatrix.html#doxid-class-atom-matrix"><span class="std std-ref">AtomMatrix</span></a><span class="p">;</span></span>
+<span data-line="59"><span class="k">class</span> <a class="doxyrest-code-link reference internal" href="class_GenericPotImpl.html#doxid-class-generic-pot-impl"><span class="std std-ref">GenericPotImpl</span></a><span class="p">;</span></span>
+<span data-line="60"><span class="k">class</span> <a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="p">;</span></span>
+<span data-line="61"> </span>
+<span data-line="62"><span class="c1">// global variables</span></span>
+<span data-line="63"> </span>
+<span data-line="64"><span class="k">static</span> <span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1a9cf3ddf52a7a4d9d9c60222bd80ec58c"></span><span class="n">g_features</span><span class="p">[];</span></span>
+<span data-line="65"><span class="kt">char</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a844ffb41af9cf83add741994874afb59"></span><span class="n">errbuf</span><span class="p">;</span></span>
+<span data-line="66"><span class="kt">char</span> <span class="kt">size_t</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a80768050917daae31ae1a45b422508fc"></span><span class="n">errlen</span><span class="p">;</span></span>
+<span data-line="67"><span class="kt">long</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a20b20f2726e47e948b24c1565ce5aa14"></span><span class="n">nAtoms</span><span class="p">;</span></span>
+<span data-line="68"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a8436501526a309242e3fe7546e718f42"></span><span class="n">positions</span><span class="p">;</span></span>
+<span data-line="69"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1ade02cb4b724090387725b1cda6d08656"></span><span class="n">atomicNrs</span><span class="p">;</span></span>
+<span data-line="70"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a80f2f54fb4a6b7d518f8e4eba4f2a001"></span><span class="n">forces</span><span class="p">;</span></span>
+<span data-line="71"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a1b6a00e3dc8a6c1560f95c3e4c529884"></span><span class="n">energy</span><span class="p">;</span></span>
+<span data-line="72"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1ac7007adf191d5924b65f55f8d8d67006"></span><span class="n">variance</span><span class="p">;</span></span>
+<span data-line="73"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a457eec3aafb3887047af8a00ed2c8593"></span><span class="n">box</span><span class="p">;</span></span>
+<span data-line="74"><span class="k">static</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-nwchem__c__abi__stub_8c_1a8a786d4b9e35a342db493b2427841545"></span><span class="n">STUB_VERSION</span> <span class="o">=</span> <span class="err">“</span><span class="n">nwchemc</span><span class="o">-</span><span class="n">stub</span><span class="o">/</span><span class="mf">1.0.0</span><span class="err">”</span><span class="p">;</span></span>
+<span data-line="75"><span class="kt">char</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a844ffb41af9cf83add741994874afb59"></span><span class="n">errbuf</span><span class="p">;</span></span>
+<span data-line="76"><span class="kt">char</span> <span class="kt">size_t</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a80768050917daae31ae1a45b422508fc"></span><span class="n">errlen</span><span class="p">;</span></span>
+<span data-line="77"><span class="kt">long</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a20b20f2726e47e948b24c1565ce5aa14"></span><span class="n">nAtoms</span><span class="p">;</span></span>
+<span data-line="78"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a8436501526a309242e3fe7546e718f42"></span><span class="n">positions</span><span class="p">;</span></span>
+<span data-line="79"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1ade02cb4b724090387725b1cda6d08656"></span><span class="n">atomicNrs</span><span class="p">;</span></span>
+<span data-line="80"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a80f2f54fb4a6b7d518f8e4eba4f2a001"></span><span class="n">forces</span><span class="p">;</span></span>
+<span data-line="81"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a1b6a00e3dc8a6c1560f95c3e4c529884"></span><span class="n">energy</span><span class="p">;</span></span>
+<span data-line="82"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1ac7007adf191d5924b65f55f8d8d67006"></span><span class="n">variance</span><span class="p">;</span></span>
+<span data-line="83"><span class="kt">long</span> <span class="k">const</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">int</span> <span class="kt">double</span> <span class="kt">double</span> <span class="kt">double</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a457eec3aafb3887047af8a00ed2c8593"></span><span class="n">box</span><span class="p">;</span></span>
+<span data-line="84"> </span>
+<span data-line="85"><span class="c1">// global functions</span></span>
+<span data-line="86"> </span>
+<span data-line="87"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a22da50d15419dadce4925c88100a1c23"><span class="std std-ref">cpmdc_set_params</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="88"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a525b75c1e47dd8595be42d2175f9f64f"><span class="std std-ref">cpmdc_energy_gradient</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="89"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a6e17756faffc4d181352a5953991f584"><span class="std std-ref">cpmdc_energy</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="90"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1ad653481360bf399295aed47e14cef118"><span class="std std-ref">cpmdc_energy_forces</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">);</span></span>
+<span data-line="91"><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a08b6b5b994b9754e6c853d3dd46c7745"><span class="std std-ref">cpmdc_session_create</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="92"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a0ffb70752daab4a244e5ffd58eaa6db5"><span class="std std-ref">cpmdc_session_set_params</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="93"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a6d07b0b1700b5352f1ce33f396a9f578"><span class="std std-ref">cpmdc_session_destroy</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">);</span></span>
+<span data-line="94"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1a6d79318bc9f2eae253d4906376123570"></span><span class="n">cpmdc_session_energy_gradient</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="95"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1a3c36a0c86b25223e47eb139ec2d89a33"></span><span class="n">cpmdc_session_energy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">);</span></span>
+<span data-line="96"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1ab94170b806559374915fb2510fd46d6b"></span><span class="n">cpmdc_session_energy_forces</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">);</span></span>
+<span data-line="97"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a9f5e4a955e689dcf3e06b52e68b6adb1"><span class="std std-ref">cpmdc_session_calculate_forces</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">forces_len</span><span class="p">);</span></span>
+<span data-line="98"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1ac63ef923626641269d88b5319f5eed8a"><span class="std std-ref">cpmdc_session_calculate_result</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="99"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a9b206e2d2173eafb39c00977101da25b"><span class="std std-ref">cpmdc_calculate_result</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="100"><span class="kt">size_t</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a50c58b775c95334c2842f3d07c247408"><span class="std std-ref">cpmdc_potential_result_size_for_force_input</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="101"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a4d5a0eade3deceabe9f7e48e7a45d430"><span class="std std-ref">cpmdc_version</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="102"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a25f2bc651370d207f2049574e7073e0d"><span class="std std-ref">cpmdc_available</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="103"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1afae0c7a27c94036223f7a0cf60488f56"><span class="std std-ref">cpmdc_finalize</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="104"><span class="kt">size_t</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1a4cf7e2f669806606c1d1293533b3d38e"></span><span class="n">cpmdc_feature_count</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="105"><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1ae40eb0e96927dc5f3feacc20c3869315"></span><span class="n">cpmdc_feature_table</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="106"><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi_8h_1a4d2414cdfa87d867cf1ab1e708dfb4ca"></span><span class="n">cpmdc_feature_find</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">feature_id</span><span class="p">);</span></span>
+<span data-line="107"><span class="k">static</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1ad84ca2b805996eae671ada2dc718ae0e"></span><span class="n">stub_fail</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="108"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a22da50d15419dadce4925c88100a1c23"><span class="std std-ref">cpmdc_set_params</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="109"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a525b75c1e47dd8595be42d2175f9f64f"><span class="std std-ref">cpmdc_energy_gradient</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="110"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a6e17756faffc4d181352a5953991f584"><span class="std std-ref">cpmdc_energy</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="111"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1ad653481360bf399295aed47e14cef118"><span class="std std-ref">cpmdc_energy_forces</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">);</span></span>
+<span data-line="112"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a4d5a0eade3deceabe9f7e48e7a45d430"><span class="std std-ref">cpmdc_version</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="113"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a25f2bc651370d207f2049574e7073e0d"><span class="std std-ref">cpmdc_available</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="114"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1afae0c7a27c94036223f7a0cf60488f56"><span class="std std-ref">cpmdc_finalize</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="115"><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a08b6b5b994b9754e6c853d3dd46c7745"><span class="std std-ref">cpmdc_session_create</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="116"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a0ffb70752daab4a244e5ffd58eaa6db5"><span class="std std-ref">cpmdc_session_set_params</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="117"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a6d07b0b1700b5352f1ce33f396a9f578"><span class="std std-ref">cpmdc_session_destroy</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">);</span></span>
+<span data-line="118"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1a3c36a0c86b25223e47eb139ec2d89a33"></span><span class="n">cpmdc_session_energy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">);</span></span>
+<span data-line="119"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1a6d79318bc9f2eae253d4906376123570"></span><span class="n">cpmdc_session_energy_gradient</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="120"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1ab94170b806559374915fb2510fd46d6b"></span><span class="n">cpmdc_session_energy_forces</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">);</span></span>
+<span data-line="121"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a9f5e4a955e689dcf3e06b52e68b6adb1"><span class="std std-ref">cpmdc_session_calculate_forces</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">forces_len</span><span class="p">);</span></span>
+<span data-line="122"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1ac63ef923626641269d88b5319f5eed8a"><span class="std std-ref">cpmdc_session_calculate_result</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="123"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a9b206e2d2173eafb39c00977101da25b"><span class="std std-ref">cpmdc_calculate_result</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="124"><span class="kt">size_t</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-stub-8c-1a50c58b775c95334c2842f3d07c247408"><span class="std std-ref">cpmdc_potential_result_size_for_force_input</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="125"><span class="kt">size_t</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1a4cf7e2f669806606c1d1293533b3d38e"></span><span class="n">cpmdc_feature_count</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="126"><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1ae40eb0e96927dc5f3feacc20c3869315"></span><span class="n">cpmdc_feature_table</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="127"><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_CPMDCFeatureEntry.html#doxid-struct-c-p-m-d-c-feature-entry"><span class="std std-ref">CPMDCFeatureEntry</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-cpmd__c__abi__stub_8c_1a4d2414cdfa87d867cf1ab1e708dfb4ca"></span><span class="n">cpmdc_feature_find</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">feature_id</span><span class="p">);</span></span>
+<span data-line="128"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-cu-h2-pot-8hpp-1a79b876a461f808a0b8e5ac38ca629988"><span class="std std-ref">c_force_eam</span></a><span class="p">(</span><span class="kt">int</span><span class="o">*</span> <span class="n">natms</span><span class="p">,</span> <span class="kt">int</span> <span class="n">ndim</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">R</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">F</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">U</span><span class="p">);</span></span>
+<span data-line="129"><a class="doxyrest-code-link reference internal" href="#doxid-metatomic-c-abi-8h-1ab1c3edb5fb26c2406f212d203a3f76c0"><span class="std std-ref">__attribute__</span></a><span class="p">((</span><span class="n">visibility</span><span class="p">(</span><span class="err">“</span><span class="k">default</span><span class="err">”</span><span class="p">)));</span></span>
+<span data-line="130"><span class="k">static</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1a6560fd88de4ee3cb0ad11596138b42c7"></span><span class="n">nz</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">s</span><span class="p">);</span></span>
+<span data-line="131"><span class="k">static</span> <span class="kt">void</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1a3cbaa0d62282e2faf4f8f8267c065187"></span><span class="n">set_err</span><span class="p">(</span><span class="kt">char</span><span class="o">*</span> <span class="n">errbuf</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">errlen</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">msg</span><span class="p">);</span></span>
+<span data-line="132"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1a70d8fad1263be239b81ec569f1f9fcc5"></span><span class="n">rgpot_mta_abi_version</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="133"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1ada2d2586cf0affa06065aa0e2908ea32"></span><span class="n">rgpot_mta_available</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="134"><a class="doxyrest-code-link reference internal" href="struct_RgpotMtaPot.html#doxid-struct-rgpot-mta-pot"><span class="std std-ref">RgpotMtaPot</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1ac2558a08d907c0164621c0c0c915ac14"></span><span class="n">rgpot_mta_create</span><span class="p">(</span><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotMtaConfig.html#doxid-struct-rgpot-mta-config"><span class="std std-ref">RgpotMtaConfig</span></a><span class="o">*</span> <span class="n">cfg</span><span class="p">,</span> <span class="kt">char</span><span class="o">*</span> <span class="n">errbuf</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">errlen</span><span class="p">);</span></span>
+<span data-line="135"><span class="kt">void</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1ac909ef1b3fb4639a073851edd1676e17"></span><span class="n">rgpot_mta_destroy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="struct_RgpotMtaPot.html#doxid-struct-rgpot-mta-pot"><span class="std std-ref">RgpotMtaPot</span></a><span class="o">*</span> <span class="n">pot</span><span class="p">);</span></span>
+<span data-line="136"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1a169ba9edd8ae10118ba8dc2fcb307f8b"></span><span class="n">rgpot_mta_force</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="struct_RgpotMtaPot.html#doxid-struct-rgpot-mta-pot"><span class="std std-ref">RgpotMtaPot</span></a><span class="o">*</span> <span class="n">pot</span><span class="p">,</span> <span class="kt">long</span> <span class="n">nAtoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomicNrs</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">variance</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">);</span></span>
+<span data-line="137"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-8h-1a2b19e40d3fa84cd9c0c26d4e61ee1aec"><span class="std std-ref">nwchemc_set_params</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="138"><a class="doxyrest-code-link reference internal" href="struct_NWChemCResult.html#doxid-struct-n-w-chem-c-result"><span class="std std-ref">NWChemCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-8h-1a9452e5aaf6c8e097d7797f3697fcc00d"><span class="std std-ref">nwchemc_energy_gradient</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="139"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-8h-1a90abe502c32b33e3bdd7f4415c7a3c6e"><span class="std std-ref">nwchemc_version</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="140"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-8h-1a85faef1e24ae6c734d0d43e7d498ef53"><span class="std std-ref">nwchemc_available</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="141"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-stub-8c-1a2b19e40d3fa84cd9c0c26d4e61ee1aec"><span class="std std-ref">nwchemc_set_params</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">);</span></span>
+<span data-line="142"><a class="doxyrest-code-link reference internal" href="struct_NWChemCResult.html#doxid-struct-n-w-chem-c-result"><span class="std std-ref">NWChemCResult</span></a> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-stub-8c-1a9452e5aaf6c8e097d7797f3697fcc00d"><span class="std std-ref">nwchemc_energy_gradient</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">);</span></span>
+<span data-line="143"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-stub-8c-1a90abe502c32b33e3bdd7f4415c7a3c6e"><span class="std std-ref">nwchemc_version</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="144"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-nwchem-c-abi-stub-8c-1a85faef1e24ae6c734d0d43e7d498ef53"><span class="std std-ref">nwchemc_available</span></a><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="145"><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8cc-1ad254a3ebf2ca0137de55bd82ea1abb42"><span class="std std-ref">pot_client_init</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">host</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">port</span><span class="p">);</span></span>
+<span data-line="146"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8cc-1a605cb8b056e3d895be066472fe1c116e"><span class="std std-ref">pot_client_free</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">);</span></span>
+<span data-line="147"><span class="kt">int32_t</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8cc-1ab471aef52e0227fbb98588e8366ad646"><span class="std std-ref">pot_calculate</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">natoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">pos</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int32_t</span><span class="o">*</span> <span class="n">atmnrs</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_forces</span><span class="p">);</span></span>
+<span data-line="148"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8cc-1a669a1a1ce89314ebbfec4c91438bd782"><span class="std std-ref">pot_get_last_error</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">);</span></span>
+<span data-line="149"><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8h-1ad254a3ebf2ca0137de55bd82ea1abb42"><span class="std std-ref">pot_client_init</span></a><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">host</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">port</span><span class="p">);</span></span>
+<span data-line="150"><span class="kt">void</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8h-1a605cb8b056e3d895be066472fe1c116e"><span class="std std-ref">pot_client_free</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">);</span></span>
+<span data-line="151"><span class="kt">int32_t</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8h-1ab471aef52e0227fbb98588e8366ad646"><span class="std std-ref">pot_calculate</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">natoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">pos</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int32_t</span><span class="o">*</span> <span class="n">atmnrs</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_forces</span><span class="p">);</span></span>
+<span data-line="152"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <a class="doxyrest-code-link reference internal" href="#doxid-pot-bridge-8h-1a669a1a1ce89314ebbfec4c91438bd782"><span class="std std-ref">pot_get_last_error</span></a><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">);</span></span>
+<span data-line="153"><span class="kt">int</span> <a class="doxyrest-code-link reference internal" href="#doxid-server-8cpp-1a0ddf1224851353fc92bfbff6f499fa97"><span class="std std-ref">main</span></a><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[]);</span></span>
+<span data-line="154"><a class="doxyrest-code-link reference internal" href="#doxid-xtb-c-abi-8h-1aed6dec1342c11226fbf6d9f0d23fc168"><span class="std std-ref">__attribute__</span></a><span class="p">((</span><span class="n">visibility</span><span class="p">(</span><span class="err">“</span><span class="k">default</span><span class="err">”</span><span class="p">)));</span></span>
+<span data-line="155"><span class="k">static</span> <span class="n">rgpot</span><span class="o">::</span><span class="n">GFNMethod</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1ae58142d5e4c55f2b690a5ca116db1df5"></span><span class="n">method_from_c</span><span class="p">(</span><span class="kt">int</span> <span class="n">m</span><span class="p">);</span></span>
+<span data-line="156"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1a9c767ca43d4c49b5f2f65165b8990469"></span><span class="n">rgpot_xtb_abi_version</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="157"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1a29c15cff90f198c7a405949ddcfde4db"></span><span class="n">rgpot_xtb_available</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></span>
+<span data-line="158"><a class="doxyrest-code-link reference internal" href="struct_RgpotXtbPot.html#doxid-struct-rgpot-xtb-pot"><span class="std std-ref">RgpotXtbPot</span></a><span class="o">*</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1ae236995756b357bc95dde5512632c1ff"></span><span class="n">rgpot_xtb_create</span><span class="p">(</span><span class="k">const</span> <a class="doxyrest-code-link reference internal" href="struct_RgpotXtbConfig.html#doxid-struct-rgpot-xtb-config"><span class="std std-ref">RgpotXtbConfig</span></a><span class="o">*</span> <span class="n">cfg</span><span class="p">,</span> <span class="kt">char</span><span class="o">*</span> <span class="n">errbuf</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">errlen</span><span class="p">);</span></span>
+<span data-line="159"><span class="kt">void</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1ada1988d2a4fb508f956e17b49d5c597f"></span><span class="n">rgpot_xtb_destroy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="struct_RgpotXtbPot.html#doxid-struct-rgpot-xtb-pot"><span class="std std-ref">RgpotXtbPot</span></a><span class="o">*</span> <span class="n">pot</span><span class="p">);</span></span>
+<span data-line="160"><span class="kt">int</span> <span class="doxyrest-code-target target" id="doxid-_x_t_b_engine_abi_8cc_1af8e626b83b9f7ec1dadfebf53a920d23"></span><span class="n">rgpot_xtb_force</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="struct_RgpotXtbPot.html#doxid-struct-rgpot-xtb-pot"><span class="std std-ref">RgpotXtbPot</span></a><span class="o">*</span> <span class="n">pot</span><span class="p">,</span> <span class="kt">long</span> <span class="n">nAtoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomicNrs</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">variance</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">);</span></span>
+<span data-line="161"> </span>
+<span data-line="162"><span class="c1">// macros</span></span>
+<span data-line="163"> </span>
+<span data-line="164"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-pot__bridge_8cc_1a933409e97453f39bfae6d29f0518b341"></span><span class="n">CATCH_AND_REPORT</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">default_ret</span><span class="p">)</span></span>
+<span data-line="165"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a2108b4728d818bb75e88ace00bcd11d3"></span><span class="n">RGPOT_MTA_ABI_VERSION</span></span>
+<span data-line="166"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-metatomic__c__abi_8h_1a409c918f350af84ff87227c561b27aa3"></span><span class="n">RGPOT_MTA_API</span></span>
+<span data-line="167"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-_metatomic_engine_abi_8cc_1a8eaafdf8bea9f6c384cda06d3e8eea42"></span><span class="n">RGPOT_MTA_ENGINE_BUILD</span></span>
+<span data-line="168"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1aa3b73c6a3161c5d0da0ec0b357f13b8f"></span><span class="n">RGPOT_XTB_ABI_VERSION</span></span>
+<span data-line="169"><span class="cp">#define </span><span class="doxyrest-code-target target" id="doxid-xtb__c__abi_8h_1a1c2e4e9e5c694894e8e5e08ae2c99479"></span><span class="n">RGPOT_XTB_API</span></span>
+</pre></div>
+</section>
+<section id="detailed-documentation">
+<span id="details-global"></span><h2>Detailed Documentation<a class="headerlink" href="#detailed-documentation" title="Link to this heading">¶</a></h2>
+<section id="typedefs">
+<h3>Typedefs<a class="headerlink" href="#typedefs" title="Link to this heading">¶</a></h3>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a624f3d7d040e783aef1536f49e2a43ca">
+<span id="index-1"></span><pre><span data-line="1"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">CPMDCResult</span> <span class="n">CPMDCResult</span></span>
+</pre></div>
+<p>Result returned by energy / gradient / forces entry points.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239">
+<span id="index-2"></span><pre><span data-line="1"><span class="k">typedef</span> <span class="k">struct</span> <a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a> <span class="n">CPMDCSession</span></span>
+</pre></div>
+<p>Opaque handle for repeated evaluations with one Cap’n Proto parameter set.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-metatomic-c-abi-8h-1a5f3ddc99188390e16bcefecd044cd132">
+<span id="index-3"></span><pre><span data-line="1"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">RgpotMtaConfig</span> <span class="n">RgpotMtaConfig</span></span>
+</pre></div>
+<p>Flat config (subset of MetatomicConfig). NULL strings =&gt; empty/default.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-8h-1a7ebd0cbe28327ac32f7726770f826961">
+<span id="index-4"></span><pre><span data-line="1"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">NWChemCResult</span> <span class="n">NWChemCResult</span></span>
+</pre></div>
+<p>Result of energy+gradient (atomic units).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8h-1ad15494aa275bd98047b204d29533f6ba">
+<span id="index-5"></span><pre><span data-line="1"><span class="k">typedef</span> <span class="k">struct</span> <span class="n">PotClient</span> <span class="n">PotClient</span></span>
+</pre></div>
+<p>C API for the RPC potential client bridge.</p>
+<p>This header provides a C-compatible interface to the distributed potential calculation client, allowing integration with Fortran or other languages with a C interface, e.g. Julia.</p>
+<p>Opaque handle to the client context.</p>
+</section>
+<section id="global-functions">
+<h3>Global Functions<a class="headerlink" href="#global-functions" title="Link to this heading">¶</a></h3>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a22da50d15419dadce4925c88100a1c23">
+<span id="index-6"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_set_params</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Apply CPMD method parameters from a Cap’n Proto message.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>params_capnp</p></td>
+<td><p>Pointer to an unpacked flat <code class="docutils literal notranslate"><span class="pre">CPMDParams</span></code> message.</p></td>
+</tr>
+<tr class="row-even"><td><p>params_capnp_size_bytes</p></td>
+<td><p>Size of <code class="docutils literal notranslate"><span class="pre">params_capnp</span></code> in bytes.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>0 on success, -1 on parse or configuration failure.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a525b75c1e47dd8595be42d2175f9f64f">
+<span id="index-7"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy_gradient</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and nuclear gradient for an atomic configuration.</p>
+<p>Positions are Angstrom; gradient is Hartree/Bohr (CPMD ionic forces are negated into a nuclear gradient for API symmetry with nwchemc).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a6e17756faffc4d181352a5953991f584">
+<span id="index-8"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute total energy only (no gradient allocation).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1ad653481360bf399295aed47e14cef118">
+<span id="index-9"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy_forces</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and nuclear forces (negative gradient, Hartree/Bohr).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a08b6b5b994b9754e6c853d3dd46c7745">
+<span id="index-10"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">cpmdc_session_create</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Create a persistent evaluation session from a Cap’n Proto message.</p>
+<p>The session owns a copy of the serialized message so callers may release the input buffer after this call returns.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a0ffb70752daab4a244e5ffd58eaa6db5">
+<span id="index-11"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_session_set_params</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Replace Cap’n Proto parameters before the session accepts topology.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a6d07b0b1700b5352f1ce33f396a9f578">
+<span id="index-12"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">cpmdc_session_destroy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">)</span></span>
+</pre></div>
+<p>Release a persistent evaluation session.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a9f5e4a955e689dcf3e06b52e68b6adb1">
+<span id="index-13"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_session_calculate_forces</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">forces_len</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and forces for one Cap’n Proto <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code> step.</p>
+<p>Session keeps persistent <code class="docutils literal notranslate"><span class="pre">CPMDParams</span></code>; each call supplies geometry. Returned energy/forces use CPMD native units: Hartree and Hartree/Bohr.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1ac63ef923626641269d88b5319f5eed8a">
+<span id="index-14"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_session_calculate_result</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute forces for one <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code> step and write <code class="docutils literal notranslate"><span class="pre">PotentialResult</span></code>.</p>
+<p>Direct-call socket entry point: method state in the session, geometry in <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code>, output energy/forces converted to <code class="docutils literal notranslate"><span class="pre">ForceInput.energyUnit</span></code> and <code class="docutils literal notranslate"><span class="pre">energyUnit</span> <span class="pre">/</span> <span class="pre">lengthUnit</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">potential_result_capnp_capacity_bytes</span></code> is too small, returns <code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">==</span> <span class="pre">0</span></code>, writes the required byte count to <code class="docutils literal notranslate"><span class="pre">potential_result_capnp_size_bytes</span></code>, and does not evaluate CPMD.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a9b206e2d2173eafb39c00977101da25b">
+<span id="index-15"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_calculate_result</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>One-shot Cap’n Proto entry point (params + ForceInput -&gt; PotentialResult).</p>
+<p>Multi-step callers should create one session and call <code class="docutils literal notranslate"><span class="pre">cpmdc_session_calculate_result()</span></code> per step.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a50c58b775c95334c2842f3d07c247408">
+<span id="index-16"></span><pre><span data-line="1"><span class="kt">size_t</span> <span class="n">cpmdc_potential_result_size_for_force_input</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Byte count needed for a <code class="docutils literal notranslate"><span class="pre">PotentialResult</span></code> for the given <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code>.</p>
+<p>Parses geometry only; does not initialize or evaluate CPMD. Returns 0 when the message is invalid or too large for the C ABI.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a4d5a0eade3deceabe9f7e48e7a45d430">
+<span id="index-17"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">cpmdc_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Compiled library version string.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1a25f2bc651370d207f2049574e7073e0d">
+<span id="index-18"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_available</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>1 when the embedded OpenCPMD runtime is available.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-8h-1afae0c7a27c94036223f7a0cf60488f56">
+<span id="index-19"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">cpmdc_finalize</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Finalize an owned embedded CPMD runtime.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a22da50d15419dadce4925c88100a1c23">
+<span id="index-20"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_set_params</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Apply CPMD method parameters from a Cap’n Proto message.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>params_capnp</p></td>
+<td><p>Pointer to an unpacked flat <code class="docutils literal notranslate"><span class="pre">CPMDParams</span></code> message.</p></td>
+</tr>
+<tr class="row-even"><td><p>params_capnp_size_bytes</p></td>
+<td><p>Size of <code class="docutils literal notranslate"><span class="pre">params_capnp</span></code> in bytes.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>0 on success, -1 on parse or configuration failure.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a525b75c1e47dd8595be42d2175f9f64f">
+<span id="index-21"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy_gradient</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and nuclear gradient for an atomic configuration.</p>
+<p>Positions are Angstrom; gradient is Hartree/Bohr (CPMD ionic forces are negated into a nuclear gradient for API symmetry with nwchemc).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a6e17756faffc4d181352a5953991f584">
+<span id="index-22"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute total energy only (no gradient allocation).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1ad653481360bf399295aed47e14cef118">
+<span id="index-23"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_energy_forces</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and nuclear forces (negative gradient, Hartree/Bohr).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a4d5a0eade3deceabe9f7e48e7a45d430">
+<span id="index-24"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">cpmdc_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Compiled library version string.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a25f2bc651370d207f2049574e7073e0d">
+<span id="index-25"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_available</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>1 when the embedded OpenCPMD runtime is available.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1afae0c7a27c94036223f7a0cf60488f56">
+<span id="index-26"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">cpmdc_finalize</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Finalize an owned embedded CPMD runtime.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a08b6b5b994b9754e6c853d3dd46c7745">
+<span id="index-27"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">cpmdc_session_create</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Create a persistent evaluation session from a Cap’n Proto message.</p>
+<p>The session owns a copy of the serialized message so callers may release the input buffer after this call returns.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a0ffb70752daab4a244e5ffd58eaa6db5">
+<span id="index-28"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">cpmdc_session_set_params</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Replace Cap’n Proto parameters before the session accepts topology.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a6d07b0b1700b5352f1ce33f396a9f578">
+<span id="index-29"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">cpmdc_session_destroy</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">)</span></span>
+</pre></div>
+<p>Release a persistent evaluation session.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a9f5e4a955e689dcf3e06b52e68b6adb1">
+<span id="index-30"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_session_calculate_forces</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">forces_h_bohr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">forces_len</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute energy and forces for one Cap’n Proto <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code> step.</p>
+<p>Session keeps persistent <code class="docutils literal notranslate"><span class="pre">CPMDParams</span></code>; each call supplies geometry. Returned energy/forces use CPMD native units: Hartree and Hartree/Bohr.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1ac63ef923626641269d88b5319f5eed8a">
+<span id="index-31"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_session_calculate_result</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="#doxid-cpmd-c-abi-8h-1a49ff1835247d81d2ea1d2bea854ba239"><span class="std std-ref">CPMDCSession</span></a><span class="o">*</span> <span class="n">session</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Compute forces for one <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code> step and write <code class="docutils literal notranslate"><span class="pre">PotentialResult</span></code>.</p>
+<p>Direct-call socket entry point: method state in the session, geometry in <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code>, output energy/forces converted to <code class="docutils literal notranslate"><span class="pre">ForceInput.energyUnit</span></code> and <code class="docutils literal notranslate"><span class="pre">energyUnit</span> <span class="pre">/</span> <span class="pre">lengthUnit</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">potential_result_capnp_capacity_bytes</span></code> is too small, returns <code class="docutils literal notranslate"><span class="pre">ok</span> <span class="pre">==</span> <span class="pre">0</span></code>, writes the required byte count to <code class="docutils literal notranslate"><span class="pre">potential_result_capnp_size_bytes</span></code>, and does not evaluate CPMD.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a9b206e2d2173eafb39c00977101da25b">
+<span id="index-32"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_CPMDCResult.html#doxid-struct-c-p-m-d-c-result"><span class="std std-ref">CPMDCResult</span></a> <span class="n">cpmdc_calculate_result</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">,</span> <span class="kt">void</span><span class="o">*</span> <span class="n">potential_result_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">potential_result_capnp_capacity_bytes</span><span class="p">,</span> <span class="kt">size_t</span><span class="o">*</span> <span class="n">potential_result_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>One-shot Cap’n Proto entry point (params + ForceInput -&gt; PotentialResult).</p>
+<p>Multi-step callers should create one session and call <code class="docutils literal notranslate"><span class="pre">cpmdc_session_calculate_result()</span></code> per step.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cpmd-c-abi-stub-8c-1a50c58b775c95334c2842f3d07c247408">
+<span id="index-33"></span><pre><span data-line="1"><span class="kt">size_t</span> <span class="n">cpmdc_potential_result_size_for_force_input</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">force_input_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">force_input_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Byte count needed for a <code class="docutils literal notranslate"><span class="pre">PotentialResult</span></code> for the given <code class="docutils literal notranslate"><span class="pre">ForceInput</span></code>.</p>
+<p>Parses geometry only; does not initialize or evaluate CPMD. Returns 0 when the message is invalid or too large for the C ABI.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-cu-h2-pot-8hpp-1a79b876a461f808a0b8e5ac38ca629988">
+<span id="index-34"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">c_force_eam</span><span class="p">(</span><span class="kt">int</span><span class="o">*</span> <span class="n">natms</span><span class="p">,</span> <span class="kt">int</span> <span class="n">ndim</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">R</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">F</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">U</span><span class="p">)</span></span>
+</pre></div>
+<p>C-linkage bridge to the Fortran EAM implementation.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>natms</p></td>
+<td><p>Array containing counts of Cu and H atoms.</p></td>
+</tr>
+<tr class="row-even"><td><p>ndim</p></td>
+<td><p>Total dimensions (3 * N).</p></td>
+</tr>
+<tr class="row-odd"><td><p>box</p></td>
+<td><p>Diagonal box vectors (assumes cubic).</p></td>
+</tr>
+<tr class="row-even"><td><p>R</p></td>
+<td><p>Pointer to flat position array.</p></td>
+</tr>
+<tr class="row-odd"><td><p>F</p></td>
+<td><p>Pointer to output force array.</p></td>
+</tr>
+<tr class="row-even"><td><p>U</p></td>
+<td><p>Pointer to output energy value.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>Void.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-metatomic-c-abi-8h-1ab1c3edb5fb26c2406f212d203a3f76c0">
+<span id="index-35"></span><pre><span data-line="1"><span class="n">__attribute__</span><span class="p">((</span><span class="n">visibility</span><span class="p">(</span><span class="err">“</span><span class="k">default</span><span class="err">”</span><span class="p">)))</span></span>
+</pre></div>
+<p>Energy + forces. Returns 0 on success. variance may be NULL.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-8h-1a2b19e40d3fa84cd9c0c26d4e61ee1aec">
+<span id="index-36"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">nwchemc_set_params</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Apply sticky method options from an unpacked flat <code class="docutils literal notranslate"><span class="pre">NWChemParams</span></code> message.</p>
+<p class="rubric">Returns:</p>
+<p>0 on success, non-zero if embed unavailable or params are invalid</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-8h-1a9452e5aaf6c8e097d7797f3697fcc00d">
+<span id="index-37"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_NWChemCResult.html#doxid-struct-n-w-chem-c-result"><span class="std std-ref">NWChemCResult</span></a> <span class="n">nwchemc_energy_gradient</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Energy + nuclear gradient.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>n_atoms</p></td>
+<td><p>atom count</p></td>
+</tr>
+<tr class="row-even"><td><p>positions_ang</p></td>
+<td><p>n_atoms*3 Angstrom, row-major xyz</p></td>
+</tr>
+<tr class="row-odd"><td><p>atomic_numbers</p></td>
+<td><p>n_atoms Z values</p></td>
+</tr>
+<tr class="row-even"><td><p>params_capnp</p></td>
+<td><p>unpacked flat <code class="docutils literal notranslate"><span class="pre">NWChemParams</span></code> message</p></td>
+</tr>
+<tr class="row-odd"><td><p>params_capnp_size_bytes</p></td>
+<td><p>size of params_capnp in bytes</p></td>
+</tr>
+<tr class="row-even"><td><p>grad_h_bohr</p></td>
+<td><p>out n_atoms*3 Hartree/Bohr, row-major</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-8h-1a90abe502c32b33e3bdd7f4415c7a3c6e">
+<span id="index-38"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">nwchemc_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Engine version string (static buffer).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-8h-1a85faef1e24ae6c734d0d43e7d498ef53">
+<span id="index-39"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">nwchemc_available</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>1 if real embed (RGPOT_HAS_NWCHEM), 0 if stub.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-stub-8c-1a2b19e40d3fa84cd9c0c26d4e61ee1aec">
+<span id="index-40"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">nwchemc_set_params</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">)</span></span>
+</pre></div>
+<p>Apply sticky method options from an unpacked flat <code class="docutils literal notranslate"><span class="pre">NWChemParams</span></code> message.</p>
+<p class="rubric">Returns:</p>
+<p>0 on success, non-zero if embed unavailable or params are invalid</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-stub-8c-1a9452e5aaf6c8e097d7797f3697fcc00d">
+<span id="index-41"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="struct_NWChemCResult.html#doxid-struct-n-w-chem-c-result"><span class="std std-ref">NWChemCResult</span></a> <span class="n">nwchemc_energy_gradient</span><span class="p">(</span><span class="kt">int</span> <span class="n">n_atoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">positions_ang</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int</span><span class="o">*</span> <span class="n">atomic_numbers</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">params_capnp</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">params_capnp_size_bytes</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">grad_h_bohr</span><span class="p">)</span></span>
+</pre></div>
+<p>Energy + nuclear gradient.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>n_atoms</p></td>
+<td><p>atom count</p></td>
+</tr>
+<tr class="row-even"><td><p>positions_ang</p></td>
+<td><p>n_atoms*3 Angstrom, row-major xyz</p></td>
+</tr>
+<tr class="row-odd"><td><p>atomic_numbers</p></td>
+<td><p>n_atoms Z values</p></td>
+</tr>
+<tr class="row-even"><td><p>params_capnp</p></td>
+<td><p>unpacked flat <code class="docutils literal notranslate"><span class="pre">NWChemParams</span></code> message</p></td>
+</tr>
+<tr class="row-odd"><td><p>params_capnp_size_bytes</p></td>
+<td><p>size of params_capnp in bytes</p></td>
+</tr>
+<tr class="row-even"><td><p>grad_h_bohr</p></td>
+<td><p>out n_atoms*3 Hartree/Bohr, row-major</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-stub-8c-1a90abe502c32b33e3bdd7f4415c7a3c6e">
+<span id="index-42"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">nwchemc_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>Engine version string (static buffer).</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-nwchem-c-abi-stub-8c-1a85faef1e24ae6c734d0d43e7d498ef53">
+<span id="index-43"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">nwchemc_available</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span></span>
+</pre></div>
+<p>1 if real embed (RGPOT_HAS_NWCHEM), 0 if stub.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8cc-1ad254a3ebf2ca0137de55bd82ea1abb42">
+<span id="index-44"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">pot_client_init</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">host</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">port</span><span class="p">)</span></span>
+</pre></div>
+<p>Initializes the RPC client connection.</p>
+<p>Constructs a string-based address from the <em>host</em> and <em>port</em>, then initializes a new <code class="docutils literal notranslate"><span class="pre">capnp::EzRpcClient</span></code>. The main capability is cast to the <code class="docutils literal notranslate"><span class="pre">Potential</span></code> interface defined in the schema.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Returns <code class="docutils literal notranslate"><span class="pre">nullptr</span></code> if the connection cannot be established or if the address is malformed.</p>
+</div>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8cc-1a605cb8b056e3d895be066472fe1c116e">
+<span id="index-45"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">pot_client_free</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">)</span></span>
+</pre></div>
+<p>Frees all resources associated with the client.</p>
+<p>Performs a standard <code class="docutils literal notranslate"><span class="pre">delete</span></code> on the client pointer. This triggers the <code class="docutils literal notranslate"><span class="pre">PotClient</span></code> destructor, which cleans up the <code class="docutils literal notranslate"><span class="pre">unique_ptr</span></code> and associated RPC state.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8cc-1ab471aef52e0227fbb98588e8366ad646">
+<span id="index-46"></span><pre><span data-line="1"><span class="kt">int32_t</span> <span class="n">pot_calculate</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">natoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">pos</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int32_t</span><span class="o">*</span> <span class="n">atmnrs</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_forces</span><span class="p">)</span></span>
+</pre></div>
+<p>Executes a remote potential calculation.</p>
+<p>This function performs the following steps:</p>
+<ol class="arabic simple">
+<li><p>Resets the <code class="docutils literal notranslate"><span class="pre">last_error</span></code> buffer.</p></li>
+<li><p>Initializes a calculation request.</p></li>
+<li><p>Maps the input pointers to <code class="docutils literal notranslate"><span class="pre">kj::arrayPtr</span></code> views to avoid unnecessary copying before serialization.</p></li>
+<li><p>Waits for the RPC promise to resolve.</p></li>
+<li><p>Validates the size of the returned force array.</p></li>
+<li><p>Copies the results into the provided output buffers.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The server must return a force array matching <em>natoms</em> * 3. If the sizes do not match, a non-zero error code is returned.</p>
+</div>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8cc-1a669a1a1ce89314ebbfec4c91438bd782">
+<span id="index-47"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">pot_get_last_error</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">)</span></span>
+</pre></div>
+<p>Retrieves the most recent error message.</p>
+<p>Checks if a valid client handle is provided and if the <code class="docutils literal notranslate"><span class="pre">last_error</span></code> buffer contains data. If no error is recorded, an empty string is returned.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8h-1ad254a3ebf2ca0137de55bd82ea1abb42">
+<span id="index-48"></span><pre><span data-line="1"><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">pot_client_init</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">host</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">port</span><span class="p">)</span></span>
+</pre></div>
+<p>Initializes the RPC client connection.</p>
+<p>Constructs a string-based address from the <em>host</em> and <em>port</em>, then initializes a new <code class="docutils literal notranslate"><span class="pre">capnp::EzRpcClient</span></code>. The main capability is cast to the <code class="docutils literal notranslate"><span class="pre">Potential</span></code> interface defined in the schema.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Returns <code class="docutils literal notranslate"><span class="pre">nullptr</span></code> if the connection cannot be established or if the address is malformed.</p>
+</div>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>host</p></td>
+<td><p>Target server hostname or IP address.</p></td>
+</tr>
+<tr class="row-even"><td><p>port</p></td>
+<td><p>Network port of the potential server.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>Pointer to the client context or <code class="docutils literal notranslate"><span class="pre">NULL</span></code> on failure.</p>
+<p class="rubric">See also:</p>
+<p>pot_get_last_error</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8h-1a605cb8b056e3d895be066472fe1c116e">
+<span id="index-49"></span><pre><span data-line="1"><span class="kt">void</span> <span class="n">pot_client_free</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">)</span></span>
+</pre></div>
+<p>Frees all resources associated with the client.</p>
+<p>Performs a standard <code class="docutils literal notranslate"><span class="pre">delete</span></code> on the client pointer. This triggers the <code class="docutils literal notranslate"><span class="pre">PotClient</span></code> destructor, which cleans up the <code class="docutils literal notranslate"><span class="pre">unique_ptr</span></code> and associated RPC state.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>client</p></td>
+<td><p>The opaque client handle to release.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>Void.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8h-1ab471aef52e0227fbb98588e8366ad646">
+<span id="index-50"></span><pre><span data-line="1"><span class="kt">int32_t</span> <span class="n">pot_calculate</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">natoms</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">pos</span><span class="p">,</span> <span class="k">const</span> <span class="kt">int32_t</span><span class="o">*</span> <span class="n">atmnrs</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span><span class="o">*</span> <span class="n">box</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_energy</span><span class="p">,</span> <span class="kt">double</span><span class="o">*</span> <span class="n">out_forces</span><span class="p">)</span></span>
+</pre></div>
+<p>Executes a remote potential calculation.</p>
+<p>The <em>client</em> must be successfully initialized.</p>
+<p>This function performs the following steps:</p>
+<ol class="arabic simple">
+<li><p>Resets the <code class="docutils literal notranslate"><span class="pre">last_error</span></code> buffer.</p></li>
+<li><p>Initializes a calculation request.</p></li>
+<li><p>Maps the input pointers to <code class="docutils literal notranslate"><span class="pre">kj::arrayPtr</span></code> views to avoid unnecessary copying before serialization.</p></li>
+<li><p>Waits for the RPC promise to resolve.</p></li>
+<li><p>Validates the size of the returned force array.</p></li>
+<li><p>Copies the results into the provided output buffers.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The server must return a force array matching <em>natoms</em> * 3. If the sizes do not match, a non-zero error code is returned.</p>
+</div>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>client</p></td>
+<td><p>The opaque client handle.</p></td>
+</tr>
+<tr class="row-even"><td><p>natoms</p></td>
+<td><p>Total number of atoms in the system.</p></td>
+</tr>
+<tr class="row-odd"><td><p>pos</p></td>
+<td><p>Array of flattened atomic coordinates.</p></td>
+</tr>
+<tr class="row-even"><td><p>atmnrs</p></td>
+<td><p>Array of atomic numbers.</p></td>
+</tr>
+<tr class="row-odd"><td><p>box</p></td>
+<td><p>Simulation cell vectors in row-major order.</p></td>
+</tr>
+<tr class="row-even"><td><p>out_energy</p></td>
+<td><p>Pointer to store the calculated energy.</p></td>
+</tr>
+<tr class="row-odd"><td><p>out_forces</p></td>
+<td><p>Buffer to store the calculated forces.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>0 on success, non-zero on failure.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-pot-bridge-8h-1a669a1a1ce89314ebbfec4c91438bd782">
+<span id="index-51"></span><pre><span data-line="1"><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">pot_get_last_error</span><span class="p">(</span><a class="doxyrest-code-link reference internal" href="class_PotClient.html#doxid-struct-pot-client"><span class="std std-ref">PotClient</span></a><span class="o">*</span> <span class="n">client</span><span class="p">)</span></span>
+</pre></div>
+<p>Retrieves the most recent error message.</p>
+<p>Checks if a valid client handle is provided and if the <code class="docutils literal notranslate"><span class="pre">last_error</span></code> buffer contains data. If no error is recorded, an empty string is returned.</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>client</p></td>
+<td><p>The opaque client handle.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>String containing the error description.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-server-8cpp-1a0ddf1224851353fc92bfbff6f499fa97">
+<span id="index-52"></span><pre><span data-line="1"><span class="kt">int</span> <span class="n">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[])</span></span>
+</pre></div>
+<p>The main entry point handles command-line arguments to specify the network port and the potential type. It instantiates the requested physics engine and blocks until the server is terminated.</p>
+</section>
+</section>
+<section id="usage">
+<span id="doxid-server-8cpp-1autotoc-md19"></span><h2>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h2>
+<p><a href="#id1"><span class="problematic" id="id2">``</span></a><a href="#id3"><span class="problematic" id="id4">``</span></a>./potserv &lt;port&gt; &lt;PotentialType&gt;</p>
+<p class="rubric">Parameters:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>argc</p></td>
+<td><p>Argument count.</p></td>
+</tr>
+<tr class="row-even"><td><p>argv</p></td>
+<td><p>Argument vector.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="rubric">Returns:</p>
+<p>0 on success, 1 on initialization failure.</p>
+<div class="doxyrest-title-code-block highlight" id="doxid-xtb-c-abi-8h-1aed6dec1342c11226fbf6d9f0d23fc168">
+<span id="index-53"></span><pre><span data-line="1"><span class="n">__attribute__</span><span class="p">((</span><span class="n">visibility</span><span class="p">(</span><span class="err">“</span><span class="k">default</span><span class="err">”</span><span class="p">)))</span></span>
+</pre></div>
+<p>Energy + forces. Returns 0 on success. variance may be NULL.</p>
+</section>
+</section>
+
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"><div class="navigation-prev">
+    <a href="class_rgpot_RpcClient.html">
+      <i class="i-lucide chevron-left"></i>
+      <div class="page-info">
+        <span>Previous</span><div class="title">class rgpot::RpcClient</div></div>
+    </a>
+  </div><div class="navigation-next">
+    <a href="namespace_rgpot.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">namespace rgpot</div>
+      </div>
+      <i class="i-lucide chevron-right"></i>
+    </a>
+  </div></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        color: var(--sy-c-text-weak);
+        font-size: 0.9em;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 1rem;
+          align-items: center;
+        "
+      >
+
+        
+        <span style="display: inline-flex; align-items: center; gap: 0.3em">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M7,20H4V4h3V20z M14,20h-3V12h3V20z M21,20h-3V8h3V20z" />
+          </svg>
+          <span
+            >Analytics by
+            <a
+              href="https://umami.is/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="color: inherit; text-decoration: underline"
+              >Umami</a
+            ></span
+          >
+        </span>
+
+        
+        <span style="display: inline-flex; align-items: center; gap: 0.3em">
+          <span>provided by</span>
+          <span style="display: inline-flex; align-items: center; gap: 0.3em">
+            <svg xmlns="http://www.w3.org/2000/svg" width="1.4em" height="1.4em" viewBox="0 0 64 64" aria-hidden="true"><g fill-rule="evenodd"><ellipse cx="32" cy="11" fill="#80D25B" rx="7" ry="9"/><path fill="#80D25B" d="M20.3,46c0,0-3.2,9.9.3,13.8c3.5,3.9 6.1,3.4 6.1-6C26.8,44.3 20.3,46 20.3,46Z"/><path fill="#80D25B" d="M38.3,46c0,0-3.2,9.9.4,13.8c3.5,3.9 6.1,3.4 6.1-6C44.8,44.3 38.3,46 38.3,46Z" transform="matrix(-1 0 0 1 81.8 0)"/><path fill="#80D25B" d="M20.6,21.2c0,0-6.7-5.8-10.5-5.2C6.2,16.7 6,22.2 6,24c0,1.8 1.8,13.3 3.8,12.5c2-0.8 4-8.5 4-8.5c1.9,2.3 4.8,2.5 4.8,2.5L20.6,21.2Z"/><path fill="#80D25B" d="M57.6,21.2c0,0-6.6-5.8-10.5-5.2C43.2,16.7 43,22.2 43,24c0,1.8 1.8,13.3 3.8,12.5c2-0.8 4-8.5 4-8.5c1.9,2.3 4.8,2.5 4.8,2.5L57.6,21.2Z" transform="matrix(-1 0 0 1 100.623 0)"/><path fill="#BD7575" stroke="#595959" stroke-linecap="round" stroke-width="2" d="M32,53C40.8,53 48,44.5 48,34C48,23.5 46.7,17 32,17C17.3,17 16,23.5 16,34C16,44.5 23.2,53 32,53Z"/><polygon fill="#BD7575" stroke="#595959" stroke-linecap="round" stroke-width="2" points="32 22 38.9 26 38.9 34 32 38 25.1 34 25.1 26"/><path stroke="#595959" stroke-linecap="round" stroke-width="2" d="M30,8C28.9,8 28,8.9 28,10"/><path stroke="#595959" stroke-linecap="round" stroke-width="2" d="M36,8C34.9,8 34,8.9 34,10" transform="matrix(-1 0 0 1 70 0)"/><path stroke="#595959" stroke-linecap="round" stroke-width="2" d="M32.1,38.2L32.1,52.4M32,21.7L32,17M25.2,26L17.7,23.1M25.1,34.2L16.8,38.9"/><path stroke="#595959" stroke-linecap="round" stroke-width="2" d="M46.2,26L38.7,23.1" transform="matrix(-1 0 0 1 84.951 0)"/><path stroke="#595959" stroke-linecap="round" stroke-width="2" d="M47.1,34.2L38.8,38.9" transform="matrix(-1 0 0 1 85.891 0)"/></g></svg>
+            <a
+              href="https://turtletech.us/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="color: inherit; text-decoration: underline"
+              >TurtleTech ehf</a
+            >
+          </span>
+        </span>
+      </div>
+    </div>
+
+    
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2025--present, rgpot developers</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div> <div class="sy-foot-socials">
+<a href="https://github.com/OmniPotentRPC/rgpot" aria-label="GitHub">
+  <iconify-icon icon="simple-icons:github"></iconify-icon>
+</a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9a2dae69"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/target-highlight.js?v=df7d332b"></script>
+      <script src="../_static/shibuya.js?v=cac61aee"></script></body>
+</html>

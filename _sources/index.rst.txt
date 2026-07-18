@@ -1,0 +1,91 @@
+
+=========
+``rgpot``
+=========
+
+:Author: `Rohit Goswami <https://rgoswami.me>`_
+
+.. raw:: html
+
+   <p class="rgpot-hero">
+     <img class="rgpot-hero-logo rgpot-hero-logo--light"
+          src="_static/rgpot_logo_light.webp"
+          alt="rgpot logo"
+          width="320"
+          height="320"
+          loading="eager" />
+     <img class="rgpot-hero-logo rgpot-hero-logo--dark"
+          src="_static/rgpot_logo_dark.webp"
+          alt="rgpot logo"
+          width="320"
+          height="320"
+          loading="eager" />
+   </p>
+
+Overview
+--------
+
+``rgpot`` provides a unified Cap'n Proto schema and RPC server for potential
+energy calculations.
+Clients send ``ForceInput`` messages containing geometry and units,
+receive ``PotentialResult`` messages containing energy and forces, and use
+``PotentialConfig`` only for backend setup.
+
+The C++ server hosts built-in potentials such as Lennard-Jones and CuH2,
+optional xTB / tblite / metatomic backends, and runtime-loaded quantum engines.
+``NWChemPot`` loads ``libnwchemc`` from the split ``nwchemc`` project.
+``CPMDPot`` loads ``libcpmdc`` from the split ``cpmdc`` project.
+Both quantum frontends keep geometry on ``ForceInput`` and carry method options in
+the matching ``PotentialConfig`` arm.
+
+The pip package (``pip install rgpot``) ships nanobind abi3 bindings and multi-ABI
+Metatomic engines for **torch 2.7+**.
+See:
+
+:doc:`howto/pip-python`
+
+
+.. code:: bash
+
+    git clone https://github.com/OmniPotentRPC/rgpot.git
+    cd rgpot && pixi shell -e rpctest
+    meson setup bbdir -Dwith_tests=true -Dwith_rpc=true --buildtype=debug
+    meson compile -C bbdir && meson test -C bbdir
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/quickstart
+   tutorials/molecular-global-optimization
+
+.. toctree::
+   :maxdepth: 2
+   :caption: How-To Guides
+
+   howto/pip-python
+   howto/embedding
+   howto/integration
+   howto/eindir-anneal
+   howto/eon-rgpot
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   reference/architecture
+   api/index
+   changelog
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Development
+
+   contributing/index
+   code_of_conduct
+
+License
+-------
+
+MIT, however note that some of the potentials are adapted from eOn which is
+under a BSD 3-Clause License.

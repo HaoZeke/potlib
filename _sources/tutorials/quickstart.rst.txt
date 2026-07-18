@@ -1,0 +1,96 @@
+
+
+Quickstart
+----------
+
+This tutorial builds rgpot from source, runs the local tests, and exercises the
+Cap'n Proto RPC server with the repository integration script.
+The same ``ForceInput`` / ``PotentialResult`` wire protocol is used by external
+clients.
+
+What you will need
+~~~~~~~~~~~~~~~~~~
+
+- `pixi <https://pixi.sh>`_ (manages the full toolchain)
+
+Clone and build
+~~~~~~~~~~~~~~~
+
+.. code:: bash
+
+    git clone https://github.com/OmniPotentRPC/rgpot.git
+    cd rgpot
+    pixi shell -e rpctest
+    meson setup bbdir -Dwith_tests=true -Dwith_rpc=true --buildtype=debug
+    meson compile -C bbdir
+
+The RPC build produces the ``potserv`` executable:
+
+::
+
+    bbdir/CppCore/potserv
+
+Run the tests
+~~~~~~~~~~~~~
+
+.. code:: bash
+
+    meson test -C bbdir --print-errorlogs
+
+Run the RPC smoke
+~~~~~~~~~~~~~~~~~
+
+The checked smoke starts ``potserv``, connects through pycapnp, sends a
+``ForceInput``, and verifies the returned ``PotentialResult``:
+
+.. code:: bash
+
+    python tests/rpc_integ.py --server-bin ./bbdir/CppCore/potserv
+
+Run configure smokes for the runtime-loaded quantum frontends:
+
+.. code:: bash
+
+    python tests/rpc_integ.py \
+      --server-bin ./bbdir/CppCore/potserv \
+      --nwchem-smoke \
+      --cpmd-smoke
+
+What just happened
+~~~~~~~~~~~~~~~~~~
+
+1. ``potserv`` loaded a built-in potential and exposed it over Cap'n Proto RPC.
+
+2. The Python client sent atomic positions in ``ForceInput``.
+
+3. The server returned energy and forces in ``PotentialResult``.
+
+4. The same wire protocol works from any language with a Cap'n Proto
+
+implementation.
+
+Start a manual server
+~~~~~~~~~~~~~~~~~~~~~
+
+Launch a Lennard-Jones server on port 12345:
+
+.. code:: bash
+
+    ./bbdir/CppCore/potserv 12345 LJ
+
+For runtime-loaded quantum engines, pass the matching selector and engine path:
+
+.. code:: bash
+
+    CPMDC_LIBRARY=/path/to/libcpmdc.so ./bbdir/CppCore/potserv 12345 CPMD
+    NWCHEMC_LIBRARY=/path/to/libnwchemc.so ./bbdir/CppCore/potserv 12345 NWChem
+
+Next steps
+~~~~~~~~~~
+
+- :doc:`../howto/pip-python` — ``pip install rgpot`` (LJ + Metatomic multi-ABI
+  engines, torch 2.7+)
+- :doc:`../reference/architecture` — architecture overview
+- :doc:`../howto/integration` — embedding into external projects
+- :doc:`../howto/embedding` — meson/cmake subproject
+- :doc:`../changelog` — release history
