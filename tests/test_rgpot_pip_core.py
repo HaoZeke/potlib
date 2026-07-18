@@ -116,4 +116,3 @@ def test_core_is_abi3_or_free_threaded():
     gil_disabled = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
     if sys.version_info >= (3, 12) and not gil_disabled:
         assert "abi3" in name, f"expected abi3 extension, got {name}"
-
