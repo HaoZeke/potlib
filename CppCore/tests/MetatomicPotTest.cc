@@ -1,6 +1,7 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -488,5 +489,5 @@ TEST_CASE("MetatomicDlopen loads engine and matches linked pot energy",
   plugin.forceImpl(in, &o2);
   REQUIRE(std::isfinite(o1.energy));
   REQUIRE(std::isfinite(o2.energy));
-  REQUIRE(o1.energy == Approx(o2.energy).margin(1e-5));
+  REQUIRE(o1.energy == Catch::Approx(o2.energy).margin(1e-5));
 }

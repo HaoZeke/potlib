@@ -58,13 +58,17 @@ if has_metatomic
     if is_variable('_torch_libdir')
         _engine_build_rpath = _torch_libdir
         if is_variable('_py_purelib')
-            _engine_build_rpath = ':'.join([
-                _torch_libdir,
-                _py_purelib / 'metatensor' / 'lib',
-                _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major) / 'lib',
-                _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
-                _py_purelib / 'vesin' / 'lib',
-            ])
+            _engine_build_rpath = ':'.join(
+                [
+                    _torch_libdir,
+                    _py_purelib / 'metatensor' / 'lib',
+                    _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major) / 'lib',
+                    _py_purelib / 'metatomic' / 'torch' / (
+                        'torch-' + _torch_major
+                    ) / 'lib',
+                    _py_purelib / 'vesin' / 'lib',
+                ],
+            )
         endif
     endif
 
