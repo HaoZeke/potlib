@@ -194,6 +194,48 @@ TEST_CASE("vesin_compat traits distinguish enum vs struct device layouts",
   rgpot::vesin_compat::set_algorithm_default(without_alg);
   REQUIRE_THAT(without_alg.cutoff, WithinAbs(3.5, 1e-15));
 
+  // vesin 0.6 skin / n_threads members (and absence on older shapes).
+  struct OptionsWithSkinThreads {
+    double skin = -1.0;
+    int n_threads = -1;
+  };
+  struct OptionsNoSkin {
+    double cutoff = 0.0;
+  };
+  STATIC_REQUIRE(
+      rgpot::vesin_compat::has_skin_member<OptionsWithSkinThreads>::value);
+  STATIC_REQUIRE(
+      rgpot::vesin_compat::has_n_threads_member<OptionsWithSkinThreads>::value);
+  STATIC_REQUIRE_FALSE(
+      rgpot::vesin_compat::has_skin_member<OptionsNoSkin>::value);
+
+  OptionsWithSkinThreads with_skin{};
+  rgpot::vesin_compat::set_skin(with_skin, 0.25);
+  rgpot::vesin_compat::set_n_threads(with_skin, 4);
+  REQUIRE_THAT(with_skin.skin, WithinAbs(0.25, 1e-15));
+  REQUIRE(with_skin.n_threads == 4);
+
+  // Live VesinOptions from the build's vesin.h: fill_neighbor_options must
+  // produce a usable request (and set 0.6 fields when present).
+  {
+    VesinOptions live{};
+    rgpot::vesin_compat::fill_neighbor_options(live, /*cutoff=*/5.0,
+                                               /*full_list=*/true);
+    REQUIRE_THAT(live.cutoff, WithinAbs(5.0, 1e-15));
+    REQUIRE(live.full);
+    REQUIRE_FALSE(live.sorted);
+    REQUIRE(live.return_shifts);
+    REQUIRE_FALSE(live.return_distances);
+    REQUIRE(live.return_vectors);
+    if constexpr (rgpot::vesin_compat::has_skin_member<VesinOptions>::value) {
+      REQUIRE_THAT(live.skin, WithinAbs(0.0, 1e-15));
+    }
+    if constexpr (rgpot::vesin_compat::has_n_threads_member<
+                      VesinOptions>::value) {
+      REQUIRE(live.n_threads == 0);
+    }
+  }
+
   // Live VesinDevice from the build's vesin.h must construct without error.
   // Branch via a function template so if constexpr can discard the inactive
   // arm (plain if constexpr in this non-template TEST_CASE type-checks both).

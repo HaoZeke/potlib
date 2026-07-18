@@ -4,7 +4,7 @@ channels = ["conda-forge"]
 description = "RPC based core for potential energy surface functionality."
 name = "rgpot"
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
-version = "2.5.0"
+version = "2.5.2"
 
 [feature.cigen.tasks]
 # Export every ci/gha/*.ncl workflow (shared pins/steps in ci/gha/lib/).
@@ -46,8 +46,10 @@ platforms = ["linux-64"]
 torch = ">=2.10, <2.11"
 metatomic-torch = ">=0.1.9, <0.2"
 metatensor-torch = ">=0.8.4, <0.9"
-vesin-torch = ">=0.5.2, <0.6"
-vesin = ">=0.5.2, <0.6"
+# vesin 0.6 inserts skin/n_threads into VesinOptions; engines must build and
+# run against the same line (ABI is pass-by-value).
+vesin-torch = ">=0.6.0, <0.7"
+vesin = ">=0.6.0, <0.7"
 
 [feature.rpc.dependencies]
 capnproto = ">=1.0.2,<2"

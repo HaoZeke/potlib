@@ -143,7 +143,7 @@ NB_MODULE(_core, m) {
   m.doc() =
       "rgpot Python bindings (nanobind): LJ core + Metatomic dlopen frontend. "
       "Stable ABI (abi3) when built with Python >= 3.12.";
-  m.attr("__version__") = "2.4.0";
+  m.attr("__version__") = "2.5.2";
   m.attr("has_metatomic_dlopen") = true;
 
   m.def("evaluate_lj", &evaluate_lj, nb::arg("positions"),

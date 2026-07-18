@@ -457,17 +457,11 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
 
   auto cutoff = request->engine_cutoff(m_config.length_unit);
 
-  // Zero-init VesinOptions so unknown/newer fields stay at safe defaults.
-  // algorithm (vesin 0.5+) is set via type-trait helper so older headers
-  // without that member still compile — never names VesinAutoAlgorithm.
+  // VesinOptions layout must match the linked libvesin (0.5 vs 0.6 diverge
+  // on skin/n_threads). fill_neighbor_options zero-inits and sets fields
+  // via vesin_compat traits for the headers we compile against.
   VesinOptions options{};
-  options.cutoff = cutoff;
-  options.full = request->full_list();
-  options.sorted = false;
-  vesin_compat::set_algorithm_default(options);
-  options.return_shifts = true;
-  options.return_distances = false;
-  options.return_vectors = true;
+  vesin_compat::fill_neighbor_options(options, cutoff, request->full_list());
 
   VesinNeighborList *vesin_nl = new VesinNeighborList();
 
@@ -483,7 +477,16 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
     std::string err_str = "vesin_neighbors failed";
     if (error_message != nullptr) {
       err_str += ": " + std::string(error_message);
+    } else {
+      // Bare failure is the usual symptom of a VesinOptions ABI mismatch
+      // (engine built against a different vesin minor than libvesin.so).
+      err_str +=
+          " (no message; check vesin header/lib major match — need "
+          "vesin>=0.6 for current engines)";
     }
+    err_str += " cutoff=" + std::to_string(cutoff) +
+               " nAtoms=" + std::to_string(nAtoms) +
+               " full=" + std::to_string(static_cast<int>(options.full));
     delete vesin_nl;
     throw std::runtime_error(err_str);
   }
