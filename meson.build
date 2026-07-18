@@ -195,8 +195,10 @@ print(api_inc)
     # Portable RUNPATH is install_rpath / repair script.
     torch_dep = declare_dependency(
         compile_args: [
-            '-isystem', _torch_inc,
-            '-isystem', _torch_api_inc,
+            '-isystem',
+            _torch_inc,
+            '-isystem',
+            _torch_api_inc,
         ],
         link_args: [
             '-L' + _torch_libdir,
@@ -223,10 +225,16 @@ print(api_inc)
     #   metatensor_torch/torch-X.Y/{lib,include}
     #   metatomic/torch/torch-X.Y/{lib,include}
     #   vesin/lib/libvesin.so
-    _mts_torch_root = _py_purelib / 'metatensor_torch' / ('torch-' + _torch_major)
-    _mta_torch_root = _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major)
+    _mts_torch_root = _py_purelib / 'metatensor_torch' / (
+        'torch-' + _torch_major
+    )
+    _mta_torch_root = _py_purelib / 'metatomic' / 'torch' / (
+        'torch-' + _torch_major
+    )
     # Legacy layout fallback
-    _mts_torch_legacy = _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major)
+    _mts_torch_legacy = _py_purelib / 'metatensor' / 'torch' / (
+        'torch-' + _torch_major
+    )
 
     _mts_inc_dirs = [
         _py_purelib / 'metatensor' / 'include',
@@ -394,7 +402,9 @@ rgpot_dep = declare_dependency(
 # --------------------- Python package (pip install rgpot)
 if get_option('with_python')
     if get_option('with_rpc_client_only')
-        error('with_python requires the full pot library (not with_rpc_client_only)')
+        error(
+            'with_python requires the full pot library (not with_rpc_client_only)',
+        )
     endif
     subdir('python')
 endif

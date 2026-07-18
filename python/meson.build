@@ -15,9 +15,9 @@ py = py_mod.find_installation(pure: false)
 py_dep = py.dependency()
 
 _nb_probe = run_command(
-  py,
-  '-c',
-  '''
+    py,
+    '-c',
+    '''
 import nanobind, pathlib, sys, sysconfig
 p = pathlib.Path(nanobind.__file__).resolve().parent
 cands = [p / "src" / "nb_combined.cpp", p / "nb_combined.cpp"]
@@ -37,13 +37,12 @@ print("1" if ft else "0")
 print(f"{ver.major}.{ver.minor}")
 print(nanobind.__version__)
 ''',
-  check: false,
+    check: false,
 )
 if _nb_probe.returncode() != 0
-  error(
-    'with_python requires nanobind>=2.2 in the build Python '
-    + '(pip/pixi install nanobind)',
-  )
+    error(
+        'with_python requires nanobind>=2.2 in the build Python ' + '(pip/pixi install nanobind)',
+    )
 endif
 _nb_lines = _nb_probe.stdout().strip().split('\n')
 _nb_include = _nb_lines[0]
@@ -53,21 +52,25 @@ _nb_free_threaded = _nb_lines[3] == '1'
 _nb_version = _nb_lines[5]
 
 message('rgpot python: nanobind @0@'.format(_nb_version))
-message('rgpot python: free-threaded interpreter = @0@'.format(_nb_free_threaded))
+message(
+    'rgpot python: free-threaded interpreter = @0@'.format(_nb_free_threaded),
+)
 
 # -isystem so abs paths under .pixi/site-packages are allowed
 nanobind_dep = declare_dependency(
-  compile_args: [
-    '-isystem' + _nb_include,
-    '-isystem' + _nb_robin,
-  ],
+    compile_args: [
+        '-isystem' + _nb_include,
+        '-isystem' + _nb_robin,
+    ],
 )
 
 if not is_variable('rgpot')
-  error('with_python requires the full rgpot library (disable with_rpc_client_only)')
+    error(
+        'with_python requires the full rgpot library (disable with_rpc_client_only)',
+    )
 endif
 if not is_variable('metatomic_dlopen')
-  error('with_python requires MetatomicDlopen (rgpot/MetatomicPot)')
+    error('with_python requires MetatomicDlopen (rgpot/MetatomicPot)')
 endif
 
 _py_incs = _incdirs
@@ -78,77 +81,78 @@ _py_link = [rgpot, lennard_jones, metatomic_dlopen]
 
 dl_dep = dependency('dl', required: false)
 if not dl_dep.found()
-  dl_dep = meson.get_compiler('cpp').find_library('dl', required: false)
+    dl_dep = meson.get_compiler('cpp').find_library('dl', required: false)
 endif
 
 _nb_cpp_args = _args + [
-  '-DNB_DOMAIN=rgpot',
-  '-Wno-unused-parameter',
+    '-DNB_DOMAIN=rgpot',
+    '-Wno-unused-parameter',
 ]
 
 _core_sources = files('bind/bind_module.cpp') + [_nb_combined]
 
 if _nb_free_threaded
-  _nb_cpp_args += ['-DNB_FREE_THREADED']
-  message('rgpot python: FREE_THREADED build; stable ABI skipped')
-  py.extension_module(
-    '_core',
-    sources: _core_sources,
-    dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
-    include_directories: _py_incs,
-    link_with: _py_link,
-    cpp_args: _nb_cpp_args,
-    install: true,
-    install_rpath: _py_rpath,
-    build_rpath: _py_rpath,
-    subdir: 'rgpot',
-    gnu_symbol_visibility: 'hidden',
-  )
+    _nb_cpp_args += ['-DNB_FREE_THREADED']
+    message('rgpot python: FREE_THREADED build; stable ABI skipped')
+    py.extension_module(
+        '_core',
+        sources: _core_sources,
+        dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+        include_directories: _py_incs,
+        link_with: _py_link,
+        cpp_args: _nb_cpp_args,
+        install: true,
+        install_rpath: _py_rpath,
+        build_rpath: _py_rpath,
+        subdir: 'rgpot',
+        gnu_symbol_visibility: 'hidden',
+    )
 else
-  _use_abi3 = py.language_version().version_compare('>=3.12')
-  if _use_abi3
-    message('rgpot python: STABLE_ABI build (abi3, Py_LIMITED_API=3.12)')
-    py.extension_module(
-      '_core',
-      sources: _core_sources,
-      dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
-      include_directories: _py_incs,
-      link_with: _py_link,
-      cpp_args: _nb_cpp_args,
-      install: true,
-      install_rpath: _py_rpath,
-      build_rpath: _py_rpath,
-      subdir: 'rgpot',
-      gnu_symbol_visibility: 'hidden',
-      limited_api: '3.12',
-    )
-  else
-    warning(
-      'rgpot python: Python < 3.12 — version-specific extension '
-      + '(stable ABI requires 3.12+)',
-    )
-    py.extension_module(
-      '_core',
-      sources: _core_sources,
-      dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
-      include_directories: _py_incs,
-      link_with: _py_link,
-      cpp_args: _nb_cpp_args,
-      install: true,
-      install_rpath: _py_rpath,
-      build_rpath: _py_rpath,
-      subdir: 'rgpot',
-      gnu_symbol_visibility: 'hidden',
-    )
-  endif
+    _use_abi3 = py.language_version().version_compare('>=3.12')
+    if _use_abi3
+        message('rgpot python: STABLE_ABI build (abi3, Py_LIMITED_API=3.12)')
+        py.extension_module(
+            '_core',
+            sources: _core_sources,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            include_directories: _py_incs,
+            link_with: _py_link,
+            cpp_args: _nb_cpp_args,
+            install: true,
+            install_rpath: _py_rpath,
+            build_rpath: _py_rpath,
+            subdir: 'rgpot',
+            gnu_symbol_visibility: 'hidden',
+            limited_api: '3.12',
+        )
+    else
+        warning(
+            'rgpot python: Python < 3.12 — version-specific extension ' + '(stable ABI requires 3.12+)',
+        )
+        py.extension_module(
+            '_core',
+            sources: _core_sources,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            include_directories: _py_incs,
+            link_with: _py_link,
+            cpp_args: _nb_cpp_args,
+            install: true,
+            install_rpath: _py_rpath,
+            build_rpath: _py_rpath,
+            subdir: 'rgpot',
+            gnu_symbol_visibility: 'hidden',
+        )
+    endif
 endif
 
 py.install_sources(
-  files('rgpot/__init__.py'),
-  pure: false,
-  subdir: 'rgpot',
+    files('rgpot/__init__.py'),
+    pure: false,
+    subdir: 'rgpot',
 )
 
 if is_variable('metatomic_engine')
-  message('metatomic_engine installs into the wheel; multi-ABI pack via scripts/rgpot_pack_multi_abi_engines.sh')
+    message(
+        'metatomic_engine installs into the wheel; multi-ABI pack via scripts/rgpot_pack_multi_abi_engines.sh',
+    )
 endif

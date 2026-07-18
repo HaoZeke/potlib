@@ -78,7 +78,7 @@ if has_metatomic
             'MetatomicPot.cc',
             'MetatomicEngineAbi.cc',
         ],
-        dependencies: _deps,
+        dependencies: _deps + [dl_dep],
         cpp_args: _args + ['-DRGPOT_MTA_ENGINE_BUILD'],
         # No link_with: _linkto — engine must not NEEDED host pot libs
         include_directories: _incdirs + [mta_inc],
