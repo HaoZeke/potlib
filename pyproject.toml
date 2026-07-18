@@ -1,6 +1,6 @@
 [project]
 name = "rgpot"
-version = "2.5.0"
+version = "2.5.2"
 description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic multi-ABI dlopen; nanobind abi3)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -39,7 +39,8 @@ metatomic = [
   "metatensor-core>=0.1.0",
   "metatensor-torch>=0.6.0",
   "metatomic-torch>=0.1.0",
-  "vesin>=0.1.0",
+  # 0.6+ VesinOptions (skin/n_threads); must match engine build headers.
+  "vesin>=0.6.0",
 ]
 ase = ["ase>=3.22"]
 test = ["pytest>=7", "numpy>=1.24"]
@@ -57,7 +58,7 @@ requires = [
   "metatensor-core",
   "metatensor-torch",
   "metatomic-torch",
-  "vesin",
+  "vesin>=0.6.0",
 ]
 build-backend = "mesonpy"
 
