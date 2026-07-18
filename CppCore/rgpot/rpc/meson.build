@@ -44,6 +44,12 @@ gen_rpc = custom_target(
         meson.current_source_dir(),
         '@INPUT@',
     ],
+    # Install generated header next to vendored schema for pkg-config consumers.
+    install: not meson.is_subproject(),
+    install_dir: [
+        false,
+        get_option('includedir') / 'rgpot' / 'rpc',
+    ],
 )
 # Use the target object itself for includes to ensure proper dependency tracking
 _incdirs += include_directories('.')

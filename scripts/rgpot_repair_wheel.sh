@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Rewrite absolute purelib RUNPATHs to $ORIGIN-relative site-packages paths.
+#
+# Engines live at either:
+#   .rgpot.mesonpy.libs/libmetatomic_engine.so          (legacy single)
+#   rgpot/lib/torch-X.Y/libmetatomic_engine.so          (multi-ABI)
+# Each engine gets RUNPATH for *its* torch-X.Y only (never list all ABIs).
+set -euo pipefail
+WHL="${1:?wheel path}"
+command -v patchelf >/dev/null
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+python3 -m zipfile -e "$WHL" "$WORK"
+
+engine_rpath_for_maj() {
+  local maj="$1"
+  # From rgpot/lib/torch-X.Y/ → site-packages peers are ../../../
+  # From .rgpot.mesonpy.libs/ → site-packages peers are ../
+  local origin_to_site="$2"
+  echo "\$ORIGIN:\${origin_to_site}torch/lib:\${origin_to_site}metatensor/lib:\${origin_to_site}vesin/lib:\${origin_to_site}metatensor_torch/torch-${maj}/lib:\${origin_to_site}metatomic/torch/torch-${maj}/lib:\${origin_to_site}metatensor/torch/torch-${maj}/lib"
+}
+
+CORE_RPATH='$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
+POT_RPATH='$ORIGIN'
+
+while IFS= read -r -d '' so; do
+  base=$(basename "$so")
+  rel=${so#"$WORK/"}
+  if [[ "$base" == *metatomic_engine* ]]; then
+    maj=""
+    if [[ "$rel" =~ torch-([0-9]+\.[0-9]+)/ ]]; then
+      maj="${BASH_REMATCH[1]}"
+      # rgpot/lib/torch-X.Y/lib.so → three levels up to site-packages
+      peer='$ORIGIN/../../../'
+    else
+      maj="${RGPOT_TORCH_MAJOR:-}"
+      if [[ -z "$maj" ]]; then
+        maj=$(readelf -d "$so" 2>/dev/null | sed -n 's/.*torch-\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1 || true)
+      fi
+      maj=${maj:-2.9}
+      peer='$ORIGIN/../'
+    fi
+    # Build rpath string without nested expansion bugs
+    ENG_RPATH="\$ORIGIN:${peer}torch/lib:${peer}metatensor/lib:${peer}vesin/lib"
+    ENG_RPATH+=":${peer}metatensor_torch/torch-${maj}/lib"
+    ENG_RPATH+=":${peer}metatomic/torch/torch-${maj}/lib"
+    ENG_RPATH+=":${peer}metatensor/torch/torch-${maj}/lib"
+    echo "patchelf engine $rel (torch-$maj)"
+    patchelf --set-rpath "$ENG_RPATH" "$so"
+  elif [[ "$base" == _core* ]]; then
+    echo "patchelf core $(basename "$so")"
+    patchelf --set-rpath "$CORE_RPATH" "$so"
+  elif [[ "$so" == *".rgpot.mesonpy.libs"* ]]; then
+    patchelf --set-rpath "$POT_RPATH" "$so" 2>/dev/null || true
+  fi
+done < <(find "$WORK" -type f \( -name '*.so' -o -name '*.so.*' \) -print0)
+
+bad=0
+while IFS= read -r -d '' so; do
+  rp=$(readelf -d "$so" 2>/dev/null | sed -n 's/.*Library \(runpath\|rpath\): \[\(.*\)\]/\2/p' || true)
+  if echo "$rp" | grep -E '/home/|/Users/|/bbdir|/\.mesonpy' >/dev/null 2>&1; then
+    echo "ERROR: absolute host path in $(basename "$so"): $rp" >&2
+    bad=1
+  fi
+done < <(find "$WORK" -type f -name '*.so' -print0)
+[[ $bad -eq 0 ]] || exit 1
+
+python3 - <<PY
+import zipfile
+from pathlib import Path
+root = Path("$WORK")
+out = Path("$WHL")
+tmp = out.with_suffix(".whl.tmp")
+with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as z:
+    for p in sorted(root.rglob("*")):
+        if p.is_file():
+            z.write(p, p.relative_to(root).as_posix())
+tmp.replace(out)
+print("REPAIR_OK", out)
+PY

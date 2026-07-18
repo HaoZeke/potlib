@@ -23,6 +23,38 @@ Native rgpot units are eV and Angstrom.
 RPC clients may request compatible units through ~ForceInput.lengthUnit~ and
 ~ForceInput.energyUnit~.
 
+** Python (PyPI)
+
+Install the manylinux wheel (nanobind **abi3**, Python >= 3.12 for the stable
+ABI extension; requires-python is >= 3.10 for pure metadata):
+
+#+begin_src bash
+pip install rgpot
+# Metatomic path (engine libs resolve from these packages at runtime):
+pip install 'rgpot[metatomic]'
+# or: pip install torch metatomic-torch metatensor-torch metatensor-core vesin
+#+end_src
+
+Lennard-Jones needs only ~numpy~. Metatomic uses **dlopen** of a bundled
+engine:
+
+- layout: ~rgpot/lib/torch-X.Y/libmetatomic_engine.so~
+- picker: installed ~torch~ major (same multi-ABI idea as metatomic-torch)
+- **supported torch majors: 2.7 and newer** (wheels ship 2.7–2.13 engines)
+- torch 2.6 and older are not supported for Metatomic dlopen
+
+#+begin_src python
+import numpy as np
+import rgpot
+
+print(rgpot.__version__)
+print(rgpot.available_metatomic_engine_abis())  # e.g. 2.7 .. 2.13
+# energy, forces, variance = rgpot.evaluate_metatomic(
+#     positions, atom_types, box, model_path="model.pt")
+#+end_src
+
+See https://pypi.org/project/rgpot/ .
+
 ** Build And Test
 
 Meson is the primary build path.
@@ -67,7 +99,7 @@ ctest --test-dir build_client --output-on-failure
 | =CuH2Pot= | =CuH2= | Built-in Cu-H EAM potential |
 | =XTBPot= | =XTB=, =GFNFF=, =GFN0xTB=, =GFN1xTB= | Enable with =-Dwith_xtb=true=; use pixi env =xtbbld= or =tbbld= |
 | =TBLitePot= | =TBLite=, =TBLiteGFN1=, =TBLiteIPEA1= | Enable with =-Dwith_tblite=true=; use pixi env =tblitebld= or =tbbld= |
-| =MetatomicPot= | =Metatomic:<model_path>= | Enable with =-Dwith_metatomic=true=; use pixi env =metatomicbld= |
+| =MetatomicPot= | =Metatomic:<model_path>= | Enable with =-Dwith_metatomic=true=; use pixi env =metatomicbld=. Pip engines: torch 2.7+ |
 | =NWChemPot= | =NWChem= | Frontend always builds; load =libnwchemc= from the split =nwchemc= project at runtime |
 | =CPMDPot= | =CPMD= | Frontend always builds; load =libcpmdc= from the split =cpmdc= project at runtime |
 

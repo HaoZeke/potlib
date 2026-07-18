@@ -2,9 +2,9 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 //
-// Requires vesin >= 0.5 (VesinDevice is a struct {type, device_id};
-// VesinOptions includes algorithm/sorted). Pin via pixi feature.metatomic
-// (vesin>=0.5.2,<0.6).
+// Neighbor lists use vesin. Source is compatible with both vesin 0.3.x
+// (enum VesinDevice, no Options.algorithm) and 0.5+ (struct VesinDevice
+// {type, device_id}, Options.algorithm) via type traits in vesin_compat.hpp.
 
 #include <mutex>
 #include <string>
@@ -26,19 +26,10 @@
 
 #pragma GCC diagnostic pop
 
+#include "rgpot/MetatomicPot/MetatomicConfig.hpp"
 #include "rgpot/Potential.hpp"
 
 namespace rgpot {
-
-struct MetatomicConfig {
-  std::string model_path;
-  std::string device;
-  std::string length_unit = "angstrom";
-  std::string extensions_directory;
-  bool check_consistency = false;
-  double uncertainty_threshold = -1.0;
-  std::string dtype_override;
-};
 
 class MetatomicPot : public Potential<MetatomicPot> {
 public:
@@ -62,10 +53,12 @@ private:
   torch::Device m_device;
   bool m_check_consistency;
   std::string m_energy_key;
+  std::string m_energy_uncertainty_key;
+  double m_uncertainty_threshold = -1.0;
 
   mutable std::mutex m_mutex;
-  mutable torch::Tensor m_cached_types; //!< Cached atomic types tensor.
-  mutable size_t m_cached_natoms = 0;   //!< Atom count for cached types.
+  mutable torch::Tensor m_cached_types;
+  mutable size_t m_cached_natoms = 0;
 
   metatensor_torch::TensorBlock
   computeNeighbors(metatomic_torch::NeighborListOptions request, long nAtoms,

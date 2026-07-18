@@ -1,0 +1,85 @@
+[project]
+name = "rgpot"
+version = "2.5.0"
+description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic multi-ABI dlopen; nanobind abi3)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Rohit Goswami", email = "rgoswami@ieee.org" },
+]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+keywords = ["potential", "Lennard-Jones", "metatomic", "rgpot", "potlib", "dlopen", "nanobind", "abi3"]
+
+[project.urls]
+Homepage = "https://github.com/OmniPotentRPC/rgpot"
+Repository = "https://github.com/OmniPotentRPC/rgpot"
+Issues = "https://github.com/OmniPotentRPC/rgpot/issues"
+Changelog = "https://github.com/OmniPotentRPC/rgpot/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+# Runtime Python stack for the Metatomic engine (torch + metatomic from PyPI).
+# The engine .so is built into the wheel; these packages provide the NEEDED libs.
+# Bundled multi-ABI engines cover torch 2.7+ (see README).
+metatomic = [
+  "torch>=2.7",
+  "metatensor-core>=0.1.0",
+  "metatensor-torch>=0.6.0",
+  "metatomic-torch>=0.1.0",
+  "vesin>=0.1.0",
+]
+ase = ["ase>=3.22"]
+test = ["pytest>=7", "numpy>=1.24"]
+
+[build-system]
+requires = [
+  "meson-python>=0.16",
+  "meson>=1.3",
+  "ninja",
+  "nanobind>=2.2",
+  "numpy>=1.24",
+  # Build-time for libmetatomic_engine.so (same purelib layout at runtime).
+  # Multi-ABI pack targets torch 2.7+; older majors are not shipped.
+  "torch>=2.7",
+  "metatensor-core",
+  "metatensor-torch",
+  "metatomic-torch",
+  "vesin",
+]
+build-backend = "mesonpy"
+
+# Wheel keeps dlopen Metatomic path: engine plugin + thin frontend (not LJ-only).
+[tool.meson-python.args]
+setup = [
+  "-Dwith_python=true",
+  "-Dwith_rpc=false",
+  "-Dwith_rpc_client_only=false",
+  "-Dwith_tests=false",
+  "-Dwith_examples=false",
+  "-Dwith_metatomic=true",
+  "-Dwith_xtb=false",
+  "-Dwith_tblite=false",
+  "-Dwith_rust_core=false",
+  "-Dwith_cache=false",
+  "-Dwith_eigen=false",
+  "-Db_lto=false",
+]
+install = ["--skip-subprojects"]
+dist = ["--include-subprojects"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

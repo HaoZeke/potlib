@@ -48,7 +48,7 @@ TEST_CASE("Invariance and Caching Behavior", "[Invariance]") {
   rgpot::registry<rgpot::LJPot>::forceCalls = 0;
 
   // --- Baseline ---
-  auto [e_base, f_base] = (*pot)(pos, types, box);
+  auto [e_base, f_base, v_base] = (*pot)(pos, types, box);
   size_t calls_after_base = rgpot::registry<rgpot::LJPot>::forceCalls;
   REQUIRE(calls_after_base == 1);
 
@@ -60,7 +60,7 @@ TEST_CASE("Invariance and Caching Behavior", "[Invariance]") {
       pos(i, 2) += 5.0;
     }
 
-    auto [e_trans, f_trans] = (*pot)(pos, types, box);
+    auto [e_trans, f_trans, v_trans] = (*pot)(pos, types, box);
     size_t calls_after_trans = rgpot::registry<rgpot::LJPot>::forceCalls;
 
     // Physics check: Energy should be invariant
@@ -77,7 +77,7 @@ TEST_CASE("Invariance and Caching Behavior", "[Invariance]") {
     // Rotate 90 degrees around Z
     rotate_z(pos, M_PI / 2.0);
 
-    auto [e_rot, f_rot] = (*pot)(pos, types, box);
+    auto [e_rot, f_rot, v_rot] = (*pot)(pos, types, box);
     size_t calls_after_rot = rgpot::registry<rgpot::LJPot>::forceCalls;
 
     // Physics check: Energy should be invariant

@@ -1,7 +1,7 @@
 project(
     'rgpot',
     'cpp',
-    version: '2.2.1',
+    version: '2.5.0',
     default_options: ['warning_level=2', 'cpp_std=c++20'],
 )
 # IMPORTANT!! warning_level=3 passes -fimplicit-none
@@ -126,30 +126,45 @@ endif
 
 has_metatomic = false
 if get_option('with_metatomic')
-    # PyTorch C++ API (libtorch) -- found via cmake.
-    # Meson's cmake trace often fails to resolve the full linker flags for
-    # libtorch_cpu.so. We supplement with an explicit rpath + link_args.
-    torch_dep = dependency(
-        'Torch',
-        method: 'cmake',
-        modules: ['torch'],
-        required: true,
-    )
-    _deps += torch_dep
-
-    # PyTorch package paths are discovered without importing torch. Importing
-    # torch loads compiled NumPy extensions during configure, so the probe must
-    # only use Python's standard library and the installed package metadata.
+    # Discover torch without importing it (import can load NumPy C extensions
+    # during meson configure). Supports multi-ABI builds via:
+    #   RGPOT_TORCH_ROOT=/path/to/site-packages/torch  (isolated major)
+    #   or first torch/version.py on sys.path (PYTHONPATH prefixes).
+    # Prefer manual -isystem/-L over cmake Torch: old/CUDA wheels break cmake
+    # with missing nvcc; libtorch_cpu.so is enough for the engine plugin.
+    # Metatomic multi-ABI headers always come from the host purelib.
     _py_probe = run_command(
         find_program('python3'),
         '-c',
         '''
+import os
 import re
+import sys
 import sysconfig
 from pathlib import Path
 
 purelib = Path(sysconfig.get_paths()["purelib"])
-version_file = purelib / "torch" / "version.py"
+
+def torch_root() -> Path:
+    env = os.environ.get("RGPOT_TORCH_ROOT", "").strip()
+    if env:
+        p = Path(env)
+        if (p / "version.py").is_file():
+            return p
+        if (p / "torch" / "version.py").is_file():
+            return p / "torch"
+        raise SystemExit(f"RGPOT_TORCH_ROOT has no version.py: {env}")
+    for entry in sys.path:
+        cand = Path(entry) / "torch" / "version.py"
+        if cand.is_file():
+            return cand.parent
+    host = purelib / "torch" / "version.py"
+    if host.is_file():
+        return host.parent
+    raise SystemExit("torch not found (set RGPOT_TORCH_ROOT or install torch)")
+
+troot = torch_root()
+version_file = troot / "version.py"
 match = re.search(
     r"^__version__\s*=\s*['\"]([^'\"]+)",
     version_file.read_text(),
@@ -158,21 +173,45 @@ match = re.search(
 if match is None:
     raise SystemExit(f"torch version not found in {version_file}")
 version = ".".join(match.group(1).split("+")[0].split(".")[:2])
+libdir = troot / "lib"
+inc = troot / "include"
+api_inc = troot / "include" / "torch" / "csrc" / "api" / "include"
+if not (libdir / "libtorch_cpu.so").is_file() and not (libdir / "libtorch_cpu.dylib").is_file():
+    raise SystemExit(f"libtorch_cpu not under {libdir}")
 print(purelib)
 print(version)
+print(libdir)
+print(inc)
+print(api_inc)
 ''',
         check: true,
     ).stdout().strip().split('\n')
     _py_purelib = _py_probe[0]
     _torch_major = _py_probe[1]
-    _torch_libdir = _py_purelib / 'torch' / 'lib'
-    _deps += declare_dependency(
+    _torch_libdir = _py_probe[2]
+    _torch_inc = _py_probe[3]
+    _torch_api_inc = _py_probe[4]
+    # Manual torch dep (no cmake): includes + link search paths only.
+    # Portable RUNPATH is install_rpath / repair script.
+    torch_dep = declare_dependency(
+        compile_args: [
+            '-isystem',
+            _torch_inc,
+            '-isystem',
+            _torch_api_inc,
+        ],
         link_args: [
             '-L' + _torch_libdir,
-            '-Wl,-rpath,' + _torch_libdir,
+            '-Wl,-rpath-link,' + _torch_libdir,
+            # Older libtorch splits symbols across libtorch + libtorch_cpu + libc10.
+            '-Wl,--no-as-needed',
+            '-ltorch',
             '-ltorch_cpu',
+            '-lc10',
+            '-Wl,--as-needed',
         ],
     )
+    _deps += torch_dep
 
     # metatensor-torch / metatomic-torch headers live in the
     # python interpreter's site-packages under
@@ -181,10 +220,27 @@ print(version)
     # pkg-config dependency lookups don't see those, and
     # find_library() doesn't add include paths. Ask sysconfig for
     # the right purelib and propagate -isystem includes manually.
+    # Layout (current PyPI wheels):
+    #   metatensor/lib/libmetatensor.so
+    #   metatensor_torch/torch-X.Y/{lib,include}
+    #   metatomic/torch/torch-X.Y/{lib,include}
+    #   vesin/lib/libvesin.so
+    _mts_torch_root = _py_purelib / 'metatensor_torch' / (
+        'torch-' + _torch_major
+    )
+    _mta_torch_root = _py_purelib / 'metatomic' / 'torch' / (
+        'torch-' + _torch_major
+    )
+    # Legacy layout fallback
+    _mts_torch_legacy = _py_purelib / 'metatensor' / 'torch' / (
+        'torch-' + _torch_major
+    )
+
     _mts_inc_dirs = [
         _py_purelib / 'metatensor' / 'include',
-        _py_purelib / 'metatensor' / 'torch' / ('torch-' + _torch_major) / 'include',
-        _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'include',
+        _mts_torch_root / 'include',
+        _mts_torch_legacy / 'include',
+        _mta_torch_root / 'include',
         _py_purelib / 'vesin' / 'include',
     ]
     _mts_inc_args = []
@@ -192,53 +248,43 @@ print(version)
         _mts_inc_args += ['-isystem', d]
     endforeach
 
-    # metatensor-torch: try pkg-config, then cmake, then find_library
-    mts_dep = dependency('metatensor_torch', required: false)
-    if not mts_dep.found()
-        mts_dep = dependency('metatensor-torch', required: false)
-    endif
-    if not mts_dep.found()
-        mts_dep = dependency(
-            'metatensor_torch',
-            method: 'cmake',
-            required: false,
-        )
-    endif
-    if not mts_dep.found()
-        mts_dep = declare_dependency(
-            dependencies: [
-                cppc.find_library(
-                    'metatensor',
-                    dirs: [_py_purelib / 'metatensor' / 'lib'],
-                ),
-                cppc.find_library(
-                    'metatensor_torch',
-                    dirs: [
-                        _py_purelib / 'metatensor' / 'torch' / (
-                            'torch-' + _torch_major
-                        ) / 'lib',
-                    ],
-                ),
-            ],
-            compile_args: _mts_inc_args,
-        )
-    endif
+    # Always use purelib find_library + -isystem (no pkg-config/cmake): multi-ABI
+    # builds must not pull host Torch cmake includes (dtype symbol conflicts).
+    _mts_lib_dirs = [
+        _mts_torch_root / 'lib',
+        _mts_torch_legacy / 'lib',
+        _py_purelib / 'metatensor' / 'lib',
+    ]
+    mts_dep = declare_dependency(
+        dependencies: [
+            cppc.find_library(
+                'metatensor',
+                dirs: [_py_purelib / 'metatensor' / 'lib'],
+            ),
+            cppc.find_library(
+                'metatensor_torch',
+                dirs: _mts_lib_dirs,
+            ),
+        ],
+        compile_args: _mts_inc_args,
+    )
     _deps += mts_dep
 
-    # metatomic-torch: try pkg-config, then cmake, then find_library
-    mta_dep = dependency('metatomic_torch', required: false)
-    if not mta_dep.found()
-        mta_dep = dependency('metatomic-torch', required: false)
-    endif
-    if not mta_dep.found()
-        mta_dep = cppc.find_library(
-            'metatomic_torch',
-            dirs: [
-                _py_purelib / 'metatomic' / 'torch' / ('torch-' + _torch_major) / 'lib',
-            ],
-        )
-    endif
+    mta_dep = cppc.find_library(
+        'metatomic_torch',
+        dirs: [
+            _mta_torch_root / 'lib',
+        ],
+    )
     _deps += mta_dep
+    # Link search paths only (-L); portable RUNPATH is install_rpath / repair.
+    _deps += declare_dependency(
+        link_args: [
+            '-L' + (_mts_torch_root / 'lib'),
+            '-L' + (_mta_torch_root / 'lib'),
+            '-L' + (_py_purelib / 'metatensor' / 'lib'),
+        ],
+    )
 
     # vesin neighbor list library
     _vesin_libdir = _py_purelib / 'vesin' / 'lib'
@@ -251,7 +297,7 @@ print(version)
     endif
     _deps += vesin_dep
     _deps += declare_dependency(
-        link_args: ['-Wl,-rpath,' + _vesin_libdir],
+        link_args: ['-L' + _vesin_libdir],
     )
 
     _args += ['-DRGPOT_HAS_METATOMIC=TRUE']
@@ -352,3 +398,13 @@ rgpot_dep = declare_dependency(
     compile_args: _args,
     dependencies: _deps,
 )
+
+# --------------------- Python package (pip install rgpot)
+if get_option('with_python')
+    if get_option('with_rpc_client_only')
+        error(
+            'with_python requires the full pot library (not with_rpc_client_only)',
+        )
+    endif
+    subdir('python')
+endif

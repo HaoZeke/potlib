@@ -82,6 +82,15 @@ The Meson build supplements Torch CMake discovery with explicit =-L= /
 =-rpath= / =-ltorch_cpu= taken from =python3 -c 'import torch; ...'= so
 =libtorch_cpu.so= resolves under conda/pixi layouts.
 
+For the *pip* wheel (nanobind abi3 + multi-ABI =dlopen= engines, torch *2.7+*),
+see:
+
+#+begin_export rst
+:doc:`pip-python`
+#+end_export
+
+instead of embedding as a subproject.
+
 ** CMake
 
 rgpot also provides a CMake build.

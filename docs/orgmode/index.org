@@ -43,6 +43,15 @@ optional xTB / tblite / metatomic backends, and runtime-loaded quantum engines.
 Both quantum frontends keep geometry on ~ForceInput~ and carry method options in
 the matching ~PotentialConfig~ arm.
 
+The pip package (~pip install rgpot~) ships nanobind abi3 bindings and multi-ABI
+Metatomic engines for *torch 2.7+*.
+See:
+
+#+begin_export rst
+:doc:`howto/pip-python`
+#+end_export
+
+
 #+begin_src bash
 git clone https://github.com/OmniPotentRPC/rgpot.git
 cd rgpot && pixi shell -e rpctest
@@ -62,6 +71,7 @@ meson compile -C bbdir && meson test -C bbdir
    :maxdepth: 2
    :caption: How-To Guides
 
+   howto/pip-python
    howto/embedding
    howto/integration
    howto/eindir-anneal

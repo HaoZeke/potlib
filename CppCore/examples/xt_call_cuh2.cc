@@ -29,7 +29,7 @@ int main(void) {
       {0, 0, 30},
   };
 
-  auto [energy, forces] =
+  auto [energy, forces, variance] =
       cuh2pot(convertToAtomMatrix(positions), convertToVector(atomTypes),
               convertToArray3x3(boxMatrix));
 

@@ -2,16 +2,125 @@
 // Copyright 2023--present rgpot developers
 
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
+#include "rgpot/MetatomicPot/vesin_compat.hpp"
+#include <ATen/CPUGeneratorImpl.h>
 #include "vesin.h"
 
 #include <torch/csrc/jit/runtime/graph_executor.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 using namespace std::string_literals;
 
 namespace rgpot {
+
+namespace {
+
+// Haar-uniform SO(3) sample from a SEEDED CPU generator. The seed is the
+// pass index, so every force call averages over the SAME orientation set:
+// the averaged PES is then a fixed, smooth function of the positions.
+// Drawing from the global RNG instead makes the effective PES stochastic
+// call-to-call (same x, different E/F), which feeds a surrogate
+// non-repeatable data and lets optimizer dynamics walk into clash-scale
+// geometries.
+torch::Tensor random_so3(torch::Device device, torch::ScalarType dtype,
+                         uint64_t seed) {
+  auto gen = at::detail::createCPUGenerator(seed);
+  auto A = torch::randn({3, 3}, gen,
+                        torch::TensorOptions().dtype(torch::kFloat64));
+  auto qr = torch::linalg_qr(A);
+  auto Q = std::get<0>(qr);
+  auto R = std::get<1>(qr);
+  auto d = torch::sign(torch::diagonal(R));
+  Q = Q * d.unsqueeze(0);
+  if (torch::det(Q).item<double>() < 0) {
+    Q.select(1, 0).mul_(-1);
+  }
+  return Q.to(dtype).to(device);
+}
+
+
+// Rotation-group orbits as signed permutation matrices with det +1.
+// Chiral octahedral O = all 24; tetrahedral T = the 12 with an even
+// permutation part and an even number of sign flips. Averaging over a GROUP
+// makes E_avg exactly G-invariant and F_avg = -grad E_avg an exact identity.
+std::vector<torch::Tensor> rotation_group(long n, torch::Device device,
+                                          torch::ScalarType dtype) {
+  const int perms[6][3] = {{0, 1, 2}, {1, 2, 0}, {2, 0, 1},
+                           {0, 2, 1}, {1, 0, 2}, {2, 1, 0}};
+  const bool perm_even[6] = {true, true, true, false, false, false};
+  std::vector<torch::Tensor> out;
+  const bool want_tetra = n < 24;
+  for (int p = 0; p < 6; ++p) {
+    for (int sbits = 0; sbits < 8; ++sbits) {
+      const int s0 = (sbits & 1) ? -1 : 1;
+      const int s1 = (sbits & 2) ? -1 : 1;
+      const int s2 = (sbits & 4) ? -1 : 1;
+      const int n_minus = ((sbits & 1) != 0) + ((sbits & 2) != 0) +
+                          ((sbits & 4) != 0);
+      // det = sign(perm) * s0*s1*s2; keep proper rotations only.
+      const int det = (perm_even[p] ? 1 : -1) * s0 * s1 * s2;
+      if (det != 1) continue;
+      if (want_tetra && (!perm_even[p] || (n_minus % 2) != 0)) continue;
+      auto R = torch::zeros({3, 3},
+                            torch::TensorOptions().dtype(torch::kFloat64));
+      R[0][perms[p][0]] = static_cast<double>(s0);
+      R[1][perms[p][1]] = static_cast<double>(s1);
+      R[2][perms[p][2]] = static_cast<double>(s2);
+      out.push_back(R.to(dtype).to(device));
+    }
+  }
+  return out;
+}
+
+} // namespace
+
+void apply_torch_determinism_policy(TorchDeterminismPolicy policy) {
+  // Fast: leave process-global LibTorch flags alone so the default path keeps
+  // fused CUDA attention and other high-throughput kernels available.
+  if (policy != TorchDeterminismPolicy::Strict) {
+    return;
+  }
+
+  // Strict: request deterministic algorithms (throw when an op has no
+  // deterministic implementation) and pin scaled-dot-product attention to the
+  // math SDP backend. Flash / memory-efficient / cuDNN SDP are fused CUDA
+  // kernels with nondeterministic backward paths; math SDP remains enabled so
+  // attention still runs. Also disable TF32 cuBLAS/cuDNN paths: on Ampere+
+  // they quantize fp32 to a 10-bit mantissa, so the same model returns
+  // different forces on CUDA vs CPU.
+  //
+  // Additional CUDA/cuDNN process flags that are NOT covered by
+  // setDeterministicAlgorithms alone:
+  //   - deterministicCuDNN: forces deterministic convolution algorithms
+  //   - benchmarkCuDNN=false: auto-tuner picks different kernels run-to-run
+  //   - deterministicFillUninitializedMemory: no garbage from uninitialized
+  //     tensor storage under autograd
+  //
+  // CUBLAS_WORKSPACE_CONFIG is process *environment*, not at::globalContext.
+  // For CUDA >= 10.2 bit-stable cuBLAS, the host must set
+  // CUBLAS_WORKSPACE_CONFIG to ":4096:8" or ":16:8" *before* the first
+  // cuBLAS call (see NVIDIA cuBLAS reproducibility docs and
+  // at::Context::alertCuBLASConfigNotDeterministic). rgpot cannot inject that
+  // into a parent process that already touched cuBLAS.
+  //
+  // These settings live on at::globalContext() and affect every Torch user
+  // in the process.
+  auto &ctx = at::globalContext();
+  ctx.setDeterministicAlgorithms(true, /*warn_only=*/false);
+  ctx.setDeterministicFillUninitializedMemory(true);
+  ctx.setDeterministicCuDNN(true);
+  ctx.setBenchmarkCuDNN(false);
+  ctx.setSDPUseFlash(false);
+  ctx.setSDPUseMemEfficient(false);
+  ctx.setSDPUseCuDNN(false);
+  ctx.setSDPUseMath(true);
+  ctx.setAllowTF32CuBLAS(false);
+  ctx.setAllowTF32CuDNN(false);
+}
 
 MetatomicPot::MetatomicPot(const MetatomicConfig &config)
     : Potential(PotType::Metatomic), m_config(config),
@@ -19,6 +128,9 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
       m_device(torch::Device(c10::DeviceType::CPU)) {
 
   torch::jit::getProfilingMode() = false;
+
+  // Optional process-global determinism (default Fast = no mutation).
+  apply_torch_determinism_policy(m_config.torch_determinism);
 
   // 1. Load model
   torch::optional<std::string> extensions_directory = torch::nullopt;
@@ -103,35 +215,63 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
   requested_output->set_unit("eV");
   m_eval_options->outputs.insert(m_energy_key, requested_output);
 
+  // Optional per-atom energy_uncertainty (eOn metatomic UQ path)
+  m_uncertainty_threshold = m_config.uncertainty_threshold;
+  if (m_uncertainty_threshold > 0) {
+    try {
+      m_energy_uncertainty_key = metatomic_torch::pick_output(
+          "energy_uncertainty", outputs, torch::nullopt);
+      if (outputs.contains(m_energy_uncertainty_key)) {
+        auto uq_info = outputs.at(m_energy_uncertainty_key);
+        if (uq_info->per_atom) {
+          auto requested_uq =
+              torch::make_intrusive<metatomic_torch::ModelOutputHolder>();
+          requested_uq->per_atom = true;
+          requested_uq->explicit_gradients = {};
+          requested_uq->set_quantity("energy");
+          requested_uq->set_unit("eV");
+          m_eval_options->outputs.insert(m_energy_uncertainty_key, requested_uq);
+        } else {
+          m_uncertainty_threshold = -1.0;
+        }
+      } else {
+        m_uncertainty_threshold = -1.0;
+      }
+    } catch (...) {
+      m_uncertainty_threshold = -1.0;
+    }
+  }
+
   m_check_consistency = m_config.check_consistency;
 }
+
+
 
 void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   std::lock_guard<std::mutex> lock(m_mutex);
 
   long nAtoms = static_cast<long>(in.nAtoms);
+  const bool use_rotation =
+      m_config.random_rotation || m_config.n_symmetry_rotations > 0;
+  const bool probe_scatter =
+      m_config.so3_probe_scatter && m_config.n_symmetry_rotations > 0;
+  // Group orbit when the request reaches a group size; identity-first probe
+  // mode adds the unrotated pass in front of the probes.
+  std::vector<torch::Tensor> group_rots;
+  if (m_config.n_symmetry_rotations >= 12) {
+    group_rots = rotation_group(m_config.n_symmetry_rotations, m_device,
+                                m_dtype);
+  }
+  const long n_rot_passes =
+      !group_rots.empty() ? static_cast<long>(group_rots.size())
+                          : (m_config.n_symmetry_rotations > 0
+                                 ? m_config.n_symmetry_rotations
+                                 : 1);
+  const long n_passes = probe_scatter ? n_rot_passes + 1 : n_rot_passes;
 
-  // 1. Create tensors
   auto f64_options =
       torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU);
 
-  auto torch_positions =
-      torch::from_blob(const_cast<double *>(in.pos), {nAtoms, 3}, f64_options)
-          .to(m_dtype)
-          .to(m_device)
-          .set_requires_grad(true);
-
-  auto torch_cell =
-      torch::from_blob(const_cast<double *>(in.box), {3, 3}, f64_options)
-          .to(m_dtype)
-          .to(m_device);
-
-  auto cell_norms = torch::norm(torch_cell, 2, /*dim=*/1);
-  auto torch_pbc = cell_norms.abs() > 1e-9;
-  bool periodic[3] = {torch_pbc[0].item<bool>(), torch_pbc[1].item<bool>(),
-                      torch_pbc[2].item<bool>()};
-
-  // Cache atomic types tensor (doesn't change between geometry steps)
   if (m_cached_natoms != in.nAtoms) {
     std::vector<int32_t> types_vec(in.atmnrs, in.atmnrs + nAtoms);
     m_cached_types =
@@ -141,45 +281,175 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   }
   auto atomic_types = m_cached_types;
 
-  // 2. Create system
-  auto system = torch::make_intrusive<metatomic_torch::SystemHolder>(
-      atomic_types, torch_positions, torch_cell, torch_pbc);
+  double energy_acc = 0.0;
+  auto forces_acc = torch::zeros({nAtoms, 3}, f64_options);
+  // Force samples (CPU float64, n_passes x nAtoms x 3) for orientation force
+  // uncertainty in eV/A — energy scatter is not a force-tolerance scale.
+  std::vector<torch::Tensor> force_samples;
+  if (n_passes > 1) {
+    force_samples.reserve(static_cast<size_t>(n_passes));
+  }
+  double model_uq_variance = 0.0;
+  bool have_model_uq = false;
 
-  // 3. Compute neighbor lists
-  for (const auto &request : m_nl_requests) {
-    auto neighbors =
-        computeNeighbors(request, nAtoms, in.pos, in.box, periodic);
-    metatomic_torch::register_autograd_neighbors(system, neighbors,
-                                                 m_check_consistency);
-    system->add_neighbor_list(request, neighbors);
+  for (long i_pass = 0; i_pass < n_passes; ++i_pass) {
+    torch::Tensor R = torch::eye(3, torch::TensorOptions()
+                                        .dtype(m_dtype)
+                                        .device(m_device));
+    const bool identity_pass = probe_scatter && i_pass == 0;
+    if (use_rotation && !identity_pass) {
+      const long i_rot = probe_scatter ? i_pass - 1 : i_pass;
+      if (!group_rots.empty()) {
+        R = group_rots[static_cast<size_t>(i_rot)];
+      } else {
+        // Fixed per-pass seed: pass i uses the same orientation on every
+        // call, so the averaged PES is deterministic (Monte Carlo regime,
+        // n_symmetry_rotations < 12).
+        R = random_so3(m_device, m_dtype,
+                       0x50333A5EEDULL + static_cast<uint64_t>(i_rot));
+      }
+    }
+    auto R_cpu = R.to(torch::kCPU).to(torch::kFloat64);
+
+    auto pos_cpu = torch::from_blob(const_cast<double *>(in.pos),
+                                    {nAtoms, 3}, f64_options)
+                       .clone();
+    auto cell_cpu =
+        torch::from_blob(const_cast<double *>(in.box), {3, 3}, f64_options)
+            .clone();
+    if (use_rotation && !identity_pass) {
+      // Rotate about the centroid: rotation about the origin also drags the
+      // molecule through the model's input space, mixing orientation error
+      // with translation error.
+      auto centroid = pos_cpu.mean(0, /*keepdim=*/true);
+      pos_cpu = (pos_cpu - centroid).matmul(R_cpu.transpose(0, 1)) + centroid;
+      cell_cpu = cell_cpu.matmul(R_cpu.transpose(0, 1));
+    }
+
+    std::vector<double> pos_buf(static_cast<size_t>(nAtoms) * 3);
+    std::vector<double> cell_buf(9);
+    std::memcpy(pos_buf.data(), pos_cpu.contiguous().data_ptr<double>(),
+                pos_buf.size() * sizeof(double));
+    std::memcpy(cell_buf.data(), cell_cpu.contiguous().data_ptr<double>(),
+                9 * sizeof(double));
+
+    auto torch_positions =
+        torch::from_blob(pos_buf.data(), {nAtoms, 3}, f64_options)
+            .to(m_dtype)
+            .to(m_device)
+            .set_requires_grad(true);
+
+    auto torch_cell =
+        torch::from_blob(cell_buf.data(), {3, 3}, f64_options)
+            .to(m_dtype)
+            .to(m_device);
+
+    auto cell_norms = torch::norm(torch_cell, 2, /*dim=*/1);
+    auto torch_pbc = cell_norms.abs() > 1e-9;
+    bool periodic[3] = {torch_pbc[0].item<bool>(), torch_pbc[1].item<bool>(),
+                        torch_pbc[2].item<bool>()};
+
+    auto system = torch::make_intrusive<metatomic_torch::SystemHolder>(
+        atomic_types, torch_positions, torch_cell, torch_pbc);
+
+    for (const auto &request : m_nl_requests) {
+      auto neighbors = computeNeighbors(request, nAtoms, pos_buf.data(),
+                                        cell_buf.data(), periodic);
+      metatomic_torch::register_autograd_neighbors(system, neighbors,
+                                                   m_check_consistency);
+      system->add_neighbor_list(request, neighbors);
+    }
+
+    auto ivalue_output = m_model.forward({
+        std::vector<metatomic_torch::System>{system},
+        m_eval_options,
+        m_check_consistency,
+    });
+    auto dict_output = ivalue_output.toGenericDict();
+    auto output_map = dict_output.at(m_energy_key)
+                          .toCustomClass<metatensor_torch::TensorMapHolder>();
+
+    if (m_uncertainty_threshold > 0 && i_pass == 0 &&
+        !m_energy_uncertainty_key.empty() &&
+        dict_output.contains(m_energy_uncertainty_key)) {
+      try {
+        auto uncertainty_map =
+            dict_output.at(m_energy_uncertainty_key)
+                .toCustomClass<metatensor_torch::TensorMapHolder>();
+        auto uncertainty_block =
+            metatensor_torch::TensorMapHolder::block_by_id(uncertainty_map, 0);
+        auto flat_uncertainty =
+            uncertainty_block->values().reshape({-1}).to(torch::kCPU);
+        if (flat_uncertainty.numel() > 0) {
+          model_uq_variance =
+              flat_uncertainty.to(torch::kFloat64).mean().item<double>();
+          have_model_uq = true;
+        }
+      } catch (...) {
+      }
+    }
+
+    auto energy_block =
+        metatensor_torch::TensorMapHolder::block_by_id(output_map, 0);
+    auto energy_tensor = energy_block->values();
+    const double e_pass = energy_tensor.sum().item<double>();
+    if (!probe_scatter) {
+      energy_acc += e_pass;
+    }
+
+    energy_tensor.backward(torch::ones_like(energy_tensor));
+    auto positions_grad = system->positions().grad();
+    auto forces_tensor =
+        (-positions_grad).to(torch::kCPU).to(torch::kFloat64);
+    if (use_rotation) {
+      forces_tensor = forces_tensor.matmul(R_cpu);
+    }
+    if (probe_scatter && identity_pass) {
+      // Probe mode: the unrotated pass alone steers geometry (energy and
+      // forces from this pass only).
+      energy_acc = e_pass;
+      forces_acc = forces_tensor.clone();
+    } else if (probe_scatter) {
+      force_samples.push_back(forces_tensor.clone());
+    } else {
+      forces_acc += forces_tensor;
+      if (n_passes > 1) {
+        force_samples.push_back(forces_tensor.clone());
+      }
+    }
   }
 
-  // 4. Run model
-  auto ivalue_output = m_model.forward({
-      std::vector<metatomic_torch::System>{system},
-      m_eval_options,
-      m_check_consistency,
-  });
-  auto dict_output = ivalue_output.toGenericDict();
-  auto output_map = dict_output.at(m_energy_key)
-                        .toCustomClass<metatensor_torch::TensorMapHolder>();
-
-  // 5. Extract energy
-  auto energy_block =
-      metatensor_torch::TensorMapHolder::block_by_id(output_map, 0);
-  auto energy_tensor = energy_block->values();
-  out->energy = energy_tensor.sum().item<double>();
-
-  // 6. Compute forces via autograd
-  energy_tensor.backward(torch::ones_like(energy_tensor));
-  auto positions_grad = system->positions().grad();
-  auto forces_tensor = -positions_grad.to(torch::kCPU).to(torch::kFloat64);
-
-  std::memcpy(out->F, forces_tensor.contiguous().data_ptr<double>(),
+  const double inv_n =
+      probe_scatter ? 1.0 : 1.0 / static_cast<double>(n_passes);
+  out->energy = energy_acc * inv_n;
+  forces_acc = forces_acc * inv_n;
+  std::memcpy(out->F, forces_acc.contiguous().data_ptr<double>(),
               in.nAtoms * 3 * sizeof(double));
 
-  out->variance = 0.0;
+  if (have_model_uq) {
+    // Model energy_uncertainty mean (eV); callers may use as force floor at
+    // unit length (angstrom) — that is an explicit energy->force scale choice.
+    out->variance = model_uq_variance;
+  } else if (n_passes > 1 && !force_samples.empty()) {
+    // RMS force residual over orientations (eV/A): proper force-scale
+    // uncertainty for criterion smearing. Energy orientation scatter can be
+    // several eV on non-invariant evaluations and must not raise force tol.
+    double acc2 = 0.0;
+    const double n_comp = static_cast<double>(nAtoms) * 3.0 *
+                          static_cast<double>(force_samples.size());
+    // Deviation reference: the output force -- the orientation-average in
+    // averaging mode, the unrotated force in probe mode. Either way the
+    // RMS measures how much orientation moves the force actually used.
+    for (const auto &F_i : force_samples) {
+      auto d = F_i - forces_acc;
+      acc2 += d.square().sum().item<double>();
+    }
+    out->variance = (n_comp > 0.0) ? std::sqrt(acc2 / n_comp) : 0.0;
+  } else {
+    out->variance = 0.0;
+  }
 }
+
 
 metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
     metatomic_torch::NeighborListOptions request, long nAtoms,
@@ -187,24 +457,22 @@ metatensor_torch::TensorBlock MetatomicPot::computeNeighbors(
 
   auto cutoff = request->engine_cutoff(m_config.length_unit);
 
-  // vesin 0.5+: VesinOptions gained `sorted` and `algorithm` (default zero =
-  // VesinAutoAlgorithm). Zero-init then set only the fields we care about so
-  // newer fields stay at safe defaults.
+  // Zero-init VesinOptions so unknown/newer fields stay at safe defaults.
+  // algorithm (vesin 0.5+) is set via type-trait helper so older headers
+  // without that member still compile — never names VesinAutoAlgorithm.
   VesinOptions options{};
   options.cutoff = cutoff;
   options.full = request->full_list();
   options.sorted = false;
-  options.algorithm = VesinAutoAlgorithm;
+  vesin_compat::set_algorithm_default(options);
   options.return_shifts = true;
   options.return_distances = false;
   options.return_vectors = true;
 
   VesinNeighborList *vesin_nl = new VesinNeighborList();
 
-  // vesin 0.5+: VesinDevice is struct { VesinDeviceKind type; int device_id; }.
-  // (0.3–0.4 briefly used an enum typedef; we require >=0.5 for the struct
-  // API.)
-  VesinDevice cpu{VesinCPU, /*device_id=*/0};
+  // enum VesinDevice (0.3.x) vs struct VesinDevice (0.5+) — type traits.
+  VesinDevice cpu = vesin_compat::make_cpu_device();
   const char *error_message = nullptr;
   int status = vesin_neighbors(
       reinterpret_cast<const double (*)[3]>(positions),

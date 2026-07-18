@@ -34,7 +34,7 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
 
   // Baseline timing (no cache attached)
   auto start_base = high_resolution_clock::now();
-  auto [e_base, f_base] = (*pot)(positions, types, box);
+  auto [e_base, f_base, v_base] = (*pot)(positions, types, box);
   auto end_base = high_resolution_clock::now();
   auto base_duration =
       duration_cast<nanoseconds>(end_base - start_base).count();
@@ -58,12 +58,12 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
     pot->set_cache(&pcache);
 
     // 1. Miss & Write
-    auto [e1, f1] = (*pot)(positions, types, box);
+    auto [e1, f1, v1] = (*pot)(positions, types, box);
     REQUIRE_THAT(e1, WithinAbs(e_base, 1e-12));
 
     // 2. Hit & Read
     auto start = high_resolution_clock::now();
-    auto [e2, f2] = (*pot)(positions, types, box);
+    auto [e2, f2, v2] = (*pot)(positions, types, box);
     auto end = high_resolution_clock::now();
     auto dur = duration_cast<nanoseconds>(end - start).count();
 
@@ -88,7 +88,7 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
 
       // 2. Hit
       auto start = high_resolution_clock::now();
-      auto [e2, f2] = (*pot)(positions, types, box);
+      auto [e2, f2, v2] = (*pot)(positions, types, box);
       auto end = high_resolution_clock::now();
       auto dur = duration_cast<nanoseconds>(end - start).count();
 
@@ -118,7 +118,7 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
       pot->set_cache(&pcache_read);
 
       auto start = high_resolution_clock::now();
-      auto [e_read, f_read] = (*pot)(positions, types, box);
+      auto [e_read, f_read, v_read] = (*pot)(positions, types, box);
       auto end = high_resolution_clock::now();
       auto dur = duration_cast<nanoseconds>(end - start).count();
 
@@ -137,7 +137,7 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
 
     // Should call forceImpl directly without crashing
     auto start = high_resolution_clock::now();
-    auto [e, f] = (*pot)(positions, types, box);
+    auto [e, f, v] = (*pot)(positions, types, box);
     auto end = high_resolution_clock::now();
 
     REQUIRE_THAT(e, WithinAbs(e_base, 1e-12));

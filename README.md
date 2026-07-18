@@ -23,6 +23,37 @@ RPC clients may request compatible units through `ForceInput.lengthUnit` and
 `ForceInput.energyUnit`.
 
 
+## Python (PyPI)
+
+Install the manylinux wheel (nanobind **abi3**, Python >= 3.12 for the stable
+ABI extension; requires-python is >= 3.10 for pure metadata):
+
+    pip install rgpot
+    # Metatomic path (engine libs resolve from these packages at runtime):
+    pip install 'rgpot[metatomic]'
+    # or: pip install torch metatomic-torch metatensor-torch metatensor-core vesin
+
+Lennard-Jones needs only `numpy`. Metatomic uses **dlopen** of a bundled
+engine:
+
+-   layout: `rgpot/lib/torch-X.Y/libmetatomic_engine.so`
+-   picker: installed `torch` major (same multi-ABI idea as metatomic-torch)
+-   **supported torch majors: 2.7 and newer** (wheels ship 2.7–2.13 engines)
+-   torch 2.6 and older are not supported for Metatomic dlopen
+
+```python
+import numpy as np
+import rgpot
+
+print(rgpot.__version__)
+print(rgpot.available_metatomic_engine_abis())  # e.g. 2.7 .. 2.13
+# energy, forces, variance = rgpot.evaluate_metatomic(
+#     positions, atom_types, box, model_path="model.pt")
+```
+
+See <https://pypi.org/project/rgpot/>.
+
+
 ## Build And Test
 
 Meson is the primary build path.
@@ -89,7 +120,7 @@ RPC client types:
 <tr>
 <td class="org-left"><code>XTBPot</code></td>
 <td class="org-left"><code>XTB</code>, <code>GFNFF</code>, <code>GFN0xTB</code>, <code>GFN1xTB</code></td>
-<td class="org-left">Enable with <code>-Dwith_xtb=true</code>; use pixi env <code>xtbbld</code> or <code>tbbld</code></td>
+<td class="org-left">Enable with <code>-Dwith_xtb=true</code>; use pixi env <code>xtbbld</code> or <code>tbbld</code>; linked <code>XTBPot</code> + dlopen <code>libxtb_engine.so</code> (see <code>docs/xtb_backends.md</code>)</td>
 </tr>
 
 <tr>
@@ -101,7 +132,7 @@ RPC client types:
 <tr>
 <td class="org-left"><code>MetatomicPot</code></td>
 <td class="org-left"><code>Metatomic:&lt;model_path&gt;</code></td>
-<td class="org-left">Enable with <code>-Dwith_metatomic=true</code>; use pixi env <code>metatomicbld</code></td>
+<td class="org-left">Enable with <code>-Dwith_metatomic=true</code>; use pixi env <code>metatomicbld</code>. Pip engines: torch 2.7+</td>
 </tr>
 
 <tr>

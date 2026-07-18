@@ -10,6 +10,7 @@
  */
 
 // clang-format off
+#include <cmath>
 #include <utility>
 #include <vector>
 #include <stdexcept>
@@ -30,7 +31,11 @@ public:
   /**
    * @brief Default constructor initializing parameters.
    */
-  LJPot() : Potential(PotType::LJ), u0{1.0}, cuttOffR{15.0}, psi{1.0} {}
+  LJPot() : Potential(PotType::LJ), u0{1.0}, cuttOffR{15.0}, psi{1.0} {
+    // Shift so U(cuttOffR) = 0 (standard shifted 12-6 LJ).
+    const double a = std::pow(psi / cuttOffR, 6.0);
+    cuttOffU = 4.0 * u0 * a * (a - 1.0);
+  }
 
   /**
    * @brief Computes the forces and energy for a given configuration.

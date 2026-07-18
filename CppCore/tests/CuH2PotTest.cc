@@ -20,7 +20,8 @@ TEST_CASE("CuH2Pot Energy and Forces", "[CuH2Pot]") {
       {0, 21.702000000000002, 0}, //
       {0, 0, 100.00000000000000}  //
   }};
-  auto [energy, forces] = cuh2pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = cuh2pot(positions, atmtypes, box);
+  (void)variance;
 
   double expected_energy = -2.7114096242662238;
   AtomMatrix expected_forces{

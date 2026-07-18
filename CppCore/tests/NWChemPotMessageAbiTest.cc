@@ -42,7 +42,8 @@ TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
   std::array<std::array<double, 3>, 3> box = {
       {{20.0, 0.0, 0.0}, {0.0, 20.0, 0.0}, {0.0, 0.0, 20.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   REQUIRE(std::isfinite(energy));
   REQUIRE(energy != 0.0);
@@ -63,4 +64,32 @@ TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
     // Real embed: O- / BLYP / 6-31G is bound (negative eV scale).
     REQUIRE(energy < 0.0);
   }
+}
+
+TEST_CASE("NWChemPot preserves typed DFT convergence parameters",
+          "[nwchem][abi]") {
+  ::capnp::MallocMessageBuilder input_message;
+  auto input = input_message.initRoot<::NWChemParams>();
+  input.setTheory("dft");
+  auto stanzas = input.initInputStanzas(1);
+  stanzas[0].setKind(::NWChemInputStanza::Kind::DFT);
+  auto dft = stanzas[0].initDft();
+  dft.setXc("hyb_gga_xc_wb97x_v");
+  dft.setEnergyConv(1.0e-6);
+
+  rgpot::NWChemPot pot(input.asReader());
+  REQUIRE(pot.available());
+
+  ::capnp::MallocMessageBuilder output_message;
+  auto output = output_message.initRoot<::NWChemParams>();
+  pot.getParams(output);
+  const auto restored_stanzas = output.asReader().getInputStanzas();
+
+  REQUIRE(restored_stanzas.size() == 1);
+  REQUIRE(restored_stanzas[0].getKind() ==
+          ::NWChemInputStanza::Kind::DFT);
+  REQUIRE(restored_stanzas[0].getDft().getXc() ==
+          "hyb_gga_xc_wb97x_v");
+  REQUIRE_THAT(restored_stanzas[0].getDft().getEnergyConv(),
+               WithinAbs(1.0e-6, 1.0e-15));
 }

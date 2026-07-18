@@ -43,8 +43,9 @@ if not get_option('with_rpc_client_only')
     endif
 
     if has_xtb
-        subdir('rgpot/XTBPot')  # 'xtbpot'
+        subdir('rgpot/XTBPot')  # 'xtbpot' + engine + dlopen frontend
         rgpotentials += [xtbpot]
+        _linkto += [xtb_dlopen]
     endif
 
     if has_tblite
@@ -52,8 +53,10 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [tblitepot]
     endif
 
+    # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
+    subdir('rgpot/MetatomicPot')
+    _linkto += [metatomic_dlopen]
     if has_metatomic
-        subdir('rgpot/MetatomicPot')  # 'metatomicpot'
         rgpotentials += [metatomicpot]
     endif
 
@@ -77,6 +80,12 @@ if not get_option('with_rpc_client_only')
         link_with: _linkto,
         install: not meson.is_subproject(),
     )
+endif
+
+# Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
+# Thin host links metatomic_dlopen_dep; optional libmetatomic_engine.so holds torch.
+if get_option('with_rpc_client_only') and has_metatomic
+    subdir('rgpot/MetatomicPot')
 endif
 
 # ------------------------ Server
@@ -163,11 +172,7 @@ if get_option('with_tests')
             ['InvarianceTest', 'invariance_test', 'InvarianceTest.cc', ''],
         ]
     endif
-    if has_xtb
-        test_array += [
-            ['XTBtest', 'xtb_test', 'XTBPotTest.cc', ''],
-        ]
-    endif
+    # XTB tests registered below with RGPOT_XTB_ENGINE for dlopen parity
     if has_tblite
         test_array += [
             ['TBLitetest', 'tblite_test', 'TBLitePotTest.cc', ''],
@@ -348,4 +353,84 @@ if get_option('with_tests')
             workdir: meson.source_root() + test.get(3),
         )
     endforeach
+
+    if has_xtb
+        xtb_test_env = environment()
+        xtb_test_env.set('RGPOT_XTB_ENGINE', xtb_engine.full_path())
+        test(
+            'XTBtest',
+            executable(
+                'xtb_test',
+                sources: ['tests/XTBPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: xtb_test_env,
+            depends: [xtb_engine],
+            workdir: meson.source_root(),
+            suite: 'xtb',
+        )
+        # Timing microbench: linked vs dlopen (same process OK for xTB).
+        xtb_backend_bench = executable(
+            'xtb_backend_bench',
+            sources: ['tests/xtb_backend_bench.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+    endif
+endif
+
+# ------------------------ Install / pkg-config for eOn and other consumers
+# eOn prefers dependency('rgpot') over subproject wrap. Packaging profile
+# matching eOn wrap defaults (no torch/xtb at link time; engines dlopen):
+#   -Dwith_rpc_client_only=true -Dpure_lib=true
+#   -Dwith_tests=false -Dwith_examples=false
+#   -Dwith_xtb=false -Dwith_metatomic=false
+# See docs/eon_pkgconfig.md.
+if not meson.is_subproject() and _rpc_stack
+    # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
+    install_subdir(
+        'rgpot',
+        install_dir: get_option('includedir'),
+        exclude_directories: ['__pycache__'],
+        exclude_files: [
+            '*.o',
+            '*.a',
+            '*.so',
+            '*.cc',
+            '*.c',
+            '*.cpp',
+            '*.f90',
+            '*.F',
+            '*.py',
+        ],
+    )
+    # Schema source next to generated header (rpc meson installs .h).
+    install_data(
+        'rgpot/rpc/Potentials.capnp',
+        install_dir: get_option('includedir') / 'rgpot' / 'rpc',
+    )
+
+    pkg = import('pkgconfig')
+    pkg.generate(
+        name: 'rgpot',
+        description: 'rgpot NWChem/CPMD frontends (dlopen engines) + ptlrpc',
+        url: 'https://github.com/OmniPotentRPC/rgpot',
+        version: meson.project_version(),
+        libraries: [nwchempot, cpmdpot, ptlrpc],
+        requires: ['capnp-rpc'],
+        subdirs: ['.'],
+        extra_cflags: [
+            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
+            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
+        ],
+        filebase: 'rgpot',
+    )
 endif

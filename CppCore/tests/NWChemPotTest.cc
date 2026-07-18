@@ -96,7 +96,8 @@ TEST_CASE("NWChemPot water energy when engine present", "[nwchem]") {
   std::array<std::array<double, 3>, 3> box = {
       {{100.0, 0.0, 0.0}, {0.0, 100.0, 0.0}, {0.0, 0.0, 100.0}}};
 
-  auto [energy, forces] = pot(positions, atmtypes, box);
+  auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
 
   REQUIRE(std::isfinite(energy));
   REQUIRE(energy != 0.0);
@@ -243,7 +244,8 @@ TEST_CASE("NWChemPot water B3LYP/6-31G* when real engine present",
   // Successive force evaluations on ONE pot (criterion: multi-SCF in-process).
   double e1 = 0.0, e2 = 0.0;
   {
-    auto [energy, forces] = pot(positions, atmtypes, box);
+    auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
     e1 = energy;
     REQUIRE(std::isfinite(energy));
     // Water B3LYP/6-31G* ~ -76.4 Ha ≈ -2079 eV (not LDA ~-2063 eV).
@@ -259,7 +261,8 @@ TEST_CASE("NWChemPot water B3LYP/6-31G* when real engine present",
     REQUIRE(any_force);
   }
   {
-    auto [energy, forces] = pot(positions, atmtypes, box);
+    auto [energy, forces, variance] = pot(positions, atmtypes, box);
+  (void)variance;
     e2 = energy;
     REQUIRE(std::isfinite(energy));
     REQUIRE(energy < -2000.0);

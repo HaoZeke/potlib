@@ -25,7 +25,7 @@ int main(void) {
       {0, 20, 0}, //
       {0, 0, 30}  //
   }};
-  auto [energy, forces] = cuh2pot(positions, atomTypes, boxMatrix);
+  auto [energy, forces, variance] = cuh2pot(positions, atomTypes, boxMatrix);
   fmt::print("Got energy {}\n Forces:\n{}", energy, fmt::streamed(forces));
   return EXIT_SUCCESS;
 }
