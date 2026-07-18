@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [2.5.2](https://github.com/OmniPotentRPC/rgpot/tree/2.5.2) - 2026-07-18
+
+### Fixed
+
+- Rebuild Metatomic engines against vesin 0.6+ ``VesinOptions`` (``skin`` /
+  ``n_threads``) so ``vesin_neighbors`` no longer fails with a bare error when
+  runtime libvesin is 0.6 and the engine was built for 0.5.
+
+
 ## [2.5.0](https://github.com/OmniPotentRPC/rgpot/tree/2.5.0) - 2026-07-17
 
 ### Added
