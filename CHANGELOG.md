@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [2.5.0](https://github.com/OmniPotentRPC/rgpot/tree/2.5.0) - 2026-07-17
+
+### Added
+
+- Multi-language Codecov coverage (Rust, C++, Python, Fortran) with OIDC uploads. ([#47](https://github.com/OmniPotentRPC/rgpot/issues/47))
+- Install headers and ``rgpot.pc`` (``nwchempot`` / ``cpmdpot`` / ``ptlrpc``; no
+  torch or xTB at link time) so eOn and other hosts can prefer
+  ``dependency('rgpot')`` over the Meson subproject wrap. Engines stay runtime
+  dlopen. See ``docs/eon_pkgconfig.md``.
+- Keep Metatomic **dlopen** product on pip: portable `libmetatomic_engine.so` plugin (no eonclib) + `evaluate_metatomic` frontend (not LJ-only wheels).
+- Metatomic dual path: linked ``MetatomicPot`` (fast) and ``MetatomicDlopen``
+  frontend plus optional ``libmetatomic_engine.so`` C ABI (slow/plugin path).
+- Metatomic engines are built for each supported torch major
+  (``rgpot/lib/torch-X.Y/libmetatomic_engine.so``) and selected at runtime from
+  the installed torch version — same multi-ABI model as metatomic-torch itself.
+  The pip product covers **torch 2.7 and newer**; earlier majors are out of scope.
+- MetatomicConfig gains an explicit ``torch_determinism`` policy
+  (``TorchDeterminismPolicy::Fast`` default, ``Strict`` opt-in). Strict mode
+  enables deterministic LibTorch algorithms, math-only scaled-dot-product
+  attention (flash / memory-efficient / cuDNN SDP disabled), deterministic
+  cuDNN with benchmarking off, deterministic fill of uninitialized memory, and
+  disables TF32 for cuBLAS and cuDNN. These flags are process-global via
+  ``at::globalContext()``; Fast never mutates them. CUDA hosts still need
+  ``CUBLAS_WORKSPACE_CONFIG=:4096:8`` (or ``:16:8``) before the first cuBLAS
+  call for bit-stable matmuls.
+- Portable Metatomic engine wheels: `$ORIGIN` RUNPATH to site-packages torch/metatomic
+  (single build-time torch major; multi-ABI package dirs cannot be listed oldest-first).
+  `scripts/rgpot_build_wheel.sh` always runs RPATH repair after `python -m build`.
+- Python bindings use **nanobind** with **stable ABI** (abi3 / Py_LIMITED_API 3.12)
+  when built on Python >= 3.12 (same policy as pyeonclient). Metatomic engines are
+  packed multi-ABI under ``rgpot/lib/torch-X.Y/`` and selected from the installed
+  torch major at runtime. Supported libtorch majors start at **2.7** (engines for
+  2.7–2.13 ship in the manylinux wheel); torch 2.6 and older are not bundled.
+- Python package `rgpot` is pip-installable: core Lennard-Jones bindings via
+  meson-python wheels (`import rgpot; rgpot.evaluate_lj(...)`), plus optional
+  Metatomic multi-ABI engines for **torch 2.7+**.
+- xTB dual backends: keep linked ``XTBPot`` and add ``XTBDlopen`` +
+  ``libxtb_engine.so`` C ABI plugin (same pattern as metatomic engine).
+
+### Fixed
+
+- Metatomic C ABI engines soft-release the GIL so pyeonclient Job.run can evaluate forces under torch autograd without a fat metatomic link.
+- SoftGilRelease in the metatomic C ABI only calls PyEval_SaveThread when PyGILState_Check is true, so nested GIL release from pyeonclient Job.run is safe.
+
+
 ## [2.2.1](https://github.com/OmniPotentRPC/rgpot/tree/2.2.1) - 2026-07-06
 
 ### Fixed
