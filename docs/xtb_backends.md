@@ -1,0 +1,59 @@
+# xTB backends: linked vs dlopen
+
+rgpot exposes two GFN-xTB force loading strategies over the same single-point
+semantics (Å / eV host units; Bohr / Hartree inside libxtb).
+
+| Backend | Class | Build | Runtime |
+|---------|-------|-------|---------|
+| **Linked** | `rgpot::XTBPot` | `-Dwith_xtb=true` (pkg-config `xtb`) | NEEDED `libxtb` in `libxtbpot` / host |
+| **dlopen** | `rgpot::XTBDlopen` | same; builds `libxtb_engine.so` | `dlopen` engine; set path below |
+
+Default method: **GFN2-xTB** (`GFNMethod::GFN2xTB` / `RGPOT_XTB_METHOD_GFN2`).
+
+## Engine selection (`XTBDlopen`)
+
+Search order for `libxtb_engine.so`:
+
+1. `XTBDlopenConfig::engine_path`
+2. env `RGPOT_XTB_ENGINE`
+3. env `XTB_ENGINE`
+4. bare `libxtb_engine.so` (loader path)
+5. `EON_POTENTIALS_PATH` / `RGPOT_ENGINE_PATH` directory lists
+
+## eOn ship baseline
+
+eOn’s in-tree `client/potentials/XTBPot` with `-Dwith_xtb=true` is the
+**linked ship** comparison target (same xtb C API + GFN2). It is not removed
+or replaced by the rgpot engine plugin.
+
+## Tests
+
+```bash
+pixi run -e xtbbld meson setup bbdir-xtb -Dwith_xtb=true -Dwith_tests=true \
+  -Dwith_rpc=false -Dwith_cache=false --buildtype=debug
+pixi run -e xtbbld meson compile -C bbdir-xtb
+pixi run -e xtbbld meson test -C bbdir-xtb --suite xtb --print-errorlogs
+```
+
+Catch tags: `[xtb]`, `[xtb][linked]`, `[xtb][dlopen]`. Dlopen tests set
+`RGPOT_XTB_ENGINE` to the built engine full path.
+
+## Timing compare
+
+rgpot microbench (linked + dlopen, warm SCF state):
+
+```bash
+export RGPOT_XTB_ENGINE=$PWD/bbdir-xtb/CppCore/libxtb_engine.so
+./bbdir-xtb/CppCore/xtb_backend_bench --warmup 5 --iters 50 \
+  --json /tmp/rgpot_xtb_internal.json
+```
+
+Full head-to-head vs eOn ship (subprocess JSON merge):
+
+```bash
+bash scripts/run_xtb_backend_bench.sh --out-dir /path/to/scratch
+```
+
+See `scripts/compare_xtb_backends.py` for flags. Protocol: shared water GFN2
+geometry, warmup force calls, then timed samples; report mean wall ms and
+whether dlopen is as-fast-or-faster than eOn linked ship (5% band).

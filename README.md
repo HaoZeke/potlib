@@ -120,7 +120,7 @@ RPC client types:
 <tr>
 <td class="org-left"><code>XTBPot</code></td>
 <td class="org-left"><code>XTB</code>, <code>GFNFF</code>, <code>GFN0xTB</code>, <code>GFN1xTB</code></td>
-<td class="org-left">Enable with <code>-Dwith_xtb=true</code>; use pixi env <code>xtbbld</code> or <code>tbbld</code></td>
+<td class="org-left">Enable with <code>-Dwith_xtb=true</code>; use pixi env <code>xtbbld</code> or <code>tbbld</code>; linked <code>XTBPot</code> + dlopen <code>libxtb_engine.so</code> (see <code>docs/xtb_backends.md</code>)</td>
 </tr>
 
 <tr>

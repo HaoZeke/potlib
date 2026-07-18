@@ -43,8 +43,9 @@ if not get_option('with_rpc_client_only')
     endif
 
     if has_xtb
-        subdir('rgpot/XTBPot')  # 'xtbpot'
+        subdir('rgpot/XTBPot')  # 'xtbpot' + engine + dlopen frontend
         rgpotentials += [xtbpot]
+        _linkto += [xtb_dlopen]
     endif
 
     if has_tblite
@@ -171,11 +172,7 @@ if get_option('with_tests')
             ['InvarianceTest', 'invariance_test', 'InvarianceTest.cc', ''],
         ]
     endif
-    if has_xtb
-        test_array += [
-            ['XTBtest', 'xtb_test', 'XTBPotTest.cc', ''],
-        ]
-    endif
+    # XTB tests registered below with RGPOT_XTB_ENGINE for dlopen parity
     if has_tblite
         test_array += [
             ['TBLitetest', 'tblite_test', 'TBLitePotTest.cc', ''],
@@ -356,4 +353,36 @@ if get_option('with_tests')
             workdir: meson.source_root() + test.get(3),
         )
     endforeach
+
+    if has_xtb
+        xtb_test_env = environment()
+        xtb_test_env.set('RGPOT_XTB_ENGINE', xtb_engine.full_path())
+        test(
+            'XTBtest',
+            executable(
+                'xtb_test',
+                sources: ['tests/XTBPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            env: xtb_test_env,
+            depends: [xtb_engine],
+            workdir: meson.source_root(),
+            suite: 'xtb',
+        )
+        # Timing microbench: linked vs dlopen (same process OK for xTB).
+        xtb_backend_bench = executable(
+            'xtb_backend_bench',
+            sources: ['tests/xtb_backend_bench.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+    endif
 endif
