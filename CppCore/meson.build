@@ -386,3 +386,51 @@ if get_option('with_tests')
         )
     endif
 endif
+
+# ------------------------ Install / pkg-config for eOn and other consumers
+# eOn prefers dependency('rgpot') over subproject wrap. Packaging profile
+# matching eOn wrap defaults (no torch/xtb at link time; engines dlopen):
+#   -Dwith_rpc_client_only=true -Dpure_lib=true
+#   -Dwith_tests=false -Dwith_examples=false
+#   -Dwith_xtb=false -Dwith_metatomic=false
+# See docs/eon_pkgconfig.md.
+if not meson.is_subproject() and _rpc_stack
+    # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
+    install_subdir(
+        'rgpot',
+        install_dir: get_option('includedir'),
+        exclude_directories: ['__pycache__'],
+        exclude_files: [
+            '*.o',
+            '*.a',
+            '*.so',
+            '*.cc',
+            '*.c',
+            '*.cpp',
+            '*.f90',
+            '*.F',
+            '*.py',
+        ],
+    )
+    # Schema source next to generated header (rpc meson installs .h).
+    install_data(
+        'rgpot/rpc/Potentials.capnp',
+        install_dir: get_option('includedir') / 'rgpot' / 'rpc',
+    )
+
+    pkg = import('pkgconfig')
+    pkg.generate(
+        name: 'rgpot',
+        description: 'rgpot NWChem/CPMD frontends (dlopen engines) + ptlrpc',
+        url: 'https://github.com/OmniPotentRPC/rgpot',
+        version: meson.project_version(),
+        libraries: [nwchempot, cpmdpot, ptlrpc],
+        requires: ['capnp-rpc'],
+        subdirs: ['.'],
+        extra_cflags: [
+            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
+            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
+        ],
+        filebase: 'rgpot',
+    )
+endif
