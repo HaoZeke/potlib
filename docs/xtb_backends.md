@@ -10,6 +10,26 @@ semantics (Å / eV host units; Bohr / Hartree inside libxtb).
 
 Default method: **GFN2-xTB** (`GFNMethod::GFN2xTB` / `RGPOT_XTB_METHOD_GFN2`).
 
+## ISO_C_BINDING C API (libxtb)
+
+libxtb is implemented in Fortran but the public surface used here is the
+**ISO_C_BINDING** C API (`xtb.h`): interoperable types, `bind(c)` procedures,
+and opaque C pointers. Hosts (linked `XTBPot` and `libxtb_engine.so`) only call
+that C contract.
+
+Contract tests care about:
+
+| Call pattern | C API |
+|--------------|--------|
+| Create | `xtb_newEnvironment` / `newCalculator` / `newResults` (+ `xtb_releaseOutput`) |
+| First geometry | `xtb_newMolecule` + `xtb_loadGFN*xTB` |
+| Updates | `xtb_updateMolecule` then `xtb_singlepoint` |
+| Destroy | `xtb_del*` in reverse order |
+| Units | host Å/eV; API Bohr/Hartree (converted in pot) |
+
+Catch tags: `[xtb][capi]` — multi-handle lifecycle, warm update, method switch,
+linked↔dlopen parity through the same ISO C semantics.
+
 ## Engine selection (`XTBDlopen`)
 
 Search order for `libxtb_engine.so`:

@@ -9,10 +9,10 @@
 namespace rgpot {
 
 /**
- * Slow/plugin path: loads libxtb_engine.so at runtime (linked libxtb lives
- * inside the engine). Search order: config.engine_path,
- * RGPOT_XTB_ENGINE, XTB_ENGINE, bare libxtb_engine.so, then
- * EON_POTENTIALS_PATH / RGPOT_ENGINE_PATH directories.
+ * Plugin path: ``dlopen`` ``libxtb_engine.so``, which implements the same
+ * ISO_C_BINDING singlepoint as linked ``XTBPot`` behind ``xtb_c_abi.h``.
+ * Search: ``engine_path``, ``RGPOT_XTB_ENGINE``, ``XTB_ENGINE``, bare
+ * ``libxtb_engine.so``, then ``EON_POTENTIALS_PATH`` / ``RGPOT_ENGINE_PATH``.
  */
 struct XTBDlopenConfig {
   XTBConfig xtb{};

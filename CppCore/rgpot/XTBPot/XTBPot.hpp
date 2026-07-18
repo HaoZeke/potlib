@@ -21,6 +21,19 @@ struct XTBConfig {
   int uhf = 0;
 };
 
+/**
+ * Linked GFN-xTB pot (NEEDED libxtb).
+ *
+ * libxtb exposes a stable **ISO_C_BINDING** C API (``xtb.h``): opaque
+ * ``xtb_TEnvironment`` / ``xtb_TCalculator`` / ``xtb_TMolecule`` /
+ * ``xtb_TResults`` handles with explicit create/update/destroy. We test and
+ * use that C contract—not free-form Fortran ABI. Each ``XTBPot`` owns its
+ * handles; first force builds the molecule, later forces call
+ * ``xtb_updateMolecule``. ``xtb_releaseOutput`` is called on create (library
+ * recommendation for multi-env processes). Do not share one instance across
+ * threads; distinct instances may be used from different threads if the
+ * loaded libxtb build is reentrant for independent handle sets.
+ */
 class XTBPot : public Potential<XTBPot> {
 public:
   XTBPot();

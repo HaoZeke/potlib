@@ -2,8 +2,10 @@
  * @file xtb_c_abi.h
  * @brief C ABI between XTBDlopen frontend and libxtb_engine.so.
  *
- * Units: positions Angstrom, energy eV, forces eV/Angstrom (rgpot host).
- * Mirrors the metatomic engine split: thin consumer, optional heavy engine.
+ * Engine wraps libxtb's ISO_C_BINDING API (`xtb.h`) behind a small stable
+ * plugin surface (create / force / destroy). Host units: positions Å, energy
+ * eV, forces eV/Å. Mirrors the metatomic engine split: thin consumer,
+ * optional heavy plugin.
  */
 #pragma once
 
