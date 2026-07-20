@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [2.5.3](https://github.com/OmniPotentRPC/rgpot/tree/2.5.3) - 2026-07-20
+
+### Fixed
+
+- Fix ``-Dwith_rpc_client_only=true -Dwith_tests=true``: use ``pot_bridge_dep``
+  (was undefined ``rgpot_bridge_dep``), link ``units.cc`` into unit tests when
+  ``rgpot_core`` is not built, and soft-skip bridge stress cases when potserv is
+  not running (lazy client connect). Catch2 configure/link/test succeed for the
+  client frontend product without a live server.
+
+
 ## [2.5.2](https://github.com/OmniPotentRPC/rgpot/tree/2.5.2) - 2026-07-18
 
 ### Fixed
