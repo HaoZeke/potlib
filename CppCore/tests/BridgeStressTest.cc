@@ -92,6 +92,18 @@ TEST_CASE("Bridge Calculation Stress", "[bridge][perf]") {
   std::vector<double> forces(natoms * 3);
   double energy = 0;
 
+  // pot_client_init is lazy: connection only opens on first calculate.
+  // Without potserv (packaging/unit CI), skip rather than hard-fail.
+  {
+    int probe = pot_calculate(client, natoms, pos.data(), atmnrs.data(),
+                              box.data(), &energy, forces.data());
+    if (probe != 0) {
+      std::string err = pot_get_last_error(client);
+      pot_client_free(client);
+      SKIP("potserv not reachable at " << HOST << ":" << PORT << ": " << err);
+    }
+  }
+
   SECTION("Sequential Load (1000 calls)") {
     for (int i = 0; i < 1000; ++i) {
       int res = pot_calculate(client, natoms, pos.data(), atmnrs.data(),

@@ -153,6 +153,17 @@ if get_option('with_tests')
     )
     test_args = _args
     test_args += ['-DRGPOTTEST']
+    # Client-only builds skip rgpot_core; UnitsTest still needs units.cc.
+    if get_option('with_rpc_client_only')
+        units_for_tests = static_library(
+            'units_for_tests',
+            sources: ['rgpot/units.cc'],
+            include_directories: _incdirs,
+            cpp_args: _args,
+            install: false,
+        )
+        test_deps += declare_dependency(link_with: units_for_tests)
+    endif
     test_array = [
         ['UnitsTest', 'units_test', 'UnitsTest.cc', ''],
     ]
@@ -332,7 +343,7 @@ if get_option('with_tests')
         test_deps += ptlrpc_dep
         test_array += [['RPCTest', 'test_rpc', 'CapnpAdapterTest.cc', '']]
         if get_option('with_rpc_client_only')
-            test_deps += rgpot_bridge_dep
+            test_deps += pot_bridge_dep
             test_array += [
                 ['RPCClientTest', 'test_rpc_client', 'BridgeStressTest.cc', ''],
             ]
