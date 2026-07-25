@@ -106,6 +106,18 @@ if not get_option('with_rpc_client_only')
         dependencies: rgpot_deps,
         include_directories: _incdirs,
     )
+
+    # The Fortran kernels must stay invisible outside librgpot: an
+    # exported legacy name is how two potentials used to bind to the same
+    # symbol.
+    if has_fortran and host_system == 'linux' and get_option('with_tests')
+        test(
+            'FortranSymbolAudit',
+            find_program('../scripts/audit_fortran_symbols.sh'),
+            args: [rgpot.full_path()],
+            depends: [rgpot],
+        )
+    endif
 endif
 
 # Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.

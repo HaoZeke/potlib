@@ -90,7 +90,6 @@ program test_tersoff
                 "forces disagree with finite differences, inner cell", failed)
 
    ! Expanded lattice: bonds sit on the cutoff shoulder.
-   deallocate (positions)
    call diamond_lattice(n_side, taper_lattice, positions, cell)
    call jitter(positions, 0.10_wp)
 
