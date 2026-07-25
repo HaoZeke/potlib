@@ -28,9 +28,13 @@ if not get_option('with_rpc_client_only')
         sources: _rgpot_srcs,
         dependencies: _deps,
         include_directories: _incdirs,
+        pic: true,
         install: false,
     )
 
+    # Snapshot before the core link-dep: the umbrella library link_wholes
+    # rgpot_core explicitly and must not also pull it through link_with.
+    _deps_sans_core = _deps
     _deps += declare_dependency(link_with: rgpot_core)
 
     # Implemented rgpotentials
@@ -67,8 +71,10 @@ if not get_option('with_rpc_client_only')
 
     _linkto += rgpotentials
 
-    # Create library
-    rgpot_deps = _deps
+    # Create the umbrella library: every pot and the core ship inside one
+    # versioned SONAME. link_whole keeps all symbols even where nothing in
+    # librgpot itself references them (consumers do).
+    rgpot_deps = _deps_sans_core
     if _rpc_stack
         rgpot_deps += [ptlrpc_dep]
     endif
@@ -77,7 +83,9 @@ if not get_option('with_rpc_client_only')
         dependencies: rgpot_deps,
         cpp_args: _args,
         include_directories: _incdirs,
-        link_with: _linkto,
+        link_whole: [rgpot_core] + _linkto,
+        version: meson.project_version(),
+        soversion: '2',
         install: not meson.is_subproject(),
     )
 endif
@@ -433,7 +441,7 @@ endif
 #   -Dwith_tests=false -Dwith_examples=false
 #   -Dwith_xtb=false -Dwith_metatomic=false
 # See docs/eon_pkgconfig.md.
-if not meson.is_subproject() and _rpc_stack
+if not meson.is_subproject()
     # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
     install_subdir(
         'rgpot',
@@ -451,25 +459,54 @@ if not meson.is_subproject() and _rpc_stack
             '*.py',
         ],
     )
-    # Schema source next to generated header (rpc meson installs .h).
-    install_data(
-        'rgpot/rpc/Potentials.capnp',
-        install_dir: get_option('includedir') / 'rgpot' / 'rpc',
-    )
+    if _rpc_stack
+        # Schema source next to generated header (rpc meson installs .h).
+        install_data(
+            'rgpot/rpc/Potentials.capnp',
+            install_dir: get_option('includedir') / 'rgpot' / 'rpc',
+        )
+    endif
+
+    # The .pc always ships: consumers discover whatever this build enabled
+    # through the RGPOT_HAS_* cflags rather than by the file's absence.
+    _pc_libs = []
+    _pc_requires = []
+    _pc_cflags = []
+    if not get_option('with_rpc_client_only')
+        _pc_libs += [rgpot]
+        _pc_cflags += ['-DRGPOT_HAS_POTLIB=TRUE']
+        if has_fortran
+            _pc_cflags += ['-DRGPOT_HAS_FORTRAN_POTS=TRUE']
+        endif
+        if has_metatomic
+            _pc_cflags += ['-DRGPOT_HAS_METATOMIC_POT=TRUE']
+        endif
+        if has_xtb
+            _pc_cflags += ['-DRGPOT_HAS_XTB_POT=TRUE']
+        endif
+        if has_tblite
+            _pc_cflags += ['-DRGPOT_HAS_TBLITE_POT=TRUE']
+        endif
+    endif
+    if _rpc_stack
+        _pc_libs += [nwchempot, cpmdpot, ptlrpc]
+        _pc_requires += ['capnp-rpc']
+        _pc_cflags += [
+            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
+            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
+        ]
+    endif
 
     pkg = import('pkgconfig')
     pkg.generate(
         name: 'rgpot',
-        description: 'rgpot NWChem/CPMD frontends (dlopen engines) + ptlrpc',
+        description: 'rgpot potentials (librgpot umbrella) + QM frontends',
         url: 'https://github.com/OmniPotentRPC/rgpot',
         version: meson.project_version(),
-        libraries: [nwchempot, cpmdpot, ptlrpc],
-        requires: ['capnp-rpc'],
+        libraries: _pc_libs,
+        requires: _pc_requires,
         subdirs: ['.'],
-        extra_cflags: [
-            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
-            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
-        ],
+        extra_cflags: _pc_cflags,
         filebase: 'rgpot',
     )
 endif

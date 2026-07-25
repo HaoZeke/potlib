@@ -25,13 +25,16 @@ metatomic_dlopen_dep = declare_dependency(
 
 # Fat linked pot + portable engine plugin only when torch/metatomic are available
 if has_metatomic
-    metatomicpot = library(
+    # Static convenience lib; ships inside the librgpot umbrella
+    # (link_whole), which then carries the torch link when metatomic is on.
+    metatomicpot = static_library(
         'metatomicpot',
         'MetatomicPot.cc',
         dependencies: _deps,
         cpp_args: _args + ['-DRGPOT_METATOMIC_LINKED=1'],
         include_directories: _incdirs + [mta_inc],
-        install: not meson.is_subproject(),
+        pic: true,
+        install: false,
     )
 
     metatomicpot_dep = declare_dependency(

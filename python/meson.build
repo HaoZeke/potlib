@@ -75,7 +75,10 @@ endif
 
 _py_incs = _incdirs
 _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
-_py_link = [rgpot, lennard_jones, metatomic_dlopen]
+# The umbrella librgpot link_wholes every pot and the dlopen frontends;
+# linking the static convenience libs again would just duplicate symbols
+# into the extension.
+_py_link = [rgpot]
 # Do not link cuh2 into the pip extension (fortcuh2 subproject not in wheel
 # when install --skip-subprojects; LJ + metatomic dlopen are the product).
 
