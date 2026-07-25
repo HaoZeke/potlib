@@ -30,10 +30,9 @@ endif
 
 # Languages
 add_languages('c', required: true)
-# Fortran/CuH2 on all hosts when available. On Darwin/CI, pair with system
-# clang++ (not conda arm64-apple-darwin20 clang) so C++ targets link the host
-# SDK; fortcuh2 is static on Darwin and scoped to the cuh2 target only so
-# LJ/ptlrpc are not polluted with gfortran link flags.
+# Fortran pot kernels on all hosts where a compiler is available. On
+# Darwin/CI, pair with system clang++ (not conda arm64-apple-darwin20 clang)
+# so C++ targets link the host SDK.
 #
 # with_fortran_pots is independent of the RPC options: client-only builds
 # skip the main library (and with it every pot), but the decision belongs
@@ -50,6 +49,9 @@ endif
 fc = disabler()
 if has_fortran
     fc = meson.get_compiler('fortran')
+    # Matches the RGPOT_HAS_FORTRAN_POTS cflag rgpot.pc exports, so in-tree
+    # sources and installed consumers gate the Fortran pots on one name.
+    _args += ['-DRGPOT_HAS_FORTRAN_POTS=TRUE']
 endif
 
 rpc_enabled = get_option('with_rpc') or get_option('with_rpc_client_only')
@@ -352,20 +354,6 @@ print(api_inc)
 
     _args += ['-DRGPOT_HAS_METATOMIC=TRUE']
     has_metatomic = true
-endif
-
-# --------------------- Subprojects
-# fortcuh2 is only needed by the CuH2 potential — do NOT add it to global
-# `_deps`. Doing so pulls -lgfortran / gcc lib paths into every intermediate
-# dylib (LJ, ptlrpc, …) and breaks conda macOS clang++ links (missing
-# __Unwind_Resume / libSystem symbols).
-fortcuh2_dep = disabler()
-if has_fortran
-    # Darwin: packagefiles/fortcuh2 builds a static lib (see fortcuh2.wrap
-    # patch_directory) so the final C++ target resolves system symbols.
-    fortcuh2_proj = subproject('fortcuh2')
-    fortcuh2_dep = fortcuh2_proj.get_variable('fortcuh2_dep')
-    _args += ['-DRGPOT_HAS_FORTRAN=TRUE']
 endif
 
 # --------------------- Rust Core (rgpot-core)

@@ -98,7 +98,6 @@ let nodownload_export =
   # A conda-forge source build sees exactly this: tracked files, no .git, no
   # checked-out wrap subprojects.
   test ! -e /tmp/rgpot-src/.git
-  test ! -e /tmp/rgpot-src/subprojects/fortcuh2
 "%
   & { name = "Export tracked tree (git archive, no .git)" }
 in
@@ -108,7 +107,6 @@ let nodownload_build_test =
   cd /tmp/rgpot-src
   meson setup bb \
     --wrap-mode=nodownload \
-    --native-file %{P.no_fortran_native_file} \
     -Dwith_tests=true \
     -Dwith_examples=false \
     -Dwith_xtensor=false \

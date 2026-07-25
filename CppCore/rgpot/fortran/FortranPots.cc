@@ -87,7 +87,7 @@ RGPOT_FORTRAN_POT_IMPL(EAMAlPot, rgpot_eam_al_force, "EAM-Al")
   }
 
 RGPOT_FORTRAN_SPECIES_POT_IMPL(FeHePot, rgpot_fehe_force, "FeHe")
-RGPOT_FORTRAN_SPECIES_POT_IMPL(CuH2FortranPot, rgpot_cuh2_force, "CuH2")
+RGPOT_FORTRAN_SPECIES_POT_IMPL(CuH2Pot, rgpot_cuh2_force, "CuH2")
 RGPOT_FORTRAN_SPECIES_POT_IMPL(WaterHPot, rgpot_water_h_force, "Water-H")
 
 #undef RGPOT_FORTRAN_SPECIES_POT_IMPL

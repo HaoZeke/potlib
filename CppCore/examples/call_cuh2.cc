@@ -4,13 +4,13 @@
 #include <fmt/ostream.h>
 #include <cstdlib>
 // clang-format on
-#include "rgpot/CuH2/CuH2Pot.hpp"
+#include "rgpot/fortran/FortranPots.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
 using rgpot::types::AtomMatrix;
 
 int main(void) {
-  auto cuh2pot = rgpot::CuH2Pot();
+  auto cuh2pot = rgpot::fortranpots::CuH2Pot();
   AtomMatrix positions{
       {0.63940268750835, 0.90484742551374, 6.97516498544584}, // Cu
       {3.19652040936288, 0.90417430354811, 6.97547796369474}, // Cu

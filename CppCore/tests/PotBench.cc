@@ -29,7 +29,7 @@
 #include "rgpot/types/AtomMatrix.hpp"
 
 #ifdef RGPOT_BENCH_CUH2
-#include "rgpot/CuH2/CuH2Pot.hpp"
+#include "rgpot/fortran/FortranPots.hpp"
 #endif
 
 using rgpot::types::AtomMatrix;
@@ -307,7 +307,7 @@ TEST_CASE("Benchmark: CuH2Pot force", "[.][benchmark][cuh2]") {
   const std::array<double, 9> box{kCuSlabSide, 0.0, 0.0, 0.0,      kCuSlabSide,
                                   0.0,         0.0, 0.0, kCuVacuum};
   std::vector<double> forces(pos.size(), 0.0);
-  rgpot::CuH2Pot pot;
+  rgpot::fortranpots::CuH2Pot pot;
 
   BENCHMARK("CuH2 force, 128 Cu + 2 H") {
     rgpot::ForceInput fi{.nAtoms = kNCu + kNH,

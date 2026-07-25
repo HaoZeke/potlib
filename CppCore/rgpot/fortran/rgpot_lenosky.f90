@@ -150,7 +150,11 @@ contains
               + (2.0_wp*y2a(sp%n - 1) + y2a(sp%n - 2))*sp%hsixth
          y = ya(sp%n - 1) + (x - sp%tmax)*yp
       else
-         klo = int(tt)
+         ! Hold the interval one below the last knot so that `x == tmax`
+         ! reads the final interval rather than one element past the table.
+         ! The weights then select the last knot exactly, and the slope
+         ! agrees with the upper extrapolation branch.
+         klo = min(int(tt), sp%n - 2)
          khi = klo + 1
          b = tt - real(klo, wp)
          a = 1.0_wp - b
