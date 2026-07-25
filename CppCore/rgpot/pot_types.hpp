@@ -34,7 +34,14 @@ enum class PotType {
   CPMD,        //!<  PW-DFT via runtime-loaded CPMD C ABI engine.
   Morse,       //!<  Pairwise Morse potential (platinum parameters).
   LJCluster,   //!<  Free-boundary 12-6 Lennard-Jones for clusters.
-  ZBL          //!<  Screened nuclear repulsion (Ziegler-Biersack-Littmark).
+  ZBL,         //!<  Screened nuclear repulsion (Ziegler-Biersack-Littmark).
+  SWSi,        //!<  Stillinger-Weber silicon.
+  EDIP,        //!<  Environment-dependent interatomic potential (silicon).
+  LenoskySi,   //!<  Lenosky tight-binding-fit silicon.
+  TersoffSi,   //!<  Tersoff bond-order silicon.
+  EAMAl,       //!<  Double-exponential EAM aluminium.
+  FeHe,        //!<  Fe-He embedded atom with species-dependent terms.
+  WaterH       //!<  TIP4P water with an interacting hydrogen atom.
 };
 
 } // namespace rgpot
