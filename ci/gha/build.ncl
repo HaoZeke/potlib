@@ -71,6 +71,57 @@ let rpc_integration =
   }
 in
 
+let windows_meson_build_test =
+  S.run_bash m%"
+  set -euo pipefail
+  pixi run meson setup bbdir \
+    --native-file %{P.no_fortran_native_file} \
+    -Dwith_tests=true \
+    -Dwith_examples=false \
+    -Dwith_xtensor=false \
+    -Dwith_eigen=false \
+    -Dwith_rpc=false \
+    -Dwith_cache=false \
+    -Dpure_lib=true
+  pixi run meson compile -C bbdir
+  pixi run meson test -C bbdir --print-errorlogs
+"%
+  & { name = "Build & Test (Meson / MSVC)" }
+in
+
+let nodownload_export =
+  S.run_bash m%"
+  set -euo pipefail
+  rm -rf /tmp/rgpot-src
+  mkdir -p /tmp/rgpot-src
+  git archive HEAD | tar -x -C /tmp/rgpot-src
+  # A conda-forge source build sees exactly this: tracked files, no .git, no
+  # checked-out wrap subprojects.
+  test ! -e /tmp/rgpot-src/.git
+  test ! -e /tmp/rgpot-src/subprojects/fortcuh2
+"%
+  & { name = "Export tracked tree (git archive, no .git)" }
+in
+
+let nodownload_build_test =
+  S.run_pixi m%"
+  cd /tmp/rgpot-src
+  meson setup bb \
+    --wrap-mode=nodownload \
+    --native-file %{P.no_fortran_native_file} \
+    -Dwith_tests=true \
+    -Dwith_examples=false \
+    -Dwith_xtensor=false \
+    -Dwith_eigen=false \
+    -Dwith_rpc=false \
+    -Dwith_cache=false \
+    -Dpure_lib=true
+  meson compile -C bb
+  meson test -C bb --print-errorlogs
+"%
+  & { name = "Configure + build + test with --wrap-mode=nodownload" }
+in
+
 {
   name = "Build Matrix",
   on = S.on_main_pr,
@@ -99,6 +150,40 @@ in
       steps =
         [S.checkout_full, S.ensure_potctl, S.setup_pixi "devbld rpctest" "devbld", S.ccache_step_matrix_sys]
         @ [meson_build_test, cmake_build_test, rpc_integration],
+    },
+    # Single explicit Windows leg, deliberately NOT folded into the
+    # os x sys x rpc x cache matrix above (that would take 16 legs to 24).
+    # meson only, MSVC from the default pixi env (vs2022_win-64); no potctl
+    # artifact, since ci-tools builds ubuntu/macos only. Fortran off via the
+    # no-fortran native file: win-64 pixi ships flang, and the flang/CuH2 leg
+    # is scoped to the phase that folds fortcuh2 in-tree.
+    build_windows_meson = {
+      name = "meson / windows-latest [MSVC RPC:false CACHE:false]",
+      "runs-on" = P.windows,
+      steps = [
+        S.checkout_minimal,
+        S.setup_pixi_default "default",
+        windows_meson_build_test,
+      ],
+    },
+    # Offline rehearsal for the conda-forge source build: configure, build and
+    # test the `git archive` tree with --wrap-mode=nodownload, so the default
+    # feature set is proven to need no wrap subproject.
+    #
+    # Scope: fortran/CuH2 is excluded because subprojects/fortcuh2.wrap is a
+    # [wrap-git] entry, which nodownload cannot resolve and git archive does not
+    # carry. Folding fortcuh2 in-tree extends this job to the CuH2 potential.
+    # The remaining wraps stay unexercised by construction: eigen (with_eigen),
+    # xxhash (with_cache), potentials-schema (with_rpc), fmt (pure_lib).
+    nodownload_rehearsal = {
+      name = "offline tarball build (nodownload / ubuntu)",
+      "runs-on" = P.ubuntu,
+      steps = [
+        S.checkout_minimal,
+        S.setup_pixi_default "default",
+        nodownload_export,
+        nodownload_build_test,
+      ],
     },
     rust_tests = {
       needs = ["ci-tools"],

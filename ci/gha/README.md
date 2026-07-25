@@ -125,6 +125,11 @@ prek ∥ docs_snapper ∥ docs_lychee ∥ towncrier(PR) ∥ ci-tools
     ↓ (after ci-tools; skipped on schedule except docs_*)
 build_and_test ∥ rust_tests ∥ client_bridge_stress
   ∥ potentials_metatomic ∥ potentials_tight_binding
+  ∥ build_windows_meson ∥ nodownload_rehearsal   (need `prepare` only; no potctl)
+  (build_windows_meson: MSVC meson leg, fortran suppressed via
+   ci/gha/machines/no-fortran.ini so the fortcuh2 wrap-git is not pulled.
+   nodownload_rehearsal: `git archive` tree built with --wrap-mode=nodownload,
+   the conda-forge source-build rehearsal; same fortran exclusion.)
   (NWChemPot frontend/stub always; energy/grad need an external libnwchemc engine.)
     ↓
 ci_gate   ← single required-check aggregator

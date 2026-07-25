@@ -29,4 +29,8 @@
   # --- common runners ---
   ubuntu = "ubuntu-latest",
   macos = "macos-latest",
+  windows = "windows-latest",
+
+  # --- meson machine files (repo-relative; also present in `git archive` trees) ---
+  no_fortran_native_file = "ci/gha/machines/no-fortran.ini",
 }
