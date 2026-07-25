@@ -70,7 +70,10 @@ endif
 
 ptlrpc_dep = declare_dependency(
     link_with: ptlrpc,
-    sources: gen_rpc,
+    # Header only: listing the generated .cpp here would compile a second
+    # copy of the capnp translation unit into every consumer, and the
+    # convenience archives all link_whole into one librgpot.
+    sources: gen_rpc[1],
     include_directories: _incdirs,
     dependencies: _ptlrpc_extra_deps,
 )
