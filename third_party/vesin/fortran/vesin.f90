@@ -83,6 +83,7 @@ contains
         sorted,                             &
         algorithm,                          &
         n_threads,                          &
+        skin,                               &
         return_shifts,                      &
         return_distances,                   &
         return_vectors                      &
@@ -109,6 +110,11 @@ contains
         !! otherwise defaults to the number of available CPU cores.
         integer(c_int32_t), intent(in), optional :: n_threads
 
+        !> Skin size for Verlet caching. A positive value lets vesin build
+        !! the cached topology at `cutoff + skin` and reuse it until an atom
+        !! moves more than `skin / 2` from its cached reference position.
+        real(c_double), intent(in), optional :: skin
+
         !> Should the returned `VesinNeighborList` contain `shifts`?
         logical, intent(in), optional :: return_shifts
 
@@ -126,6 +132,7 @@ contains
         if (present(sorted)) self%options%sorted = sorted
         if (present(algorithm)) self%options%algorithm = algorithm
         if (present(n_threads)) self%options%n_threads = n_threads
+        if (present(skin)) self%options%skin = skin
         if (present(return_shifts)) self%options%return_shifts = return_shifts
         if (present(return_distances)) self%options%return_distances = return_distances
         if (present(return_vectors)) self%options%return_vectors = return_vectors
@@ -139,6 +146,7 @@ contains
         sorted,                             &
         algorithm,                          &
         n_threads,                          &
+        skin,                               &
         return_shifts,                      &
         return_distances,                   &
         return_vectors                      &
@@ -165,6 +173,11 @@ contains
         !! otherwise defaults to the number of available CPU cores.
         integer(c_int32_t), intent(in), optional :: n_threads
 
+        !> Skin size for Verlet caching. A positive value lets vesin build
+        !! the cached topology at `cutoff + skin` and reuse it until an atom
+        !! moves more than `skin / 2` from its cached reference position.
+        real(c_double), intent(in), optional :: skin
+
         !> Should the returned `VesinNeighborList` contain `shifts`?
         logical, intent(in), optional :: return_shifts
 
@@ -182,6 +195,7 @@ contains
             sorted,                             &
             algorithm,                          &
             n_threads,                          &
+            skin,                               &
             return_shifts,                      &
             return_distances,                   &
             return_vectors                      &

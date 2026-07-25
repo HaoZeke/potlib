@@ -38,6 +38,8 @@ module rgpot_neighbors
       integer(ip) :: natoms = 0_ip
       !> Cutoff the table was built at.
       real(wp), private :: cutoff = -1.0_wp
+      !> Verlet skin the calculator caches with.
+      real(wp), private :: skin = -1.0_wp
       !> Calculator kept across calls so vesin reuses its buffers.
       type(NeighborList), private :: nl
       logical, private :: nl_ready = .false.
@@ -53,7 +55,7 @@ contains
    !! `periodic` defaults to fully periodic. `status` is zero on success;
    !! on failure the table is left empty and `errmsg` describes the fault.
    subroutine neighbor_table_build(self, positions, cell, cutoff, status, &
-                                   errmsg, periodic)
+                                   errmsg, periodic, skin)
       class(neighbor_table_t), intent(inout) :: self
       real(wp), intent(in), contiguous :: positions(:, :)
       real(wp), intent(in) :: cell(3, 3)
@@ -61,8 +63,13 @@ contains
       integer, intent(out) :: status
       character(len=:), allocatable, intent(out) :: errmsg
       logical, intent(in), optional :: periodic(3)
+      !> Verlet skin handed to vesin, which then caches its topology
+      !! between calls and rebuilds only once an atom has moved more than
+      !! half of it. Defaults to a tenth of the cutoff.
+      real(wp), intent(in), optional :: skin
 
       logical :: pbc(3)
+      real(wp) :: use_skin
       integer :: vstatus, p, np
       integer(ip) :: i, j, natoms
       integer(ip), allocatable :: fill(:)
@@ -80,14 +87,20 @@ contains
       pbc = .true.
       if (present(periodic)) pbc = periodic
 
-      if (.not. self%nl_ready .or. self%cutoff /= cutoff) then
+      use_skin = 0.1_wp*cutoff
+      if (present(skin)) use_skin = skin
+
+      if (.not. self%nl_ready .or. self%cutoff /= cutoff &
+          .or. self%skin /= use_skin) then
          ! Release the previous calculator's C buffers before replacing it;
          ! within one cutoff the calculator is reused so vesin recycles them.
          if (self%nl_ready) call self%nl%free()
          self%nl = NeighborList(cutoff=cutoff, full=.true., sorted=.true., &
-                                return_distances=.true., return_vectors=.true.)
+                                skin=use_skin, return_distances=.true., &
+                                return_vectors=.true.)
          self%nl_ready = .true.
          self%cutoff = cutoff
+         self%skin = use_skin
       end if
 
       call self%nl%compute(positions, cell, periodic=pbc, status=vstatus)
