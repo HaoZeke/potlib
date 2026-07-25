@@ -391,7 +391,7 @@ contains
       character(len=:), allocatable, intent(out) :: errmsg
 
       type(cuh2_params_t) :: shifted
-      integer(ip) :: natoms, i
+      integer(ip) :: natoms, i, nentries
       integer(ip), allocatable :: species(:)
       real(wp), allocatable :: rho(:), dfdrho(:), e_pair(:), e_embed(:)
 
@@ -477,14 +477,14 @@ contains
       end do
    end subroutine classify
 
-   !> Decimal text of `value`, for error messages.
-   pure function count_text(value) result(text)
-      integer(ip), intent(in) :: value
+   !> Decimal text of `number`, for error messages.
+   function count_text(number) result(text)
+      integer(ip), intent(in) :: number
       character(len=:), allocatable :: text
 
       character(len=12) :: buffer
 
-      write (buffer, '(i0)') value
+      write (buffer, '(i0)') number
       text = trim(buffer)
    end function count_text
 

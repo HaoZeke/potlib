@@ -150,7 +150,8 @@ contains
       decay_a = exp(-par%density_decay_a*r)
       decay_b = par%density_weight_b*exp(-par%density_decay_b*r)
       sum_exp = decay_a + decay_b
-      sum_decayed_exp = par%density_decay_a*decay_a + par%density_decay_b*decay_b
+      sum_decayed_exp = par%density_decay_a*decay_a &
+                        + par%density_decay_b*decay_b
 
       drho = par%density_scale &
              *(real(par%density_power, wp)*r**(par%density_power - 1)*sum_exp &

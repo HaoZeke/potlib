@@ -64,6 +64,10 @@ program test_cuh2
    allocate (reversed(3, natoms), f_reversed(3, natoms))
    allocate (znum_reversed(natoms), znum_foreign(natoms))
 
+   if (maxval(probe) > natoms) then
+      error stop "test_cuh2: probe list outruns the atom count"
+   end if
+
    call cuh2_energy_forces(positions, znum, cell, par, table, energy, f0, &
                            status, errmsg)
    call require(status == 0, "energy/force evaluation failed", failed)
