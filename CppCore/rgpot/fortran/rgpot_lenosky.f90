@@ -254,7 +254,7 @@ contains
             rik = table%dist(sk)
             u_ik = table%vec(:, sk)/rik
             call triplet_gradients(u_ij, rij, u_ik, rik, grad_j, grad_k)
-            f_i = f_i + dudens(i)*(grad_j + grad_k)
+            f_i = f_i - dudens(i)*(grad_j + grad_k)
          end do
       end do
 
@@ -273,7 +273,7 @@ contains
             rmn = table%dist(sn)
             u_mn = table%vec(:, sn)/rmn
             call triplet_gradients(u_mi, rim, u_mn, rmn, grad_j, grad_k)
-            f_i = f_i - dudens(m)*grad_j
+            f_i = f_i + dudens(m)*grad_j
          end do
       end do
    end subroutine atom_contribution

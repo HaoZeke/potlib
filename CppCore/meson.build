@@ -53,8 +53,13 @@ if not get_option('with_rpc_client_only')
         # The kernel archive's symbols (module symbols and the bind(c)
         # entries) stay local to librgpot: only the C++ faces above are
         # part of the library's interface.
+        # vesin's Fortran interface is an implementation detail of the
+        # kernels and is hidden with them.
         _fortran_hide_args = cppc.get_supported_link_arguments(
-            ['-Wl,--exclude-libs,librgpot_fortran_kernels.a'],
+            [
+                '-Wl,--exclude-libs,librgpot_fortran_kernels.a',
+                '-Wl,--exclude-libs,libvesin_fortran.a',
+            ],
         )
 
         subdir('rgpot/CuH2')  # 'cuh2'
