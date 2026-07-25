@@ -223,6 +223,11 @@ if get_option('with_tests')
     ]
     # Classical pots live in the rgpotentials static libs, which client-only
     # builds never produce.
+    if not get_option('with_rpc_client_only') and has_fortran
+        test_array += [
+            ['FortranPotsTest', 'fortran_pots_test', 'FortranPotsTest.cc', ''],
+        ]
+    endif
     if not get_option('with_rpc_client_only')
         test_array += [
             ['MorsePotTest', 'morse_pot_test', 'MorsePotTest.cc', ''],
