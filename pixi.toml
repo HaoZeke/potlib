@@ -165,7 +165,7 @@ prek-validate = { cmd = "prek validate-config prek.toml", description = "Validat
 # potctl: cargo workspace member at potctl/; project CLI (release + CI helpers).
 release-potctl = { cmd = "cargo run -q -p potctl --", description = "rgpot project CLI. Usage: pixi r release-potctl -- release assert | ci preflight" }
 release-sync-versions = { cmd = "cargo run -q -p potctl -- release sync", description = "Lockstep version write. Usage: pixi r release-sync-versions -- 1.2.3" }
-release-assert-lockstep = { cmd = "cargo run -q -p potctl -- release assert", description = "Assert meson/cmake/cargo/towncrier/pixi agree. Optional version; --require-changelog" }
+release-assert-lockstep = { cmd = "cargo run -q -p potctl -- release assert", description = "Assert meson/cmake/cargo/towncrier/pixi/pyproject agree. Optional version; --require-changelog" }
 release-extract-changelog = { cmd = "cargo run -q -p potctl -- release notes", description = "Print CHANGELOG section. Usage: pixi r release-extract-changelog -- 1.2.0 -o /tmp/notes.md" }
 ci-preflight = { cmd = "cargo run -q -p potctl -- ci preflight", description = "Repo sanity + lockstep (CI first step parity)" }
 
