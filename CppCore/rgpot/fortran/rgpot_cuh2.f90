@@ -417,6 +417,17 @@ contains
       call table%build(positions, cell, shifted%rcut, status, errmsg)
       if (status /= 0) return
 
+      ! Every radial term divides by the pair distance, so a coincident
+      ! pair is reported rather than left to seed a NaN in the forces.
+      nentries = table%row(natoms + 1_ip) - 1_ip
+      if (nentries > 0_ip) then
+         if (minval(table%dist(1:nentries)) <= 0.0_wp) then
+            status = 3
+            errmsg = "rgpot_cuh2: two atoms occupy the same position"
+            return
+         end if
+      end if
+
       allocate (rho(natoms), dfdrho(natoms))
       allocate (e_pair(natoms), e_embed(natoms))
 

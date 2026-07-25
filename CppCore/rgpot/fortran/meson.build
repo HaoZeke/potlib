@@ -32,6 +32,8 @@ fortran_pots_sources = files(
     'rgpot_fehe_capi.f90',
     'rgpot_water_h.f90',
     'rgpot_water_h_capi.f90',
+    'rgpot_tersoff.f90',
+    'rgpot_tersoff_capi.f90',
 )
 
 # C++ faces over the bind(c) entries.
@@ -100,4 +102,13 @@ if get_option('with_tests')
         install: false,
     )
     test('FortranFeHeGather', test_fehe, timeout: 120)
+
+    test_tersoff = executable(
+        'test_tersoff',
+        'test_tersoff.f90',
+        dependencies: [fortran_pots_dep],
+        fortran_args: _fpot_args,
+        install: false,
+    )
+    test('FortranTersoffGather', test_tersoff, timeout: 180)
 endif

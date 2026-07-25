@@ -5,8 +5,8 @@
 !!
 !! Only `bind(c)` names leave this library; the physics module exports no
 !! external symbols of its own that C could collide with. The neighbour
-!! table lives here, saved across calls so vesin reuses its buffers, which
-!! is what the legacy skin-and-rebuild bookkeeping used to do by hand.
+!! table lives here, saved across calls so vesin reuses its buffers and
+!! tracks list staleness itself, in place of a hand-rolled skin radius.
 module rgpot_eam_al_capi
    use rgpot_kinds, only: wp, ip, c_double, c_int
    use rgpot_neighbors, only: neighbor_table_t
