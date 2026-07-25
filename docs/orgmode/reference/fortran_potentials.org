@@ -55,6 +55,19 @@ Energy reduces through a per-atom array rather than a shared
 accumulator, because ~do concurrent~ gained reduction clauses only in
 Fortran 2023.
 
+** What ~do concurrent~ actually buys
+
+Compilers are not obliged to run these iterations in parallel, and by
+default gfortran does not: without ~-ftree-parallelize-loops~ (or a
+compiler that maps the construct onto threads) it treats the construct as
+an assertion about independence. The assertion is still worth having.
+It licenses vectorisation, it documents the dependency structure for the
+next reader, and above all it forces the discipline that made the port
+correct: every procedure the loop body calls must be ~pure~, and every
+write must land in memory no other iteration touches. Turning the
+construct into real parallelism later is then a compiler flag rather than
+a rewrite.
+
 ** Cost
 
 A gather evaluates each pair twice (once from each end). For three-body
