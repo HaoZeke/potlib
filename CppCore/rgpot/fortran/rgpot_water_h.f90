@@ -146,14 +146,14 @@ contains
       real(wp), intent(in) :: de, beta, r_eq, r
       real(wp), intent(out) :: energy, dedr
 
-      real(wp) :: dr, single, double
+      real(wp) :: dr, decay, decay_squared
 
       dr = r - r_eq
-      single = exp(-beta*dr)
-      double = exp(-2.0_wp*beta*dr)
+      decay = exp(-beta*dr)
+      decay_squared = exp(-2.0_wp*beta*dr)
 
-      energy = de*(double - 2.0_wp*single)
-      dedr = -2.0_wp*beta*de*(double - single)
+      energy = de*(decay_squared - 2.0_wp*decay)
+      dedr = -2.0_wp*beta*de*(decay_squared - decay)
    end subroutine morse
 
    !> Energy and radial derivative of the lone H against one oxygen.

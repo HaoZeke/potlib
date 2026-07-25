@@ -26,6 +26,8 @@ fortran_pots_sources = files(
     'rgpot_sw_capi.f90',
     'rgpot_cuh2.f90',
     'rgpot_cuh2_capi.f90',
+    'rgpot_eam_al.f90',
+    'rgpot_eam_al_capi.f90',
 )
 
 # C++ faces over the bind(c) entries.
@@ -67,4 +69,13 @@ if get_option('with_tests')
         install: false,
     )
     test('FortranCuH2Gather', test_cuh2_gather, timeout: 120)
+
+    test_eam_al = executable(
+        'test_eam_al',
+        'test_eam_al.f90',
+        dependencies: [fortran_pots_dep],
+        fortran_args: _fpot_args,
+        install: false,
+    )
+    test('FortranEAMAlGather', test_eam_al, timeout: 120)
 endif
