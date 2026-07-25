@@ -97,8 +97,12 @@ if not get_option('with_rpc_client_only')
     # vesin objects and the Fortran runtime enter here, once, rather than
     # through the convenience archives (see the vesin_hdr_dep note).
     rgpot_deps = _deps_sans_core + [vesin_dep] + fortran_rt_deps
+    _rpc_whole = []
     if _rpc_stack
-        rgpot_deps += [ptlrpc_dep]
+        # link_whole, not link_with: the RPC entry points are called by
+        # consumers rather than by librgpot itself.
+        rgpot_deps += [ptlrpc_hdr_dep]
+        _rpc_whole += [ptlrpc]
     endif
     _rgpot_link_args = []
     if has_fortran
@@ -110,7 +114,7 @@ if not get_option('with_rpc_client_only')
         cpp_args: _args,
         link_args: _rgpot_link_args,
         include_directories: _incdirs,
-        link_whole: [rgpot_core] + _linkto,
+        link_whole: [rgpot_core] + _linkto + _rpc_whole,
         version: meson.project_version(),
         soversion: '2',
         install: not meson.is_subproject(),
@@ -148,9 +152,10 @@ endif
 if rpc_enabled and not get_option('with_rpc_client_only')
     server = executable(
         'potserv',
-        ['rgpot/rpc/server.cpp', gen_rpc],
+        ['rgpot/rpc/server.cpp'],
         link_with: [ptlrpc, _linkto],
-        dependencies: _deps + [capnp_rpc_dep, vesin_dep] + fortran_rt_deps,
+        dependencies: _deps + [capnp_rpc_dep, ptlrpc_hdr_dep, vesin_dep]
+        + fortran_rt_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_language: 'cpp',
@@ -557,7 +562,7 @@ if not meson.is_subproject()
         endif
     endif
     if _rpc_stack
-        _pc_libs += [nwchempot, cpmdpot, ptlrpc]
+        _pc_libs += [nwchempot, cpmdpot]
         _pc_requires += ['capnp-rpc']
         _pc_cflags += [
             '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',

@@ -54,13 +54,18 @@ gen_rpc = custom_target(
 # Use the target object itself for includes to ensure proper dependency tracking
 _incdirs += include_directories('.')
 
-ptlrpc = library(
+# Convenience archive, not a shipped shared object: the generated capnp
+# translation unit belongs inside the one librgpot SONAME, and a separate
+# libptlrpc.so would become a runtime dependency of every consumer that
+# links a QM frontend.
+ptlrpc = static_library(
     'ptlrpc',
     gen_rpc,
     dependencies: _deps + capnp_rpc_dep + [vesin_dep],
     cpp_args: _args,
     include_directories: _incdirs,
-    install: not meson.is_subproject(),
+    pic: true,
+    install: false,
 )
 
 _ptlrpc_extra_deps = [capnp_rpc_dep]
@@ -68,21 +73,26 @@ if host_machine.system() == 'windows'
     _ptlrpc_extra_deps += cppc.find_library('ws2_32')
 endif
 
-ptlrpc_dep = declare_dependency(
-    link_with: ptlrpc,
-    # Header only: listing the generated .cpp here would compile a second
-    # copy of the capnp translation unit into every consumer, and the
-    # convenience archives all link_whole into one librgpot.
+# Header only: listing the generated .cpp here would compile a second copy
+# of the capnp translation unit into every consumer, and the convenience
+# archives all link_whole into one librgpot. The archives take this view;
+# only final binaries take the objects through ptlrpc_dep below.
+ptlrpc_hdr_dep = declare_dependency(
     sources: gen_rpc[1],
     include_directories: _incdirs,
     dependencies: _ptlrpc_extra_deps,
 )
 
+ptlrpc_dep = declare_dependency(
+    link_with: ptlrpc,
+    dependencies: [ptlrpc_hdr_dep],
+)
+
 pot_bridge = library(
     'pot_client_bridge',
-    ['pot_bridge.cc', gen_rpc],
+    ['pot_bridge.cc'],
     link_with: ptlrpc,
-    dependencies: [capnp_rpc_dep],
+    dependencies: [capnp_rpc_dep, ptlrpc_hdr_dep],
     cpp_args: _args,
     # gen_rpc outputs live in the build dir; include it explicitly so
     # Potentials.capnp.h is found even when only pot_bridge.cc is compiled first.

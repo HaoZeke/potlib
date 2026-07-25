@@ -23,7 +23,7 @@ endif
 nwchempot = static_library(
     'nwchempot',
     'NWChemPot.cc',
-    dependencies: _deps + [nwchem_dl_dep, ptlrpc_dep],
+    dependencies: _deps + [nwchem_dl_dep, ptlrpc_hdr_dep],
     cpp_args: _args + nwchem_frontend_cpp_args,
     include_directories: _incdirs + [nwchem_inc],
     install: not meson.is_subproject(),
