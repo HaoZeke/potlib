@@ -32,6 +32,13 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
+  /// Native handles are per-instance; concurrent use needs one instance
+  /// per thread.
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.reentrancy = Reentrancy::PerInstance};
+  }
+
+
 private:
   TBLiteConfig m_config;
 

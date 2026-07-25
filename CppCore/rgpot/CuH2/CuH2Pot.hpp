@@ -16,7 +16,6 @@
 // clang-format on
 #include "rgpot/Potential.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
-using rgpot::types::AtomMatrix;
 
 /**
  * @brief C-linkage bridge to the Fortran EAM implementation.
@@ -53,6 +52,13 @@ public:
    * @return Void.
    */
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
+
+  /// Fortran kernel keeps state in module/COMMON storage: every
+  /// evaluation in the process must serialize.
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.reentrancy = Reentrancy::ProcessSerial};
+  }
+
 
 private:
   /**

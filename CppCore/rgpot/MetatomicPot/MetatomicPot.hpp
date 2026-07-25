@@ -41,6 +41,14 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
+  /// Internal mutex serializes the torch session, so a shared instance is
+  /// safe; multi-image callers still prefer clones for throughput.
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.reentrancy = Reentrancy::SharedInstance,
+            .perImageInstances = true};
+  }
+
+
 private:
   MetatomicConfig m_config;
 

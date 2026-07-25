@@ -2,6 +2,7 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 #include "ForceStructs.hpp"
+#include <atomic>
 #include <cstddef>
 
 /**
@@ -23,9 +24,14 @@ namespace rgpot {
  */
 template <typename T> class registry {
 public:
-  static size_t count;      //!< Total number of active instances.
-  static size_t forceCalls; //!< Global counter for force evaluations.
-  static T *head;           //!< Pointer to the head of the linked list.
+  /// Statistics counters are atomic: force evaluations run concurrently
+  /// from NEB image / dimer endpoint threads. The instance linked list is
+  /// NOT concurrency-safe — construct and destroy potentials from one
+  /// thread (setup paths), only evaluate them concurrently.
+  static std::atomic<size_t> count; //!< Total number of active instances.
+  static std::atomic<size_t>
+      forceCalls;   //!< Global counter for force evaluations.
+  static T *head;   //!< Pointer to the head of the linked list.
   T *prev;                  //!< Pointer to the previous instance in the list.
   T *next;                  //!< Pointer to the next instance in the list.
 
@@ -78,11 +84,13 @@ public:
    * @brief Increments the force call counter.
    * @return Void.
    */
-  static void incrementForceCalls() { ++forceCalls; }
+  static void incrementForceCalls() {
+    forceCalls.fetch_add(1, std::memory_order_relaxed);
+  }
 };
 
-template <typename T> size_t registry<T>::count = 0;
-template <typename T> size_t registry<T>::forceCalls = 0;
+template <typename T> std::atomic<size_t> registry<T>::count{0};
+template <typename T> std::atomic<size_t> registry<T>::forceCalls{0};
 template <typename T> T *registry<T>::head = nullptr;
 
 /**
