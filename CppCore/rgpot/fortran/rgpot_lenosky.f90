@@ -222,6 +222,13 @@ contains
    end subroutine triplet_gradients
 
    !> Pair energy owned by `i` and the whole force acting on it.
+   !!
+   !! Unit vectors follow the tabulated kernel's convention: they point
+   !! from the neighbour towards the atom whose density the term feeds,
+   !! which is the direction its spline derivatives were fitted against.
+   !! The table stores the opposite direction, so each one is negated at
+   !! the point of use. Cosines are unaffected, which is why the energy
+   !! survives the convention but the forces do not.
    pure subroutine atom_contribution(table, dudens, i, e_i, f_i)
       type(neighbor_table_t), intent(in) :: table
       real(wp), intent(in) :: dudens(:)
@@ -238,7 +245,7 @@ contains
 
       do sj = table%row(i), table%row(i + 1_ip) - 1_ip
          rij = table%dist(sj)
-         u_ij = table%vec(:, sj)/rij
+         u_ij = -table%vec(:, sj)/rij
 
          ! Pair term: half the energy, the whole force this pair exerts.
          call splint(sp_phi, cof_phi, dof_phi, rij, e_phi, ep_phi)
@@ -252,7 +259,7 @@ contains
          ! Own density, triplets centred here.
          do sk = sj + 1_ip, table%row(i + 1_ip) - 1_ip
             rik = table%dist(sk)
-            u_ik = table%vec(:, sk)/rik
+            u_ik = -table%vec(:, sk)/rik
             call triplet_gradients(u_ij, rij, u_ik, rik, grad_j, grad_k)
             f_i = f_i - dudens(i)*(grad_j + grad_k)
          end do
@@ -262,7 +269,7 @@ contains
       do sm = table%row(i), table%row(i + 1_ip) - 1_ip
          m = table%idx(sm)
          rim = table%dist(sm)
-         u_mi = -table%vec(:, sm)/rim
+         u_mi = table%vec(:, sm)/rim
 
          call splint(sp_rho, cof_rho, dof_rho, rim, rho, rhop)
          f_i = f_i + dudens(m)*u_mi*rhop
@@ -271,7 +278,7 @@ contains
             n = table%idx(sn)
             if (n == i) cycle
             rmn = table%dist(sn)
-            u_mn = table%vec(:, sn)/rmn
+            u_mn = -table%vec(:, sn)/rmn
             call triplet_gradients(u_mi, rim, u_mn, rmn, grad_j, grad_k)
             f_i = f_i + dudens(m)*grad_j
          end do
