@@ -117,7 +117,7 @@ jobs:
         run: |
           bash scripts/run_coverage_cpp.sh cpp_lcov.info
           test -s cpp_lcov.info
-          # fortcuh2 hits from the same tree (CuH2 tests link it)
+          # Fortran kernel hits from the same tree (the pot tests drive them)
           bash scripts/run_coverage_fortran.sh fortran_lcov.info || true
           ls -la cpp_lcov.info fortran_lcov.info 2>/dev/null || true
 
@@ -194,7 +194,7 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-  # Dedicated fortran path when cpp job skipped fortcuh2; no-op if already uploaded.
+  # Dedicated fortran path when the cpp job skipped the kernels; no-op if already uploaded.
   coverage-fortran:
     runs-on: ubuntu-22.04
     name: fortran coverage
@@ -213,11 +213,11 @@ jobs:
           environments: devbld
           activate-environment: true
 
-      - name: Generate fortcuh2 coverage
+      - name: Generate Fortran kernel coverage
         env:
           RGPOT_COV_BUILDDIR: bbdir-cov
         run: |
-          # Prefer full meson tree so CuH2 tests exercise fortcuh2.
+          # The meson tree is required: the kernels build inside it.
           if [[ ! -d bbdir-cov ]]; then
             bash scripts/run_coverage_cpp.sh /tmp/cpp_for_fort.info || true
           fi

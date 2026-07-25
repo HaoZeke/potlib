@@ -79,8 +79,8 @@ _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
 # linking the static convenience libs again would just duplicate symbols
 # into the extension.
 _py_link = [rgpot]
-# Do not link cuh2 into the pip extension (fortcuh2 subproject not in wheel
-# when install --skip-subprojects; LJ + metatomic dlopen are the product).
+# Do not link cuh2 into the pip extension: the umbrella already carries the
+# slab helpers, and LJ + metatomic dlopen are the product.
 
 dl_dep = dependency('dl', required: false)
 if not dl_dep.found()

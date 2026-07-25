@@ -47,6 +47,9 @@ if not get_option('with_rpc_client_only')
     subdir('rgpot/ZBL')  # 'zbl'
     rgpotentials += [zbl]
 
+    subdir('rgpot/CuH2')  # 'cuh2': slab-geometry helpers
+    rgpotentials += [cuh2]
+
     if has_fortran
         subdir('rgpot/fortran')  # Fortran 2018 pot kernels + C entry points
         rgpotentials += [fortran_pots, fortran_kernels]
@@ -61,9 +64,6 @@ if not get_option('with_rpc_client_only')
                 '-Wl,--exclude-libs,libvesin_fortran.a',
             ],
         )
-
-        subdir('rgpot/CuH2')  # 'cuh2'
-        rgpotentials += [cuh2]
     endif
 
     if has_xtb
@@ -244,11 +244,12 @@ if get_option('with_tests')
         test_array += [
             ['CuH2test', 'cuh2_test', 'CuH2PotTest.cc', ''],
         ]
-        if has_xtensor
-            test_array += [
-                ['CuH2 Utils Test', 'cuh2_util_test', 'cuh2UtilsTest.cc', ''],
-            ]
-        endif
+    endif
+    # Slab helpers are pure C++; only their xtensor faces are conditional.
+    if has_xtensor and not get_option('with_rpc_client_only')
+        test_array += [
+            ['CuH2 Utils Test', 'cuh2_util_test', 'cuh2UtilsTest.cc', ''],
+        ]
     endif
     if get_option('with_cache')
         test_array += [  #

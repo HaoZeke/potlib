@@ -153,8 +153,8 @@ in
     # os x sys x rpc x cache matrix above (that would take 16 legs to 24).
     # meson only, MSVC from the default pixi env (vs2022_win-64); no potctl
     # artifact, since ci-tools builds ubuntu/macos only. Fortran off via the
-    # no-fortran native file: win-64 pixi ships flang, and the flang/CuH2 leg
-    # is scoped to the phase that folds fortcuh2 in-tree.
+    # no-fortran native file: win-64 pixi ships flang, and the flang/MSVC
+    # kernel leg is a separate phase.
     build_windows_meson = {
       name = "meson / windows-latest [MSVC RPC:false CACHE:false]",
       "runs-on" = P.windows,
@@ -168,11 +168,11 @@ in
     # test the `git archive` tree with --wrap-mode=nodownload, so the default
     # feature set is proven to need no wrap subproject.
     #
-    # Scope: fortran/CuH2 is excluded because subprojects/fortcuh2.wrap is a
-    # [wrap-git] entry, which nodownload cannot resolve and git archive does not
-    # carry. Folding fortcuh2 in-tree extends this job to the CuH2 potential.
-    # The remaining wraps stay unexercised by construction: eigen (with_eigen),
-    # xxhash (with_cache), potentials-schema (with_rpc), fmt (pure_lib).
+    # Scope: the Fortran pot kernels are in-tree (CppCore/rgpot/fortran, vesin
+    # vendored under third_party), so this job builds them from the archived
+    # tree with no wrap involved. The wraps stay unexercised by construction:
+    # eigen (with_eigen), xxhash (with_cache), potentials-schema (with_rpc),
+    # fmt (pure_lib).
     nodownload_rehearsal = {
       name = "offline tarball build (nodownload / ubuntu)",
       "runs-on" = P.ubuntu,
