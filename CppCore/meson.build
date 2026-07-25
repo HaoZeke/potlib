@@ -396,6 +396,34 @@ if get_option('with_tests')
             install: false,
         )
     endif
+
+    # Pot microbenchmarks. Own binary, outside the default suite: the cases
+    # carry the hidden Catch2 tag pair "[.][benchmark]" and only run when the
+    # tag is requested, which `meson test --benchmark` does through args.
+    # LJPot lives in rgpot_core, absent from client-only builds.
+    if not get_option('with_rpc_client_only')
+        pot_bench_args = test_args
+        if has_fortran
+            pot_bench_args += ['-DRGPOT_BENCH_CUH2']
+        endif
+        pot_bench = executable(
+            'pot_bench',
+            sources: ['tests/PotBench.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: pot_bench_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+        benchmark(
+            'pot_bench',
+            pot_bench,
+            args: ['[benchmark]'],
+            workdir: meson.source_root(),
+            timeout: 300,
+        )
+    endif
 endif
 
 # ------------------------ Install / pkg-config for eOn and other consumers
