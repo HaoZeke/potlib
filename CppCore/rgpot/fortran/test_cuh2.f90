@@ -50,8 +50,8 @@ program test_cuh2
    real(wp) :: cell(3, 3), energy, shifted_energy, reversed_energy
    real(wp), allocatable :: positions(:, :), forces(:, :), f0(:, :)
    real(wp), allocatable :: moved(:, :), reversed(:, :), f_reversed(:, :)
-   integer(ip), allocatable :: znum(:), znum_reversed(:)
-   real(wp) :: net(3), e_plus, e_minus, numeric, worst, worst_perm
+   integer(ip), allocatable :: znum(:), znum_reversed(:), znum_foreign(:)
+   real(wp) :: net(3), e_plus, e_minus, numeric, worst, worst_perm, e_foreign
    integer :: status, k, atom, comp, i
    character(len=:), allocatable :: errmsg
    logical :: failed
@@ -62,7 +62,7 @@ program test_cuh2
                         positions, znum, cell)
    allocate (forces(3, natoms), f0(3, natoms), moved(3, natoms))
    allocate (reversed(3, natoms), f_reversed(3, natoms))
-   allocate (znum_reversed(natoms))
+   allocate (znum_reversed(natoms), znum_foreign(natoms))
 
    call cuh2_energy_forces(positions, znum, cell, par, table, energy, f0, &
                            status, errmsg)
@@ -125,11 +125,12 @@ program test_cuh2
                 failed)
 
    ! An atomic number outside {29, 1} is refused rather than guessed at.
-   znum_reversed = znum
-   znum_reversed(3) = 26_ip
-   call cuh2_energy_forces(positions, znum_reversed, cell, par, table, &
-                           reversed_energy, forces, status, errmsg)
+   znum_foreign = znum
+   znum_foreign(3) = 26_ip
+   call cuh2_energy_forces(positions, znum_foreign, cell, par, table, &
+                           e_foreign, forces, status, errmsg)
    call require(status /= 0, "a foreign species was accepted", failed)
+   call require(len(errmsg) > 0, "a foreign species carried no message", failed)
 
    if (failed) then
       error stop "test_cuh2: failures above"

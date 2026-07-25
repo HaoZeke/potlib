@@ -165,3 +165,37 @@ TEST_CASE("Fortran potentials report process-serial reentrancy",
   REQUIRE(rgpot::fortranpots::FeHePot{}.caps().reentrancy ==
           rgpot::Reentrancy::ProcessSerial);
 }
+
+TEST_CASE("Ported CuH2 reproduces the legacy kernel exactly",
+          "[fortran][cuh2]") {
+  // Geometry, energy, and forces from CuH2PotTest, which pins the
+  // fortcuh2 kernel this port replaces.
+  const AtomMatrix positions{
+      {0.63940268750835, 0.90484742551374, 6.97516498544584}, // Cu
+      {3.19652040936288, 0.90417430354811, 6.97547796369474}, // Cu
+      {8.98363230369760, 9.94703496017833, 7.83556854923689}, // H
+      {7.64080177576300, 9.94703114803832, 7.83556986121272}  // H
+  };
+  const std::vector<int> types{29, 29, 1, 1};
+  const std::array<std::array<double, 3>, 3> box{{{15.345599999999999, 0, 0},
+                                                  {0, 21.702000000000002, 0},
+                                                  {0, 0, 100.0}}};
+
+  rgpot::fortranpots::CuH2FortranPot pot;
+  auto [energy, forces, variance] = pot(positions, types, box);
+  (void)variance;
+
+  const AtomMatrix expected{
+      {1.4919411183978113, -3.9273058476626193E-004, 1.8260603127768336E-004},
+      {-1.4919411183978113, 3.9273058476626193E-004, -1.8260603127768336E-004},
+      {-4.9118653085630006, -1.3944215503304855E-005, 4.7990036210569753E-006},
+      {4.9118653085630006, 1.3944215503304855E-005, -4.7990036210569753E-006}};
+
+  REQUIRE_THAT(energy, Catch::Matchers::WithinAbs(-2.7114096242662238, 1e-6));
+  for (size_t i = 0; i < forces.rows(); ++i) {
+    for (size_t j = 0; j < forces.cols(); ++j) {
+      REQUIRE_THAT(forces(i, j),
+                   Catch::Matchers::WithinAbs(expected(i, j), 1e-6));
+    }
+  }
+}
