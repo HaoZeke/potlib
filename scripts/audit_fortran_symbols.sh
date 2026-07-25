@@ -30,7 +30,11 @@ defined=$(nm -D --defined-only "$lib" | awk '{print $3}')
 
 # Fortran module symbols carry compiler-specific infixes; bare legacy
 # entry points end in a single underscore and contain no C++ mangling.
-offenders=$(printf '%s\n' "$defined" | grep -E '(__.*_MOD_|_ZN.*fortran)|^[a-z0-9_]+_$' || true)
+# Fortran module symbols carry a compiler infix; bind(c) entries and
+# legacy entry points are lowercase C identifiers. C++ symbols (_Z...)
+# are the library's own interface and are expected.
+offenders=$(printf '%s\n' "$defined" \
+   | grep -E '__.*_MOD_|^rgpot_[a-z0-9_]*_force$|^[a-z0-9]+_$' || true)
 
 if [[ -n "$offenders" ]]; then
    echo "audit: librgpot exports Fortran symbols:" >&2

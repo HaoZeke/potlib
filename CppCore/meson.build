@@ -49,7 +49,13 @@ if not get_option('with_rpc_client_only')
 
     if has_fortran
         subdir('rgpot/fortran')  # Fortran 2018 pot kernels + C entry points
-        rgpotentials += [fortran_pots]
+        rgpotentials += [fortran_pots, fortran_kernels]
+        # The kernel archive's symbols (module symbols and the bind(c)
+        # entries) stay local to librgpot: only the C++ faces above are
+        # part of the library's interface.
+        _fortran_hide_args = cppc.get_supported_link_arguments(
+            ['-Wl,--exclude-libs,librgpot_fortran_kernels.a'],
+        )
 
         subdir('rgpot/CuH2')  # 'cuh2'
         rgpotentials += [cuh2]
@@ -87,10 +93,15 @@ if not get_option('with_rpc_client_only')
     if _rpc_stack
         rgpot_deps += [ptlrpc_dep]
     endif
+    _rgpot_link_args = []
+    if has_fortran
+        _rgpot_link_args += _fortran_hide_args
+    endif
     rgpot = library(
         'rgpot',
         dependencies: rgpot_deps,
         cpp_args: _args,
+        link_args: _rgpot_link_args,
         include_directories: _incdirs,
         link_whole: [rgpot_core] + _linkto,
         version: meson.project_version(),

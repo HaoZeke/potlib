@@ -33,7 +33,11 @@ program test_tersoff
    real(wp), parameter :: tol_force = 1.0e-6_wp
    real(wp), parameter :: tol_sum = 1.0e-9_wp
    real(wp), parameter :: tol_energy = 1.0e-9_wp
-   real(wp), parameter :: delta = 5.0e-6_wp
+   !> Balanced against both cells: the step is large enough that the
+   !! cancellation inside `g(cos theta)`, which subtracts two terms of
+   !! order 1e7 to leave one of order 1e3, stays well below the tolerance,
+   !! and small enough that the taper's jump in curvature does too.
+   real(wp), parameter :: delta = 1.0e-5_wp
 
    type(tersoff_params_t) :: par
    type(neighbor_table_t) :: table
