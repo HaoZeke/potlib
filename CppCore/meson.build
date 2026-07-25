@@ -48,6 +48,9 @@ if not get_option('with_rpc_client_only')
     rgpotentials += [zbl]
 
     if has_fortran
+        subdir('rgpot/fortran')  # Fortran 2018 pot kernels + C entry points
+        rgpotentials += [fortran_pots]
+
         subdir('rgpot/CuH2')  # 'cuh2'
         rgpotentials += [cuh2]
     endif

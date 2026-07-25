@@ -47,6 +47,10 @@ else
         required: _fortran_pots_opt.enabled(),
     )
 endif
+fc = disabler()
+if has_fortran
+    fc = meson.get_compiler('fortran')
+endif
 
 rpc_enabled = get_option('with_rpc') or get_option('with_rpc_client_only')
 
