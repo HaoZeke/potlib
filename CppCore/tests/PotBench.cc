@@ -22,7 +22,10 @@
 #include <catch2/catch_all.hpp>
 
 #include "rgpot/ForceStructs.hpp"
+#include "rgpot/LennardJones/LJClusterPot.hpp"
 #include "rgpot/LennardJones/LJPot.hpp"
+#include "rgpot/Morse/MorsePot.hpp"
+#include "rgpot/ZBL/ZBLPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
 #ifdef RGPOT_BENCH_CUH2
@@ -49,10 +52,14 @@ constexpr double kWarmOffset = 500.0;
 constexpr double kOperatorOffset = 900.0;
 constexpr double kWarmAmplitude = 0.02; // per-atom, well inside skin/2
 
+// ZBL truncates at 2.5 A, shorter than the nearest-neighbour distance of the
+// 32 A lattice, so its case packs the same atom count into a denser cube.
+constexpr double kDenseBoxSide = 12.0;
+
 /// Analytic FCC lattice filling the cube, with a deterministic sub-angstrom
 /// modulation so no two pair distances coincide exactly.
-std::vector<double> fccPositions() {
-  const double a = kBoxSide / static_cast<double>(kCellsPerSide);
+std::vector<double> fccPositions(double side = kBoxSide) {
+  const double a = side / static_cast<double>(kCellsPerSide);
   static const double basis[4][3] = {
       {0.0, 0.0, 0.0}, {0.0, 0.5, 0.5}, {0.5, 0.0, 0.5}, {0.5, 0.5, 0.0}};
   std::vector<double> R;
@@ -103,10 +110,11 @@ void wobble(const std::vector<double> &src, double offsetX, int step,
   }
 }
 
-double evalLJ(const rgpot::LJPot &pot, const std::vector<double> &pos,
-              const std::vector<int> &types, const std::array<double, 9> &box,
-              std::vector<double> &forces) {
-  rgpot::ForceInput fi{.nAtoms = kNAtoms,
+template <typename Pot>
+double evalPot(const Pot &pot, const std::vector<double> &pos,
+               const std::vector<int> &types, const std::array<double, 9> &box,
+               std::vector<double> &forces) {
+  rgpot::ForceInput fi{.nAtoms = pos.size() / 3,
                        .pos = pos.data(),
                        .atmnrs = types.data(),
                        .box = box.data()};
@@ -134,7 +142,7 @@ TEST_CASE("Benchmark: LJPot force, cold pair list", "[.][benchmark][ljpot]") {
     const double offset =
         static_cast<double>(step++ % kColdCycle) * kColdStride;
     translate(base, offset, pos);
-    return evalLJ(pot, pos, types, box, forces);
+    return evalPot(pot, pos, types, box, forces);
   };
 }
 
@@ -151,12 +159,12 @@ TEST_CASE("Benchmark: LJPot force, warm pair list", "[.][benchmark][ljpot]") {
   // phantom reference, the second captures the candidate list at cutoff+skin.
   for (int warmup = 0; warmup < 3; ++warmup) {
     wobble(base, kWarmOffset, step++, pos);
-    evalLJ(pot, pos, types, box, forces);
+    evalPot(pot, pos, types, box, forces);
   }
 
   BENCHMARK("LJ force, 500 atoms, pair list hit") {
     wobble(base, kWarmOffset, step++, pos);
-    return evalLJ(pot, pos, types, box, forces);
+    return evalPot(pot, pos, types, box, forces);
   };
 }
 
@@ -181,6 +189,73 @@ TEST_CASE("Benchmark: LJPot force via operator()",
   BENCHMARK("LJ operator(), 500 atoms, pair list hit") {
     auto [energy, forces, variance] = pot(positions, types, box);
     return energy;
+  };
+}
+
+TEST_CASE("Benchmark: MorsePot force, warm pair list",
+          "[.][benchmark][morse]") {
+  const auto base = fccPositions();
+  const std::vector<int> types(kNAtoms, kAtomicNumber);
+  const auto box = cubicBox(kBoxSide);
+  std::vector<double> pos(base.size());
+  std::vector<double> forces(base.size(), 0.0);
+  rgpot::MorsePot pot;
+  int step = 0;
+
+  for (int warmup = 0; warmup < 3; ++warmup) {
+    wobble(base, kWarmOffset, step++, pos);
+    evalPot(pot, pos, types, box, forces);
+  }
+
+  BENCHMARK("Morse force, 500 atoms, pair list hit") {
+    wobble(base, kWarmOffset, step++, pos);
+    return evalPot(pot, pos, types, box, forces);
+  };
+}
+
+TEST_CASE("Benchmark: LJClusterPot force, warm pair list",
+          "[.][benchmark][ljcluster]") {
+  const auto base = fccPositions();
+  const std::vector<int> types(kNAtoms, kAtomicNumber);
+  const auto box = cubicBox(kBoxSide);
+  std::vector<double> pos(base.size());
+  std::vector<double> forces(base.size(), 0.0);
+  rgpot::LJClusterPot pot;
+  int step = 0;
+
+  // Free boundaries: the lattice is a finite block here, not a periodic
+  // crystal, so the pair count sits below the LJPot case at equal N.
+  for (int warmup = 0; warmup < 3; ++warmup) {
+    wobble(base, kWarmOffset, step++, pos);
+    evalPot(pot, pos, types, box, forces);
+  }
+
+  BENCHMARK("LJCluster force, 500 atoms, pair list hit") {
+    wobble(base, kWarmOffset, step++, pos);
+    return evalPot(pot, pos, types, box, forces);
+  };
+}
+
+TEST_CASE("Benchmark: ZBLPot force, warm pair list", "[.][benchmark][zbl]") {
+  const auto base = fccPositions(kDenseBoxSide);
+  std::vector<int> types(kNAtoms, 14);
+  for (std::size_t i = 1; i < kNAtoms; i += 2) {
+    types[i] = 79; // two species exercise the pair-coefficient tables
+  }
+  const auto box = cubicBox(kDenseBoxSide);
+  std::vector<double> pos(base.size());
+  std::vector<double> forces(base.size(), 0.0);
+  rgpot::ZBLPot pot;
+  int step = 0;
+
+  for (int warmup = 0; warmup < 3; ++warmup) {
+    wobble(base, kWarmOffset, step++, pos);
+    evalPot(pot, pos, types, box, forces);
+  }
+
+  BENCHMARK("ZBL force, 500 atoms, pair list hit") {
+    wobble(base, kWarmOffset, step++, pos);
+    return evalPot(pot, pos, types, box, forces);
   };
 }
 

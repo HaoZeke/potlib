@@ -38,8 +38,14 @@ if not get_option('with_rpc_client_only')
     _deps += declare_dependency(link_with: rgpot_core)
 
     # Implemented rgpotentials
-    subdir('rgpot/LennardJones')  # 'lennard_jones'
+    subdir('rgpot/LennardJones')  # 'lennard_jones': LJPot + LJClusterPot
     rgpotentials = [lennard_jones]
+
+    subdir('rgpot/Morse')  # 'morse'
+    rgpotentials += [morse]
+
+    subdir('rgpot/ZBL')  # 'zbl'
+    rgpotentials += [zbl]
 
     if has_fortran
         subdir('rgpot/CuH2')  # 'cuh2'
@@ -175,6 +181,20 @@ if get_option('with_tests')
     test_array = [
         ['UnitsTest', 'units_test', 'UnitsTest.cc', ''],
     ]
+    # Classical pots live in the rgpotentials static libs, which client-only
+    # builds never produce.
+    if not get_option('with_rpc_client_only')
+        test_array += [
+            ['MorsePotTest', 'morse_pot_test', 'MorsePotTest.cc', ''],
+            [
+                'LJClusterPotTest',
+                'ljcluster_pot_test',
+                'LJClusterPotTest.cc',
+                '',
+            ],
+            ['ZBLPotTest', 'zbl_pot_test', 'ZBLPotTest.cc', ''],
+        ]
+    endif
     if has_fortran
         test_array += [
             ['CuH2test', 'cuh2_test', 'CuH2PotTest.cc', ''],

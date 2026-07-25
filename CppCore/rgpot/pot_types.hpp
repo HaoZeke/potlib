@@ -31,7 +31,10 @@ enum class PotType {
   TBLite,      //!<  GFN tight-binding via tblite (GFN1/GFN2/IPEA1).
   Metatomic,   //!<  ML atomistic models via metatomic/PyTorch.
   NWChem,      //!<  QM via runtime-loaded NWChem C ABI engine.
-  CPMD         //!<  PW-DFT via runtime-loaded CPMD C ABI engine.
+  CPMD,        //!<  PW-DFT via runtime-loaded CPMD C ABI engine.
+  Morse,       //!<  Pairwise Morse potential (platinum parameters).
+  LJCluster,   //!<  Free-boundary 12-6 Lennard-Jones for clusters.
+  ZBL          //!<  Screened nuclear repulsion (Ziegler-Biersack-Littmark).
 };
 
 } // namespace rgpot
