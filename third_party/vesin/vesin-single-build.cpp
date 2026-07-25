@@ -2508,3 +2508,27 @@ extern "C" void vesin_free(VesinNeighborList* neighbors) {
 
     std::memset(neighbors, 0, sizeof(VesinNeighborList));
 }
+
+// eOn extension (upstream candidate); see vesin.h.
+extern "C" int vesin_neighbors_byref(
+    const double (*points)[3],
+    size_t n_points,
+    const double box[3][3],
+    const bool periodic[3],
+    const VesinDevice* device,
+    const struct VesinOptions* options,
+    struct VesinNeighborList* neighbors,
+    const char** error_message
+) {
+    if (device == nullptr || options == nullptr) {
+        if (error_message != nullptr) {
+            *error_message = "device and options must not be NULL";
+        }
+        return EXIT_FAILURE;
+    }
+
+    return vesin_neighbors(
+        points, n_points, box, periodic,
+        *device, *options, neighbors, error_message
+    );
+}

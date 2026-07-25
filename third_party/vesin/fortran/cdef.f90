@@ -10,6 +10,7 @@ module vesin_c
     public :: VesinOptions
     public :: VesinNeighborList
     public :: vesin_neighbors
+    public :: vesin_neighbors_byref
     public :: vesin_free
 
     !> Device type on which the data can be
@@ -171,6 +172,54 @@ module vesin_c
             integer(c_int)             :: status
 
         end function vesin_neighbors
+    end interface
+
+    !> `vesin_neighbors` with `device` and `options` taken by reference.
+    !!
+    !! LLVM Flang cannot pass a by-value BIND(C) derived type on the x86_64
+    !! MSVC target, so the high-level interface binds here instead.
+    interface
+        function vesin_neighbors_byref(&
+            points,        &
+            n_points,      &
+            box,           &
+            periodic,      &
+            device,        &
+            options,       &
+            neighbors,     &
+            error_message  &
+        ) result(status) bind(c, name="vesin_neighbors_byref")
+            import:: c_double, c_size_t, c_bool, c_ptr, c_int
+            import:: VesinDevice, VesinOptions, VesinNeighborList
+
+            !> Number of elements in the `points` array
+            integer(c_size_t), value   :: n_points
+
+            !> Positions of all points in the system;
+            real(c_double), intent(in) :: points(3, n_points)
+
+            !> Bounding box for the system, one vector per column.
+            real(c_double), intent(in) :: box(3,3)
+
+            !> Periodic boundary conditions, one flag per dimension.
+            logical(c_bool)            :: periodic(3)
+
+            !> Device where the `points` and `box` data is allocated.
+            type(VesinDevice), intent(in)  :: device
+
+            !> Options for the calculation
+            type(VesinOptions), intent(in) :: options
+
+            !> Storage for the computed list of neighbors.
+            type(VesinNeighborList)    :: neighbors
+
+            !> Null-terminated `char*` with the error message, if any.
+            type(c_ptr), intent(in)    :: error_message
+
+            !> Non-zero integer upon error; zero otherwise.
+            integer(c_int)             :: status
+
+        end function vesin_neighbors_byref
     end interface
 
     !> Free all allocated memory inside a `VesinNeighborList`, according to it's

@@ -5,7 +5,7 @@
 module vesin
     use, intrinsic :: iso_c_binding
     use vesin_c, only: VesinOptions, VesinNeighborList, VesinDevice, &
-                       vesin_neighbors, vesin_free, &
+                       vesin_neighbors_byref, vesin_free, &
                        VesinUnknownDevice, VesinCPU, VesinCUDA, &
                        VesinAutoAlgorithm, VesinBruteForce, VesinCellList
     implicit none
@@ -13,7 +13,7 @@ module vesin
     private
     public :: NeighborList
     ! mark everything from vesin_c private
-    private :: VesinOptions, VesinNeighborList, vesin_neighbors, vesin_free
+    private :: VesinOptions, VesinNeighborList, vesin_neighbors_byref, vesin_free
 
     ! Except the things that a user could need
     public :: VesinAutoAlgorithm, VesinBruteForce, VesinCellList
@@ -224,6 +224,7 @@ contains
 
         integer :: points_shape(2)
         logical(c_bool) :: c_periodic(3)
+        type(VesinDevice) :: c_device
         type(c_ptr) :: c_errmsg = c_null_ptr
 
         self%errmsg = ""
@@ -243,12 +244,14 @@ contains
             return
         end if
 
-        status = int(vesin_neighbors(           &
+        c_device = VesinDevice(VesinCPU, 0)
+
+        status = int(vesin_neighbors_byref(     &
             points,                             &
             int(points_shape(2), c_size_t),     &
             box,                                &
             c_periodic,                         &
-            VesinDevice(VesinCPU, 0),           &
+            c_device,                           &
             self%options,                       &
             self%c_neighbors,                   &
             c_errmsg                            &

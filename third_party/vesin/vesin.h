@@ -236,6 +236,24 @@ int VESIN_API vesin_neighbors_visit(
     const char** error_message
 );
 
+/// `vesin_neighbors` with `device` and `options` taken by pointer.
+///
+/// The Fortran interface binds to this entry point: LLVM Flang rejects a
+/// by-value BIND(C) derived type on the x86_64 MSVC target
+/// ("not yet implemented: passing VALUE BIND(C) derived type"). Semantics
+/// are otherwise identical to `vesin_neighbors`. eOn extension (upstream
+/// candidate).
+int VESIN_API vesin_neighbors_byref(
+    const double (*points)[3],
+    size_t n_points,
+    const double box[3][3],
+    const bool periodic[3],
+    const VesinDevice* device,
+    const struct VesinOptions* options,
+    struct VesinNeighborList* neighbors,
+    const char** error_message
+);
+
 #ifdef __cplusplus
 
 } // extern "C"
