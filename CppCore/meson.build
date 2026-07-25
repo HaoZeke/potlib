@@ -94,6 +94,15 @@ if not get_option('with_rpc_client_only')
         soversion: '2',
         install: not meson.is_subproject(),
     )
+
+    # Subproject consumers (eOn's wrap fallback) take the umbrella through
+    # this variable; pkg-config consumers get the same surface from
+    # rgpot.pc.
+    rgpot_dep = declare_dependency(
+        link_with: rgpot,
+        dependencies: rgpot_deps,
+        include_directories: _incdirs,
+    )
 endif
 
 # Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
