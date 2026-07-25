@@ -72,10 +72,12 @@ fortran_pots_dep = declare_dependency(
     dependencies: [vesin_f_dep],
 )
 
-# Fortran-only test programs link the kernels directly.
+# Fortran-only test programs link the kernels directly. These are leaf
+# executables, so they take the vesin objects themselves rather than the
+# headers-only view the convenience archives use.
 fortran_kernels_dep = declare_dependency(
     link_with: fortran_kernels,
-    dependencies: [vesin_f_dep],
+    dependencies: [vesin_f_dep, vesin_dep],
 )
 
 # Physics checks that run without the C++ stack: a failure here points at

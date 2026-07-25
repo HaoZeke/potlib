@@ -41,7 +41,7 @@ xtb_engine = library(
         'XTBPot.cc',
         'XTBEngineAbi.cc',
     ],
-    dependencies: _deps,
+    dependencies: _deps + [vesin_dep],
     cpp_args: _args + ['-DRGPOT_XTB_ENGINE_BUILD'],
     include_directories: _incdirs + [xtb_inc],
     install: not meson.is_subproject(),

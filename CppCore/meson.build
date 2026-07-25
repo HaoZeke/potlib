@@ -94,7 +94,9 @@ if not get_option('with_rpc_client_only')
     # Create the umbrella library: every pot and the core ship inside one
     # versioned SONAME. link_whole keeps all symbols even where nothing in
     # librgpot itself references them (consumers do).
-    rgpot_deps = _deps_sans_core
+    # vesin objects and the Fortran runtime enter here, once, rather than
+    # through the convenience archives (see the vesin_hdr_dep note).
+    rgpot_deps = _deps_sans_core + [vesin_dep] + fortran_rt_deps
     if _rpc_stack
         rgpot_deps += [ptlrpc_dep]
     endif
@@ -148,7 +150,7 @@ if rpc_enabled and not get_option('with_rpc_client_only')
         'potserv',
         ['rgpot/rpc/server.cpp', gen_rpc],
         link_with: [ptlrpc, _linkto],
-        dependencies: _deps + [capnp_rpc_dep],
+        dependencies: _deps + [capnp_rpc_dep, vesin_dep] + fortran_rt_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_language: 'cpp',
@@ -187,7 +189,7 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
             executable(
                 example.get(1),
                 sources: ['examples/' + example.get(2)],
-                dependencies: _deps,
+                dependencies: _deps + [vesin_dep] + fortran_rt_deps,
                 link_with: _linkto,
                 cpp_args: _args,
             ),
@@ -199,7 +201,7 @@ endif
 # ------------------------ Tests
 
 if get_option('with_tests')
-    test_deps = _deps
+    test_deps = _deps + [vesin_dep] + fortran_rt_deps
     test_deps += dependency(
         'Catch2',
         method: 'cmake',

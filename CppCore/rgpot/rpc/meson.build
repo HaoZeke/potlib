@@ -57,7 +57,7 @@ _incdirs += include_directories('.')
 ptlrpc = library(
     'ptlrpc',
     gen_rpc,
-    dependencies: _deps + capnp_rpc_dep,
+    dependencies: _deps + capnp_rpc_dep + [vesin_dep],
     cpp_args: _args,
     include_directories: _incdirs,
     install: not meson.is_subproject(),

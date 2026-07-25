@@ -79,6 +79,11 @@ endif
 # local patches maintained as vesin upstream candidates.
 vesin_threads_dep = dependency('threads')
 vesin_dep = dependency('vesin', version: '>=0.6', required: false)
+# vesin_hdr_dep carries compile information only. Meson copies the objects
+# of a static library into every static library that links it, so the
+# convenience archives that link_whole into librgpot must see headers
+# alone; the objects enter the umbrella once through vesin_dep.
+vesin_hdr_dep = vesin_dep
 if not vesin_dep.found()
     vesin_int = static_library(
         'vesin_internal',
@@ -89,16 +94,19 @@ if not vesin_dep.found()
         cpp_args: cppc.get_supported_arguments(['-fvisibility=hidden']),
         pic: true,
     )
-    vesin_dep = declare_dependency(
-        link_with: vesin_int,
+    vesin_hdr_dep = declare_dependency(
         dependencies: [vesin_threads_dep],
         include_directories: include_directories('third_party/vesin'),
+    )
+    vesin_dep = declare_dependency(
+        link_with: vesin_int,
+        dependencies: [vesin_hdr_dep],
     )
     message('vesin: vendored third_party/vesin')
 else
     message('vesin: system / pkg-config')
 endif
-_deps += vesin_dep
+_deps += vesin_hdr_dep
 
 # vesin Fortran interface, vendored at the same version. Fortran pots take
 # `use vesin` through vesin_f_dep (.mod directory propagated).
@@ -110,14 +118,39 @@ if has_fortran
             'third_party/vesin/fortran/cdef.f90',
             'third_party/vesin/fortran/vesin.f90',
         ],
-        dependencies: vesin_dep,
+        dependencies: vesin_hdr_dep,
         pic: true,
     )
     vesin_f_dep = declare_dependency(
         link_with: vesin_fortran_lib,
-        dependencies: vesin_dep,
+        dependencies: vesin_hdr_dep,
         include_directories: vesin_fortran_lib.private_dir_include(),
     )
+endif
+
+# Fortran runtime for the umbrella. librgpot is a C++ target that takes the
+# kernels through link_whole, which leaves meson no Fortran source of its
+# own to infer the runtime from.
+fortran_rt_deps = []
+if has_fortran
+    _fc = meson.get_compiler('fortran')
+    _fc_id = _fc.get_id()
+    _fc_rt_names = []
+    if _fc_id == 'gcc'
+        _fc_rt_names = ['gfortran']
+    elif _fc_id == 'llvm-flang' or _fc_id == 'flang'
+        _fc_rt_names = ['flang_rt.runtime', 'FortranRuntime', 'flang']
+    elif _fc_id == 'intel-llvm' or _fc_id == 'intel'
+        _fc_rt_names = ['ifcoremt']
+    endif
+    foreach _n : _fc_rt_names
+        _rt = _fc.find_library(_n, required: false)
+        if _rt.found()
+            fortran_rt_deps += _rt
+            message('fortran runtime: -l' + _n)
+            break
+        endif
+    endforeach
 endif
 
 # --------------------- Optional dependencies
