@@ -36,6 +36,8 @@ fortran_pots_sources = files(
     'rgpot_tersoff_capi.f90',
     'rgpot_edip.f90',
     'rgpot_edip_capi.f90',
+    'rgpot_lenosky.f90',
+    'rgpot_lenosky_capi.f90',
 )
 
 # C++ faces over the bind(c) entries.
@@ -141,4 +143,13 @@ if get_option('with_tests')
         install: false,
     )
     test('FortranEDIPGather', test_edip, timeout: 180)
+
+    test_lenosky = executable(
+        'test_lenosky',
+        'test_lenosky.f90',
+        dependencies: [fortran_kernels_dep],
+        fortran_args: _fpot_args,
+        install: false,
+    )
+    test('FortranLenoskyGather', test_lenosky, timeout: 180)
 endif

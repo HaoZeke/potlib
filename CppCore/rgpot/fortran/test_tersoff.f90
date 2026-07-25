@@ -207,7 +207,7 @@ contains
    subroutine finite_differences(par, table, pos, box, worst, status)
       type(tersoff_params_t), intent(in) :: par
       type(neighbor_table_t), intent(inout) :: table
-      real(wp), intent(in) :: pos(:, :)
+      real(wp), intent(in), contiguous :: pos(:, :)
       real(wp), intent(in) :: box(3, 3)
       real(wp), intent(out) :: worst
       integer, intent(out) :: status
