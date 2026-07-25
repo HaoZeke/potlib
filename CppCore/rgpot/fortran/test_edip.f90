@@ -13,7 +13,7 @@
 !! a mis-attributed coordination or end-atom term breaks the difference
 !! check even where the energy stays right.
 program test_edip
-   use rgpot_kinds, only: wp, ip
+   use rgpot_kinds, only: wp
    use rgpot_neighbors, only: neighbor_table_t
    use rgpot_edip, only: edip_params_t, edip_energy_forces
    implicit none

@@ -86,7 +86,8 @@ contains
       dedr = (one_o_a2*energy + a_eps*par%p*par%beta*r_to_minus_p*expo/rho) &
              *inv_sigma
 
-      ! Optional short-range repulsion between unlike species.
+      ! Optional short-range repulsion between unlike species. a0 is a
+      ! switch rather than a measurement, so it is compared exactly.
       if (rij <= par%s0 .and. par%a0 /= 0.0_wp) then
          energy = energy + par%a0*(cos(pi*rij/par%s0) + 1.0_wp)
          dedr = dedr + par%a0*pi/par%s0*sin(pi*rij/par%s0)
@@ -197,7 +198,7 @@ contains
       real(wp), intent(out) :: e_i
       real(wp), intent(out) :: f_i(3)
 
-      integer(ip) :: sj, sk, sm, sn, j, m, n
+      integer(ip) :: sj, sk, sm, sn, m, n
       real(wp) :: rij, rik, rim, rmn
       real(wp) :: u_ij(3), u_ik(3), u_mi(3), u_mn(3)
       real(wp) :: e_pair, dedr

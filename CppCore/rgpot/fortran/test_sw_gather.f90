@@ -10,7 +10,7 @@
 !! end-atom term would break the finite-difference check even where the
 !! energy stayed right.
 program test_sw_gather
-   use rgpot_kinds, only: wp, ip
+   use rgpot_kinds, only: wp
    use rgpot_neighbors, only: neighbor_table_t
    use rgpot_sw, only: sw_params_t, sw_energy_forces
    implicit none

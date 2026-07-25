@@ -19,7 +19,7 @@
 !! carry a fixed jitter, because a force that vanishes by symmetry tests
 !! nothing.
 program test_tersoff
-   use rgpot_kinds, only: wp, ip
+   use rgpot_kinds, only: wp
    use rgpot_neighbors, only: neighbor_table_t
    use rgpot_tersoff, only: tersoff_params_t, tersoff_energy_forces
    implicit none

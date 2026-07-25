@@ -90,6 +90,10 @@ contains
       use_skin = 0.1_wp*cutoff
       if (present(skin)) use_skin = skin
 
+      ! Exact comparison on purpose: the question is whether the caller
+      ! passed the same numbers as last time, not whether the geometry is
+      ! close, so a tolerance would keep a calculator built for a different
+      ! cutoff.
       if (.not. self%nl_ready .or. self%cutoff /= cutoff &
           .or. self%skin /= use_skin) then
          ! Release the previous calculator's C buffers before replacing it;

@@ -11,7 +11,7 @@
 !! rearrangement: dropping a neighbour's embedding derivative from `f_i`
 !! leaves the energy exactly right and the force wrong by order one.
 program test_eam_al
-   use rgpot_kinds, only: wp, ip
+   use rgpot_kinds, only: wp
    use rgpot_neighbors, only: neighbor_table_t
    use rgpot_eam_al, only: eam_al_params_t, eam_al_energy_forces
    implicit none
