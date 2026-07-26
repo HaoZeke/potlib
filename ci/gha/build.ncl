@@ -156,10 +156,11 @@ in
     # no-fortran native file: win-64 pixi ships flang, and the flang/MSVC
     # kernel leg is a separate phase.
     build_windows_meson = {
-      name = "meson / windows-latest [MSVC RPC:false CACHE:false]",
+      name = "meson / windows-2022 [MSVC RPC:false CACHE:false]",
       "runs-on" = P.windows,
       steps = [
         S.checkout_minimal,
+        S.activate_msvc,
         S.setup_pixi_default "default",
         windows_meson_build_test,
       ],

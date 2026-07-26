@@ -288,12 +288,22 @@ jobs:
   # the native file: win-64 pixi ships flang, and the flang/MSVC kernel leg is
   # a separate phase.
   build_windows_meson:
-    name: meson / windows-latest [MSVC RPC:false CACHE:false]
+    name: meson / windows-2022 [MSVC RPC:false CACHE:false]
     needs: [prepare]
     if: github.event_name != 'schedule'
-    runs-on: windows-latest
+    # windows-latest ships VS 18, where ilammy/msvc-dev-cmd fails (invalid
+    # params on 18, "VS not found" when pinned to 2022).
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
+      # Without this meson reports Unknown compiler(s): [['cl.exe']] -- the
+      # pixi env carries the toolchain packages but does not put cl.exe on
+      # PATH for the build step.
+      - name: Activate MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          vsversion: "2022"
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           pixi-version: v0.70.2
