@@ -15,6 +15,7 @@
 // clang-format on
 
 #include "rgpot/LennardJones/LJPot.hpp"
+#include "rgpot/nlist/PairListCache.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 using rgpot::types::AtomMatrix;
 
@@ -24,68 +25,61 @@ namespace rgpot {
  * @class LJPot
  * @details
  *
- * This method calculates pairwise interactions between all atoms
- * within the cutoff radius. It applies the minimum image convention
- * using the provided box dimensions to handle periodic boundaries.
+ * Pairwise interactions within the cutoff radius, minimum image convention
+ * on an orthogonal box. Pairs come from the shared
+ * ``rgpot::nlist::PairListCache`` (the eOn PairListCache design): repeated
+ * evaluations on nearby geometries reuse a Verlet-skin cached candidate
+ * list, and one-shot evaluations run a single fused scan identical in pair
+ * content to the historical per-call double loop.
  *
- * @note This implementation is adapted, untouched from the [eOn
- * project](https://github.com/TheochemUI/EONgit/blob/stable/client/potentials/LJ/LJ.cpp).
  * @warning The box is assumed to be orthogonal.
  *
  */
 void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
-  long N = in.nAtoms;
+  const long N = in.nAtoms;
   const double *R = in.pos;
   const double *box = in.box;
   double *F = out->F;
   double *U = &out->energy;
-  // This is adapted, untouched from EON's BSD 3 clause implementation
-  // Original source:
-  // https://github.com/TheochemUI/EONgit/blob/stable/client/potentials/LJ/LJ.cpp
-  // Copyright (c) 2010, EON Development Team
-  // All rights reserved. BSD 3-Clause License.
-  double diffR{0}, diffRX{0}, diffRY{0}, diffRZ{0}, dU{0}, a{0}, b{0};
   *U = 0;
-  for (int i = 0; i < N; i++) {
+  for (long i = 0; i < N; i++) {
     F[3 * i] = 0;
     F[3 * i + 1] = 0;
     F[3 * i + 2] = 0;
   }
-
-  for (int i = 0; i < N - 1; i++) {
-    for (int j = i + 1; j < N; j++) {
-      diffRX = R[3 * i] - R[3 * j];
-      diffRY = R[3 * i + 1] - R[3 * j + 1];
-      diffRZ = R[3 * i + 2] - R[3 * j + 2];
-
-      // Minimum image convention
-      diffRX = diffRX - box[0] * floor(diffRX / box[0] + 0.5);
-      diffRY = diffRY - box[4] * floor(diffRY / box[4] + 0.5);
-      diffRZ = diffRZ - box[8] * floor(diffRZ / box[8] + 0.5);
-
-      diffR = sqrt(diffRX * diffRX + diffRY * diffRY + diffRZ * diffRZ);
-
-      if (diffR < cuttOffR) {
-        // Standard 12-6 form: 4u0((psi/r)^12 - (psi/r)^6)
-        a = pow(psi / diffR, 6);
-        b = 4 * u0 * a;
-
-        *U = *U + b * (a - 1) - cuttOffU;
-
-        dU = -6 * b / diffR * (2 * a - 1);
-
-        // Update forces for both atoms
-        // F is the negative derivative
-        F[3 * i] = F[3 * i] - dU * diffRX / diffR;
-        F[3 * i + 1] = F[3 * i + 1] - dU * diffRY / diffR;
-        F[3 * i + 2] = F[3 * i + 2] - dU * diffRZ / diffR;
-
-        F[3 * j] = F[3 * j] + dU * diffRX / diffR;
-        F[3 * j + 1] = F[3 * j + 1] + dU * diffRY / diffR;
-        F[3 * j + 2] = F[3 * j + 2] + dU * diffRZ / diffR;
-      }
-    }
+  if (N < 2 || cuttOffR <= 0.0) {
+    return;
   }
+
+  nlist::CachedPairList::Options opt;
+  opt.cutoff = cuttOffR;
+
+  const double psi2 = psi * psi;
+  double energyAcc = 0.0;
+  nlist::PairListCache::global().evaluate(
+      R, static_cast<std::size_t>(N), box, opt,
+      [&](int32_t i, int32_t j, double dx, double dy, double dz, double r2) {
+        const double invR2 = 1.0 / r2;
+        const double sr2 = psi2 * invR2;
+        const double a = sr2 * sr2 * sr2; // (psi/r)^6 without pow()
+        const double b = 4.0 * u0 * a;
+        energyAcc += b * (a - 1.0) - cuttOffU;
+
+        // -dU/dr / r along d = r_i - r_j, matching the historical loop's
+        // sign convention.
+        const double fscale = 6.0 * b * invR2 * (2.0 * a - 1.0);
+        const double fx = fscale * dx;
+        const double fy = fscale * dy;
+        const double fz = fscale * dz;
+
+        F[3 * i] += fx;
+        F[3 * i + 1] += fy;
+        F[3 * i + 2] += fz;
+        F[3 * j] -= fx;
+        F[3 * j + 1] -= fy;
+        F[3 * j + 2] -= fz;
+      });
+  *U = energyAcc;
   return;
 }
 
