@@ -100,6 +100,31 @@ inside ~librgpot~ calls the entry points, so no Fortran symbol reaches
 the dynamic table and the old collision class (two potentials exporting
 ~force_~) cannot recur.
 
+** Archive rules
+
+The kernels are one of several PIC convenience archives that
+~link_whole~ into a single ~librgpot~. Three rules keep that arrangement
+sound; each was learned by breaking it.
+
+- A convenience archive takes a *headers-only* dependency on anything
+  another archive also links. Meson copies a static library's objects
+  into every static library that links it, so two archives that both
+  ~link_with~ a third each carry its objects, and the umbrella then sees
+  every symbol twice. Linking dependencies belong on the umbrella and on
+  leaf binaries, where the objects arrive once. This is why ~vesin_dep~
+  has a ~vesin_hdr_dep~ counterpart, and ~ptlrpc_dep~ a ~ptlrpc_hdr_dep~.
+- The *Fortran runtime is named explicitly*. ~librgpot~ is a C++ target
+  that takes the kernels through ~link_whole~, so meson has no Fortran
+  source of its own to infer ~-lgfortran~ (or the flang equivalent) from.
+- *Generated sources propagate as headers.* A ~declare_dependency~ that
+  lists a generated ~.cpp~ in ~sources:~ compiles that translation unit
+  again in every consumer; list only the generated header.
+
+The invariants are worth checking mechanically: no object appears in two
+whole-linked archives, ~librgpot~ carries no ~NEEDED~ entry on a sibling
+rgpot object (consumers that bundle the umbrella alone depend on this),
+and the Fortran runtime appears when the kernels are enabled.
+
 * Cell convention
 
 C callers pass nine doubles, row-major, one cell vector per row. Fortran
@@ -117,3 +142,20 @@ since such an error can leave the energy correct.
 
 Pinned reference energies from the pre-port kernels live in the Catch2
 tests, at the tolerances the original suites used.
+
+** Compilers
+
+CI builds the kernels with the conda-forge gfortran (13/14) and, on
+Windows, with LLVM Flang. The port was additionally built and tested
+under *gfortran 15.2.0*, which passes all of it and reports diagnostics
+the older compilers stay quiet about, notably ~Unused parameter ... which
+has been explicitly imported~ and ~-Wcompare-reals~. Both classes are
+worth reading rather than silencing: the first is dead code, and the
+second is fair warning unless the comparison really is asking "are these
+the same number I was handed before" -- cache validity or a switch
+parameter -- in which case say so in a comment at the site.
+
+Flang on ~x86_64-pc-windows-msvc~ cannot lower a by-value ~BIND(C)~
+derived type; it aborts rather than diagnosing. Interfaces that must
+build there pass such structs by pointer, which is why the vendored vesin
+interface binds ~vesin_neighbors_byref~.

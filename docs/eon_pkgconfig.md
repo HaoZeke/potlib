@@ -18,7 +18,8 @@ meson setup build-eon-export \
   --prefix=/usr/local
 meson compile -C build-eon-export
 meson install -C build-eon-export
-# exports: libnwchempot, libcpmdpot, libptlrpc, include/rgpot/**, rgpot.pc
+# exports: libnwchempot, libcpmdpot, include/rgpot/**, rgpot.pc
+# (the Cap'n Proto schema ships inside librgpot; there is no libptlrpc)
 ```
 
 Optional engine plugins (install separately / set `*_ENGINE` env at run time):
