@@ -4,7 +4,7 @@
 #include <fmt/ostream.h>
 #include <cstdlib>
 // clang-format on
-#include "rgpot/CuH2/CuH2Pot.hpp"
+#include "rgpot/fortran/FortranPots.hpp"
 #include "rgpot/types/adapters/xtensor.hpp"
 using rgpot::types::AtomMatrix;
 using rgpot::types::adapt::xtensor::convertToArray3x3;
@@ -12,7 +12,7 @@ using rgpot::types::adapt::xtensor::convertToAtomMatrix;
 using rgpot::types::adapt::xtensor::convertToVector;
 
 int main(void) {
-  auto cuh2pot = rgpot::CuH2Pot();
+  auto cuh2pot = rgpot::fortranpots::CuH2Pot();
 
   xt::xtensor<double, 2> positions{
       {0.63940268750835, 0.90484742551374, 6.97516498544584}, // Cu

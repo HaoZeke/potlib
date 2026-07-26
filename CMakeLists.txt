@@ -51,29 +51,8 @@ endif()
 
 # 1. Server/Physics Dependencies
 if(NOT RGPOT_RPC_CLIENT_ONLY)
-  # CuH2 / fortcuh2. On Apple/CI pair system clang++ (host SDK) with conda
-  # gfortran; enable_language(Fortran) alone does not break C++ links when the
-  # C/C++ compilers are /usr/bin/clang{,++} rather than conda's darwin20 driver.
-  set(RGPOT_HAS_FORTRAN FALSE)
-  include(CheckLanguage)
-  check_language(Fortran)
-  if(CMAKE_Fortran_COMPILER)
-    enable_language(Fortran)
-    set(RGPOT_HAS_FORTRAN TRUE)
-    message(STATUS "Fortran found. CuH2 potential enabled.")
-    find_package(fortcuh2 QUIET)
-    if(NOT fortcuh2_FOUND)
-      message(STATUS "fortcuh2 not found, attempting to fetch...")
-      FetchContent_Declare(
-        fortcuh2
-        GIT_REPOSITORY https://github.com/theochemui/fortran_cuh2_src.git
-        GIT_TAG main)
-      FetchContent_MakeAvailable(fortcuh2)
-    endif()
-  else()
-    message(STATUS "Fortran NOT found. CuH2 potential disabled.")
-  endif()
-
+  # The Fortran 2018 pot kernels (rgpot/fortran) build under meson only; this
+  # CMake path is a consumer smoke build of the pure C++ surface.
   if(RGPOT_WITH_CACHE)
     # Conda macOS runners sometimes fail FindThreads before RocksDB; set the
     # pthread hint explicitly so RocksDBConfig's find_dependency(Threads) works.
@@ -123,14 +102,14 @@ if(RGPOT_WITH_RPC)
 
   # On Apple, static intermediate RPC libs avoid install_name / mixed
   # toolchain dylib issues when system clang links conda Cap'n Proto; the
-  # full RPC/cache/CuH2 feature set is still exercised in executables/tests.
+  # full RPC/cache feature set is still exercised in executables/tests.
   if(APPLE)
     add_library(ptlrpc STATIC ${CAPNP_SOURCES})
   else()
     add_library(ptlrpc SHARED ${CAPNP_SOURCES})
   endif()
   target_link_libraries(ptlrpc PUBLIC CapnProto::capnp-rpc)
-  # Always drive C++ links with the C++ linker, even if Fortran is enabled.
+  # Always drive C++ links with the C++ linker.
   set_target_properties(ptlrpc PROPERTIES LINKER_LANGUAGE CXX)
 
   # Ensure the generated headers are in the include path
@@ -157,14 +136,18 @@ endif()
 
 if(NOT RGPOT_RPC_CLIENT_ONLY)
   # Basic sources
-  set(RGPOT_SOURCES CppCore/rgpot/PotHelpers.cc
-                    CppCore/rgpot/units.cc
-                    CppCore/rgpot/LennardJones/LJPot.cc)
-
-  if(RGPOT_HAS_FORTRAN)
-    list(APPEND RGPOT_SOURCES CppCore/rgpot/CuH2/CuH2Pot.cc
-         CppCore/rgpot/CuH2/cuh2Utils.cc)
-  endif()
+  # The classical pots potserv can serve. Keep this in step with the arms in
+  # rgpot/rpc/server.cpp: the server names them unconditionally, so a missing
+  # source here surfaces as an undefined constructor at link time rather than
+  # as a smaller build.
+  set(RGPOT_SOURCES
+      CppCore/rgpot/PotHelpers.cc
+      CppCore/rgpot/units.cc
+      CppCore/rgpot/LennardJones/LJPot.cc
+      CppCore/rgpot/LennardJones/LJClusterPot.cc
+      CppCore/rgpot/Morse/MorsePot.cc
+      CppCore/rgpot/ZBL/ZBLPot.cc
+      CppCore/rgpot/CuH2/cuh2Utils.cc)
 
   # NWChemPot / CPMDPot are pure dlopen consumers of the split nwchemc / cpmdc
   # engines (parity with meson). Cap'n Proto params live in the generated schema,
@@ -201,16 +184,8 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
     rgpot PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/CppCore>
                  $<INSTALL_INTERFACE:include>)
 
-  if(RGPOT_HAS_FORTRAN)
-    target_link_libraries(rgpot PUBLIC fortcuh2)
-    # Static fortcuh2 needs the gfortran runtime; do not make gfortran the driver.
-    if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-      target_link_libraries(rgpot PUBLIC gfortran)
-    endif()
-    if(UNIX AND NOT APPLE)
-      target_link_libraries(rgpot PUBLIC m)
-    endif()
-    target_compile_definitions(rgpot PUBLIC RGPOT_HAS_FORTRAN)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(rgpot PUBLIC m)
   endif()
 
   if(NOT RGPOT_PURE_LIB)
@@ -300,10 +275,6 @@ if(RGPOT_BUILD_TESTS)
       set_target_properties(${TEST_NAME} PROPERTIES LINKER_LANGUAGE CXX)
       add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endfunction()
-
-    if(RGPOT_HAS_FORTRAN)
-      add_pot_test(CuH2Test CppCore/tests/CuH2PotTest.cc)
-    endif()
 
     if(RGPOT_WITH_CACHE)
       add_pot_test(InvarianceTest CppCore/tests/InvarianceTest.cc)

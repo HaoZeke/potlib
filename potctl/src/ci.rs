@@ -278,6 +278,7 @@ pub fn required_paths(root: &Path) -> Vec<PathBuf> {
         root.join("rgpot-core").join("Cargo.toml"),
         root.join("potctl").join("Cargo.toml"),
         root.join("towncrier.toml"),
+        root.join("pyproject.toml"),
         root.join("cog.toml"),
     ]
 }

@@ -29,4 +29,12 @@
   # --- common runners ---
   ubuntu = "ubuntu-latest",
   macos = "macos-latest",
+  # windows-latest ships VS 18, where ilammy/msvc-dev-cmd fails (invalid
+  # params on 18, "VS not found" when pinned to 2022). eOn's Windows leg hit
+  # the same wall.
+  windows = "windows-2022",
+  msvc_dev_cmd = "ilammy/msvc-dev-cmd@v1",
+
+  # --- meson machine files (repo-relative; also present in `git archive` trees) ---
+  no_fortran_native_file = "ci/gha/machines/no-fortran.ini",
 }

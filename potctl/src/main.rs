@@ -24,7 +24,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Release / version lockstep (meson, CMake, cargo, towncrier, pixi, pyproject).
+    /// Release / version lockstep (meson, CMake, cargo, towncrier, pixi workspace, pyproject).
     Release {
         #[command(subcommand)]
         action: ReleaseCmd,

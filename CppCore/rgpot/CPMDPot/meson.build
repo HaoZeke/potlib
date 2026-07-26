@@ -19,7 +19,7 @@ endif
 cpmdpot = static_library(
     'cpmdpot',
     'CPMDPot.cc',
-    dependencies: _deps + [cpmd_dl_dep, ptlrpc_dep],
+    dependencies: _deps + [cpmd_dl_dep, ptlrpc_hdr_dep],
     cpp_args: _args + cpmd_frontend_cpp_args,
     include_directories: _incdirs + [cpmd_inc],
     install: not meson.is_subproject(),

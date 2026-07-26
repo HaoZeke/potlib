@@ -15,7 +15,6 @@
 
 #include "rgpot/types/AtomMatrix.hpp"
 
-using rgpot::types::AtomMatrix;
 
 namespace rgpot {
 namespace types {

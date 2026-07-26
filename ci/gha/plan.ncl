@@ -16,6 +16,8 @@ let P = S.pins in
     ensure_potctl = P.ensure_potctl,
     ubuntu = P.ubuntu,
     macos = P.macos,
+    windows = P.windows,
+    no_fortran_native_file = P.no_fortran_native_file,
   },
   # Job graph: orchestrator encodes stages; these ids document intended order/deps.
   stages = [
@@ -67,6 +69,18 @@ let P = S.pins in
       },
     },
     {
+      id = "build_windows_meson",
+      runs_on = P.windows,
+      needs = ["prepare"],
+      role = "single MSVC meson leg (no potctl artifact, fortran off)",
+    },
+    {
+      id = "nodownload_rehearsal",
+      runs_on = P.ubuntu,
+      needs = ["prepare"],
+      role = "git archive tree built with --wrap-mode=nodownload (conda-forge parity)",
+    },
+    {
       id = "rust_tests",
       needs = ["ci-tools"],
       role = "rgpot-core + potctl tests",
@@ -100,6 +114,8 @@ let P = S.pins in
         "towncrier",
         "ci-tools",
         "build_and_test",
+        "build_windows_meson",
+        "nodownload_rehearsal",
         "rust_tests",
         "client_bridge_stress",
         "potentials_metatomic",

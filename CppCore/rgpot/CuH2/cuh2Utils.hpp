@@ -26,7 +26,6 @@
 #include "xtensor/xview.hpp"
 #endif
 
-using rgpot::types::AtomMatrix;
 
 namespace rgpot {
 namespace cuh2 {

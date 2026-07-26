@@ -48,7 +48,7 @@ flag_management:
       carryforward: true
     - name: fortran
       paths:
-        - subprojects/fortcuh2/**
+        - CppCore/rgpot/fortran/**
       carryforward: true
 
 comment:

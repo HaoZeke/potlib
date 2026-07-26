@@ -12,9 +12,9 @@
 #include <capnp/message.h>
 #include <kj/debug.h>
 
-#ifdef RGPOT_HAS_FORTRAN
-#include "rgpot/CuH2/CuH2Pot.hpp"
-#endif // RGPOT_HAS_FORTRAN
+#ifdef RGPOT_HAS_FORTRAN_POTS
+#include "rgpot/fortran/FortranPots.hpp"
+#endif // RGPOT_HAS_FORTRAN_POTS
 
 #ifdef RGPOT_HAS_XTB
 #include "rgpot/XTBPot/XTBPot.hpp"
@@ -29,9 +29,12 @@
 #endif // RGPOT_HAS_METATOMIC
 
 #include "rgpot/CPMDPot/CPMDPot.hpp"
+#include "rgpot/LennardJones/LJClusterPot.hpp"
 #include "rgpot/LennardJones/LJPot.hpp"
+#include "rgpot/Morse/MorsePot.hpp"
 #include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/Potential.hpp"
+#include "rgpot/ZBL/ZBLPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 #include "rgpot/types/adapters/capnp/capnp_adapter.hpp"
 #include "rgpot/units.hpp"
@@ -175,7 +178,7 @@ public:
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0] << " <port> <PotentialType>" << std::endl;
-    std::cerr << "  Available PotentialTypes: CuH2, LJ"
+    std::cerr << "  Available PotentialTypes: CuH2, LJ, LJCluster, Morse, ZBL"
 #ifdef RGPOT_HAS_XTB
               << ", XTB, GFNFF, GFN0xTB, GFN1xTB"
 #endif
@@ -202,15 +205,25 @@ int main(int argc, char *argv[]) {
   std::string pot_type = argv[2];
   std::unique_ptr<rgpot::PotentialBase> potential_to_use;
 
-#ifdef RGPOT_HAS_FORTRAN
+#ifdef RGPOT_HAS_FORTRAN_POTS
   if (pot_type == "CuH2") {
     std::cout << "Loading CuH2 potential..." << std::endl;
-    potential_to_use = std::make_unique<rgpot::CuH2Pot>();
+    potential_to_use = std::make_unique<rgpot::fortranpots::CuH2Pot>();
   } else
-#endif // RGPOT_HAS_FORTRAN
+#endif // RGPOT_HAS_FORTRAN_POTS
       if (pot_type == "LJ") {
     std::cout << "Loading LJ potential..." << std::endl;
     potential_to_use = std::make_unique<rgpot::LJPot>();
+  } else if (pot_type == "LJCluster") {
+    std::cout << "Loading LJ cluster potential (free boundaries)..."
+              << std::endl;
+    potential_to_use = std::make_unique<rgpot::LJClusterPot>();
+  } else if (pot_type == "Morse") {
+    std::cout << "Loading Morse potential (Pt parameters)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::MorsePot>();
+  } else if (pot_type == "ZBL") {
+    std::cout << "Loading ZBL potential..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::ZBLPot>();
 #ifdef RGPOT_HAS_XTB
   } else if (pot_type == "XTB") {
     std::cout << "Loading XTB potential (GFN2-xTB)..." << std::endl;

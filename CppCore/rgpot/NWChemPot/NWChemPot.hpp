@@ -29,6 +29,13 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
+  /// The dlopen'd engine keeps global session state: serialize
+  /// process-wide.
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.reentrancy = Reentrancy::ProcessSerial, .periodic = false};
+  }
+
+
   /** Apply NWChem arm payload as the next Cap'n Proto message for the engine. */
   bool setParams(const ::NWChemParams::Reader &params);
 

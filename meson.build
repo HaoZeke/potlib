@@ -30,14 +30,28 @@ endif
 
 # Languages
 add_languages('c', required: true)
-# Fortran/CuH2 on all hosts when available. On Darwin/CI, pair with system
-# clang++ (not conda arm64-apple-darwin20 clang) so C++ targets link the host
-# SDK; fortcuh2 is static on Darwin (packagefiles) and scoped to the cuh2
-# target only so LJ/ptlrpc are not polluted with gfortran link flags.
-if not get_option('with_rpc_client_only')
-    has_fortran = add_languages('fortran', required: false)
-else
+# Fortran pot kernels on all hosts where a compiler is available. On
+# Darwin/CI, pair with system clang++ (not conda arm64-apple-darwin20 clang)
+# so C++ targets link the host SDK.
+#
+# with_fortran_pots is independent of the RPC options: client-only builds
+# skip the main library (and with it every pot), but the decision belongs
+# to the pot option, not to the RPC role.
+_fortran_pots_opt = get_option('with_fortran_pots')
+if _fortran_pots_opt.disabled()
     has_fortran = false
+else
+    has_fortran = add_languages(
+        'fortran',
+        required: _fortran_pots_opt.enabled(),
+    )
+endif
+fc = disabler()
+if has_fortran
+    fc = meson.get_compiler('fortran')
+    # Matches the RGPOT_HAS_FORTRAN_POTS cflag rgpot.pc exports, so in-tree
+    # sources and installed consumers gate the Fortran pots on one name.
+    _args += ['-DRGPOT_HAS_FORTRAN_POTS=TRUE']
 endif
 
 rpc_enabled = get_option('with_rpc') or get_option('with_rpc_client_only')
@@ -56,6 +70,87 @@ _deps += m_dep
 # libstdc++ only on Linux/GCC; Darwin/clang uses libc++ via the driver.
 if host_system == 'linux'
     _deps += [declare_dependency(link_args: '-lstdc++')]
+endif
+
+# ------------------------ vesin (neighbour lists)
+# One vesin for the whole tree: the nlist headers, MetatomicPot, and the
+# Fortran pots all consume this dependency. Prefer an installed vesin
+# >= 0.6; fall back to the vendored single-TU build, which carries the
+# local patches maintained as vesin upstream candidates.
+vesin_threads_dep = dependency('threads')
+vesin_dep = dependency('vesin', version: '>=0.6', required: false)
+# vesin_hdr_dep carries compile information only. Meson copies the objects
+# of a static library into every static library that links it, so the
+# convenience archives that link_whole into librgpot must see headers
+# alone; the objects enter the umbrella once through vesin_dep.
+vesin_hdr_dep = vesin_dep
+if not vesin_dep.found()
+    vesin_int = static_library(
+        'vesin_internal',
+        ['third_party/vesin/vesin-single-build.cpp'],
+        dependencies: [vesin_threads_dep],
+        # Consumers link statically; hidden symbols stay out of the
+        # enclosing shared objects' dynamic tables.
+        cpp_args: cppc.get_supported_arguments(['-fvisibility=hidden']),
+        pic: true,
+    )
+    vesin_hdr_dep = declare_dependency(
+        dependencies: [vesin_threads_dep],
+        include_directories: include_directories('third_party/vesin'),
+    )
+    vesin_dep = declare_dependency(
+        link_with: vesin_int,
+        dependencies: [vesin_hdr_dep],
+    )
+    message('vesin: vendored third_party/vesin')
+else
+    message('vesin: system / pkg-config')
+endif
+_deps += vesin_hdr_dep
+
+# vesin Fortran interface, vendored at the same version. Fortran pots take
+# `use vesin` through vesin_f_dep (.mod directory propagated).
+vesin_f_dep = disabler()
+if has_fortran
+    vesin_fortran_lib = static_library(
+        'vesin_fortran',
+        [
+            'third_party/vesin/fortran/cdef.f90',
+            'third_party/vesin/fortran/vesin.f90',
+        ],
+        dependencies: vesin_hdr_dep,
+        pic: true,
+    )
+    vesin_f_dep = declare_dependency(
+        link_with: vesin_fortran_lib,
+        dependencies: vesin_hdr_dep,
+        include_directories: vesin_fortran_lib.private_dir_include(),
+    )
+endif
+
+# Fortran runtime for the umbrella. librgpot is a C++ target that takes the
+# kernels through link_whole, which leaves meson no Fortran source of its
+# own to infer the runtime from.
+fortran_rt_deps = []
+if has_fortran
+    _fc = meson.get_compiler('fortran')
+    _fc_id = _fc.get_id()
+    _fc_rt_names = []
+    if _fc_id == 'gcc'
+        _fc_rt_names = ['gfortran']
+    elif _fc_id == 'llvm-flang' or _fc_id == 'flang'
+        _fc_rt_names = ['flang_rt.runtime', 'FortranRuntime', 'flang']
+    elif _fc_id == 'intel-llvm' or _fc_id == 'intel'
+        _fc_rt_names = ['ifcoremt']
+    endif
+    foreach _n : _fc_rt_names
+        _rt = _fc.find_library(_n, required: false)
+        if _rt.found()
+            fortran_rt_deps += _rt
+            message('fortran runtime: -l' + _n)
+            break
+        endif
+    endforeach
 endif
 
 # --------------------- Optional dependencies
@@ -286,36 +381,12 @@ print(api_inc)
         ],
     )
 
-    # vesin neighbor list library
-    _vesin_libdir = _py_purelib / 'vesin' / 'lib'
-    vesin_dep = dependency('vesin', required: false)
-    if not vesin_dep.found()
-        vesin_dep = cppc.find_library(
-            'vesin',
-            dirs: [_vesin_libdir],
-        )
-    endif
-    _deps += vesin_dep
-    _deps += declare_dependency(
-        link_args: ['-L' + _vesin_libdir],
-    )
+    # vesin comes from the top-level dependency (vendored static fallback):
+    # compile-time and runtime layouts always match, so the purelib lookup
+    # is unnecessary here.
 
     _args += ['-DRGPOT_HAS_METATOMIC=TRUE']
     has_metatomic = true
-endif
-
-# --------------------- Subprojects
-# fortcuh2 is only needed by the CuH2 potential — do NOT add it to global
-# `_deps`. Doing so pulls -lgfortran / gcc lib paths into every intermediate
-# dylib (LJ, ptlrpc, …) and breaks conda macOS clang++ links (missing
-# __Unwind_Resume / libSystem symbols).
-fortcuh2_dep = disabler()
-if has_fortran
-    # Darwin: packagefiles/fortcuh2 builds a static lib (see fortcuh2.wrap
-    # patch_directory) so the final C++ target resolves system symbols.
-    fortcuh2_proj = subproject('fortcuh2')
-    fortcuh2_dep = fortcuh2_proj.get_variable('fortcuh2_dep')
-    _args += ['-DRGPOT_HAS_FORTRAN=TRUE']
 endif
 
 # --------------------- Rust Core (rgpot-core)

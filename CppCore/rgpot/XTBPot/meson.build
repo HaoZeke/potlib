@@ -7,13 +7,15 @@ endif
 
 xtb_inc = include_directories('.')
 
-xtbpot = library(
+# Static convenience lib; ships inside the librgpot umbrella (link_whole).
+xtbpot = static_library(
     'xtbpot',
     'XTBPot.cc',
     dependencies: _deps,
     cpp_args: _args,
     include_directories: _incdirs + [xtb_inc],
-    install: not meson.is_subproject(),
+    pic: true,
+    install: false,
 )
 
 # Thin dlopen frontend — no NEEDED on libxtb (engine carries it).
@@ -39,7 +41,7 @@ xtb_engine = library(
         'XTBPot.cc',
         'XTBEngineAbi.cc',
     ],
-    dependencies: _deps,
+    dependencies: _deps + [vesin_dep],
     cpp_args: _args + ['-DRGPOT_XTB_ENGINE_BUILD'],
     include_directories: _incdirs + [xtb_inc],
     install: not meson.is_subproject(),

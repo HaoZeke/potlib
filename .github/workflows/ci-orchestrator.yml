@@ -280,6 +280,102 @@ jobs:
         shell: pixi run -e rpctest bash -e {0}
         run: potctl ci rpc-integ --server-bin bbdir/CppCore/potserv
 
+  # --- Stage 2a': single Windows leg (explicit job, not a matrix axis) ---
+  # Kept out of build_and_test on purpose: adding windows-latest to the
+  # os x sys x rpc x cache matrix would take 16 legs to 24. meson only, MSVC
+  # from the default pixi env (vs2022_win-64), rpc/cache off, no potctl
+  # (ci-tools stages ubuntu/macos artifacts only). Fortran is suppressed via
+  # the native file: win-64 pixi ships flang, and the flang/MSVC kernel leg is
+  # a separate phase.
+  build_windows_meson:
+    name: meson / windows-2022 [MSVC RPC:false CACHE:false]
+    needs: [prepare]
+    if: github.event_name != 'schedule'
+    # windows-latest ships VS 18, where ilammy/msvc-dev-cmd fails (invalid
+    # params on 18, "VS not found" when pinned to 2022).
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      # No activate-environment here: the default env carries
+      # vs2022_win-64 and vswhere, whose activation rewrites PATH instead of
+      # appending, and setup-pixi refuses that ("Unable to handle environment
+      # activation which does not only append to PATH"). The build step runs
+      # through `pixi run`, which activates per command anyway.
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.70.2
+          cache: true
+          environments: default
+      # cl.exe still has to be on PATH for meson's compiler detection inside
+      # `pixi run`; without this it reports Unknown compiler(s): [['cl.exe']].
+      - name: Activate MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          vsversion: "2022"
+      - name: Build & Test (Meson / MSVC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pixi run meson setup bbdir \
+            --native-file ci/gha/machines/no-fortran.ini \
+            -Dwith_tests=true \
+            -Dwith_examples=false \
+            -Dwith_xtensor=false \
+            -Dwith_eigen=false \
+            -Dwith_rpc=false \
+            -Dwith_cache=false \
+            -Dpure_lib=true
+          pixi run meson compile -C bbdir
+          pixi run meson test -C bbdir --print-errorlogs
+
+  # --- Stage 2a'': offline source-build rehearsal (conda-forge parity) ---
+  # Builds the `git archive` tree (tracked files, no .git, no checked-out wrap
+  # subprojects) under --wrap-mode=nodownload, so the default feature set is
+  # proven to need no subproject download.
+  #
+  # Scope: the Fortran pot kernels are in-tree (CppCore/rgpot/fortran, vesin
+  # vendored under third_party), so this job builds them from the archived tree
+  # with no wrap involved. The other wraps stay unexercised by construction:
+  # eigen (with_eigen), xxhash (with_cache), potentials-schema (with_rpc),
+  # fmt (pure_lib).
+  nodownload_rehearsal:
+    name: offline tarball build (nodownload / ubuntu)
+    needs: [prepare]
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.70.2
+          cache: true
+          environments: default
+          activate-environment: true
+      - name: Export tracked tree (git archive, no .git)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/rgpot-src
+          mkdir -p /tmp/rgpot-src
+          git archive HEAD | tar -x -C /tmp/rgpot-src
+          test ! -e /tmp/rgpot-src/.git
+      - name: Configure + build + test with --wrap-mode=nodownload
+        shell: pixi run bash -e {0}
+        run: |
+          cd /tmp/rgpot-src
+          meson setup bb \
+            --wrap-mode=nodownload \
+            -Dwith_tests=true \
+            -Dwith_examples=false \
+            -Dwith_xtensor=false \
+            -Dwith_eigen=false \
+            -Dwith_rpc=false \
+            -Dwith_cache=false \
+            -Dpure_lib=true
+          meson compile -C bb
+          meson test -C bb --print-errorlogs
+
   # --- Stage 2b: rust ---
   rust_tests:
     name: Rust Core Tests (${{ matrix.os }})
@@ -445,6 +541,8 @@ jobs:
       - towncrier
       - ci-tools
       - build_and_test
+      - build_windows_meson
+      - nodownload_rehearsal
       - rust_tests
       - client_bridge_stress
       - potentials_metatomic
@@ -470,6 +568,8 @@ jobs:
             "towncrier:${{ needs.towncrier.result }}" \
             "ci-tools:${{ needs.ci-tools.result }}" \
             "build_and_test:${{ needs.build_and_test.result }}" \
+            "build_windows_meson:${{ needs.build_windows_meson.result }}" \
+            "nodownload_rehearsal:${{ needs.nodownload_rehearsal.result }}" \
             "rust_tests:${{ needs.rust_tests.result }}" \
             "client_bridge_stress:${{ needs.client_bridge_stress.result }}" \
             "potentials_metatomic:${{ needs.potentials_metatomic.result }}" \

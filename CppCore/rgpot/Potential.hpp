@@ -27,10 +27,9 @@
 
 #include "rgpot/ForceStructs.hpp"
 #include "rgpot/PotHelpers.hpp"
+#include "rgpot/pot_caps.hpp"
 #include "rgpot/pot_types.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
-
-using rgpot::types::AtomMatrix;
 
 namespace rgpot {
 
@@ -60,9 +59,29 @@ public:
    */
   /// Energy, forces, and optional uncertainty scale (eV). See derived
   /// Potential::operator() for variance semantics.
-  virtual std::tuple<double, AtomMatrix, double>
-  operator()(const AtomMatrix &positions, const std::vector<int> &atmtypes,
+  virtual std::tuple<double, types::AtomMatrix, double>
+  operator()(const types::AtomMatrix &positions,
+             const std::vector<int> &atmtypes,
              const std::array<std::array<double, 3>, 3> &box) = 0;
+
+  /**
+   * @brief Concurrency and evaluation capabilities of this potential.
+   *
+   * Multi-threaded callers (NEB images, dimer endpoints) derive their
+   * sharing and cloning policy from this instead of hard-coded lists.
+   */
+  [[nodiscard]] virtual PotCaps caps() const noexcept { return {}; }
+
+  /**
+   * @brief Fingerprint of the potential's parameter set.
+   *
+   * Mixed into the result-cache key so results never cross parameter
+   * sets. Implementations hash their config field by field (see
+   * ParamHash.hpp) plus a kernel-version salt that changes whenever the
+   * numerics change. The default (0) suits parameter-free potentials
+   * whose numerics never changed.
+   */
+  [[nodiscard]] virtual uint64_t paramsKey() const noexcept { return 0; }
 
 #ifdef RGPOT_HAS_CACHE
   /**
@@ -125,11 +144,12 @@ public:
    *         (e.g. metatomic energy_uncertainty mean or multi-rotation energy
    *         sample variance). Variance is 0 when unused.
    */
-  std::tuple<double, AtomMatrix, double>
-  operator()(const AtomMatrix &positions, const std::vector<int> &atmtypes,
+  std::tuple<double, types::AtomMatrix, double>
+  operator()(const types::AtomMatrix &positions,
+             const std::vector<int> &atmtypes,
              const std::array<std::array<double, 3>, 3> &box) override {
     size_t nAtoms = positions.rows();
-    AtomMatrix forces = AtomMatrix::Zero(nAtoms, 3);
+    types::AtomMatrix forces = types::AtomMatrix::Zero(nAtoms, 3);
 
     double flatBox[9];
     static_assert(sizeof(box) == 9 * sizeof(double));
@@ -151,6 +171,10 @@ public:
     hash_val ^= XXH3_64bits(fi.box, 9 * sizeof(double));
     size_t type_val = static_cast<size_t>(m_type);
     hash_val ^= XXH3_64bits(&type_val, sizeof(size_t));
+    // Parameter fingerprint: two instances of one PotType with different
+    // configs must never share cache entries.
+    uint64_t params_val = paramsKey();
+    hash_val ^= XXH3_64bits(&params_val, sizeof(params_val));
 
     rgpot::cache::KeyHash key(hash_val);
 

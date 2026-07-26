@@ -11,6 +11,14 @@ let P = import "pins.ncl" in
 
   checkout_minimal = { uses = P.checkout },
 
+  # cl.exe is not on PATH on a bare Windows runner; meson reports
+  # "Unknown compiler(s): [['cl.exe']]" without this.
+  activate_msvc = {
+    name = "Activate MSVC (Windows)",
+    uses = P.msvc_dev_cmd,
+    with = { arch = "x64", vsversion = "2022" },
+  },
+
   checkout_full = {
     uses = P.checkout,
     with = { submodules = "recursive", "fetch-depth" = 0 },

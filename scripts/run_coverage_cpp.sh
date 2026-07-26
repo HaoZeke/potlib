@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instrument CppCore (+ fortcuh2 when linked) via Meson b_coverage + lcov.
+# Instrument CppCore (C++ and the Fortran kernels) via Meson b_coverage + lcov.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -36,10 +36,10 @@ lcov --directory "$BUILD" --capture --output-file "$OUT" \
   --rc lcov_branch_coverage=1 2>/dev/null \
   || lcov --directory "$BUILD" --capture --output-file "$OUT"
 
-# Keep library sources: CppCore/rgpot and fortcuh2
+# Keep library sources: CppCore/rgpot (C++ and Fortran kernels)
 TMP=$(mktemp)
 if lcov --extract "$OUT" \
-  '*/CppCore/rgpot/*' '*/subprojects/fortcuh2/*' '*/include/*' \
+  '*/CppCore/rgpot/*' '*/include/*' \
   --output-file "$TMP" 2>/dev/null; then
   mv "$TMP" "$OUT"
 else

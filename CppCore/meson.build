@@ -28,18 +28,42 @@ if not get_option('with_rpc_client_only')
         sources: _rgpot_srcs,
         dependencies: _deps,
         include_directories: _incdirs,
+        pic: true,
         install: false,
     )
 
+    # Snapshot before the core link-dep: the umbrella library link_wholes
+    # rgpot_core explicitly and must not also pull it through link_with.
+    _deps_sans_core = _deps
     _deps += declare_dependency(link_with: rgpot_core)
 
     # Implemented rgpotentials
-    subdir('rgpot/LennardJones')  # 'lennard_jones'
+    subdir('rgpot/LennardJones')  # 'lennard_jones': LJPot + LJClusterPot
     rgpotentials = [lennard_jones]
 
+    subdir('rgpot/Morse')  # 'morse'
+    rgpotentials += [morse]
+
+    subdir('rgpot/ZBL')  # 'zbl'
+    rgpotentials += [zbl]
+
+    subdir('rgpot/CuH2')  # 'cuh2': slab-geometry helpers
+    rgpotentials += [cuh2]
+
     if has_fortran
-        subdir('rgpot/CuH2')  # 'cuh2'
-        rgpotentials += [cuh2]
+        subdir('rgpot/fortran')  # Fortran 2018 pot kernels + C entry points
+        rgpotentials += [fortran_pots, fortran_kernels]
+        # The kernel archive's symbols (module symbols and the bind(c)
+        # entries) stay local to librgpot: only the C++ faces above are
+        # part of the library's interface.
+        # vesin's Fortran interface is an implementation detail of the
+        # kernels and is hidden with them.
+        _fortran_hide_args = cppc.get_supported_link_arguments(
+            [
+                '-Wl,--exclude-libs,librgpot_fortran_kernels.a',
+                '-Wl,--exclude-libs,libvesin_fortran.a',
+            ],
+        )
     endif
 
     if has_xtb
@@ -67,19 +91,55 @@ if not get_option('with_rpc_client_only')
 
     _linkto += rgpotentials
 
-    # Create library
-    rgpot_deps = _deps
+    # Create the umbrella library: every pot and the core ship inside one
+    # versioned SONAME. link_whole keeps all symbols even where nothing in
+    # librgpot itself references them (consumers do).
+    # vesin objects and the Fortran runtime enter here, once, rather than
+    # through the convenience archives (see the vesin_hdr_dep note).
+    rgpot_deps = _deps_sans_core + [vesin_dep] + fortran_rt_deps
+    _rpc_whole = []
     if _rpc_stack
-        rgpot_deps += [ptlrpc_dep]
+        # link_whole, not link_with: the RPC entry points are called by
+        # consumers rather than by librgpot itself.
+        rgpot_deps += [ptlrpc_hdr_dep]
+        _rpc_whole += [ptlrpc]
+    endif
+    _rgpot_link_args = []
+    if has_fortran
+        _rgpot_link_args += _fortran_hide_args
     endif
     rgpot = library(
         'rgpot',
         dependencies: rgpot_deps,
         cpp_args: _args,
+        link_args: _rgpot_link_args,
         include_directories: _incdirs,
-        link_with: _linkto,
+        link_whole: [rgpot_core] + _linkto + _rpc_whole,
+        version: meson.project_version(),
+        soversion: '2',
         install: not meson.is_subproject(),
     )
+
+    # Subproject consumers (eOn's wrap fallback) take the umbrella through
+    # this variable; pkg-config consumers get the same surface from
+    # rgpot.pc.
+    rgpot_dep = declare_dependency(
+        link_with: rgpot,
+        dependencies: rgpot_deps,
+        include_directories: _incdirs,
+    )
+
+    # The Fortran kernels must stay invisible outside librgpot: an
+    # exported legacy name is how two potentials used to bind to the same
+    # symbol.
+    if has_fortran and host_system == 'linux' and get_option('with_tests')
+        test(
+            'FortranSymbolAudit',
+            find_program('../scripts/audit_fortran_symbols.sh'),
+            args: [rgpot.full_path()],
+            depends: [rgpot],
+        )
+    endif
 endif
 
 # Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
@@ -92,9 +152,9 @@ endif
 if rpc_enabled and not get_option('with_rpc_client_only')
     server = executable(
         'potserv',
-        ['rgpot/rpc/server.cpp', gen_rpc],
+        ['rgpot/rpc/server.cpp'],
         link_with: [ptlrpc, _linkto],
-        dependencies: _deps + [capnp_rpc_dep],
+        dependencies: _deps + [capnp_rpc_dep, ptlrpc_hdr_dep, vesin_dep] + fortran_rt_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_language: 'cpp',
@@ -133,7 +193,7 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
             executable(
                 example.get(1),
                 sources: ['examples/' + example.get(2)],
-                dependencies: _deps,
+                dependencies: _deps + [vesin_dep] + fortran_rt_deps,
                 link_with: _linkto,
                 cpp_args: _args,
             ),
@@ -145,7 +205,7 @@ endif
 # ------------------------ Tests
 
 if get_option('with_tests')
-    test_deps = _deps
+    test_deps = _deps + [vesin_dep] + fortran_rt_deps
     test_deps += dependency(
         'Catch2',
         method: 'cmake',
@@ -167,15 +227,35 @@ if get_option('with_tests')
     test_array = [
         ['UnitsTest', 'units_test', 'UnitsTest.cc', ''],
     ]
+    # Classical pots live in the rgpotentials static libs, which client-only
+    # builds never produce.
+    if not get_option('with_rpc_client_only') and has_fortran
+        test_array += [
+            ['FortranPotsTest', 'fortran_pots_test', 'FortranPotsTest.cc', ''],
+        ]
+    endif
+    if not get_option('with_rpc_client_only')
+        test_array += [
+            ['MorsePotTest', 'morse_pot_test', 'MorsePotTest.cc', ''],
+            [
+                'LJClusterPotTest',
+                'ljcluster_pot_test',
+                'LJClusterPotTest.cc',
+                '',
+            ],
+            ['ZBLPotTest', 'zbl_pot_test', 'ZBLPotTest.cc', ''],
+        ]
+    endif
     if has_fortran
         test_array += [
             ['CuH2test', 'cuh2_test', 'CuH2PotTest.cc', ''],
         ]
-        if has_xtensor
-            test_array += [
-                ['CuH2 Utils Test', 'cuh2_util_test', 'cuh2UtilsTest.cc', ''],
-            ]
-        endif
+    endif
+    # Slab helpers are pure C++; only their xtensor faces are conditional.
+    if has_xtensor and not get_option('with_rpc_client_only')
+        test_array += [
+            ['CuH2 Utils Test', 'cuh2_util_test', 'cuh2UtilsTest.cc', ''],
+        ]
     endif
     if get_option('with_cache')
         test_array += [  #
@@ -396,6 +476,34 @@ if get_option('with_tests')
             install: false,
         )
     endif
+
+    # Pot microbenchmarks. Own binary, outside the default suite: the cases
+    # carry the hidden Catch2 tag pair "[.][benchmark]" and only run when the
+    # tag is requested, which `meson test --benchmark` does through args.
+    # LJPot lives in rgpot_core, absent from client-only builds.
+    if not get_option('with_rpc_client_only')
+        pot_bench_args = test_args
+        if has_fortran
+            pot_bench_args += ['-DRGPOT_BENCH_CUH2']
+        endif
+        pot_bench = executable(
+            'pot_bench',
+            sources: ['tests/PotBench.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: pot_bench_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+        benchmark(
+            'pot_bench',
+            pot_bench,
+            args: ['[benchmark]'],
+            workdir: meson.source_root(),
+            timeout: 300,
+        )
+    endif
 endif
 
 # ------------------------ Install / pkg-config for eOn and other consumers
@@ -405,7 +513,7 @@ endif
 #   -Dwith_tests=false -Dwith_examples=false
 #   -Dwith_xtb=false -Dwith_metatomic=false
 # See docs/eon_pkgconfig.md.
-if not meson.is_subproject() and _rpc_stack
+if not meson.is_subproject()
     # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
     install_subdir(
         'rgpot',
@@ -423,25 +531,54 @@ if not meson.is_subproject() and _rpc_stack
             '*.py',
         ],
     )
-    # Schema source next to generated header (rpc meson installs .h).
-    install_data(
-        'rgpot/rpc/Potentials.capnp',
-        install_dir: get_option('includedir') / 'rgpot' / 'rpc',
-    )
+    if _rpc_stack
+        # Schema source next to generated header (rpc meson installs .h).
+        install_data(
+            'rgpot/rpc/Potentials.capnp',
+            install_dir: get_option('includedir') / 'rgpot' / 'rpc',
+        )
+    endif
+
+    # The .pc always ships: consumers discover whatever this build enabled
+    # through the RGPOT_HAS_* cflags rather than by the file's absence.
+    _pc_libs = []
+    _pc_requires = []
+    _pc_cflags = []
+    if not get_option('with_rpc_client_only')
+        _pc_libs += [rgpot]
+        _pc_cflags += ['-DRGPOT_HAS_POTLIB=TRUE']
+        if has_fortran
+            _pc_cflags += ['-DRGPOT_HAS_FORTRAN_POTS=TRUE']
+        endif
+        if has_metatomic
+            _pc_cflags += ['-DRGPOT_HAS_METATOMIC_POT=TRUE']
+        endif
+        if has_xtb
+            _pc_cflags += ['-DRGPOT_HAS_XTB_POT=TRUE']
+        endif
+        if has_tblite
+            _pc_cflags += ['-DRGPOT_HAS_TBLITE_POT=TRUE']
+        endif
+    endif
+    if _rpc_stack
+        _pc_libs += [nwchempot, cpmdpot]
+        _pc_requires += ['capnp-rpc']
+        _pc_cflags += [
+            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
+            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
+        ]
+    endif
 
     pkg = import('pkgconfig')
     pkg.generate(
         name: 'rgpot',
-        description: 'rgpot NWChem/CPMD frontends (dlopen engines) + ptlrpc',
+        description: 'rgpot potentials (librgpot umbrella) + QM frontends',
         url: 'https://github.com/OmniPotentRPC/rgpot',
         version: meson.project_version(),
-        libraries: [nwchempot, cpmdpot, ptlrpc],
-        requires: ['capnp-rpc'],
+        libraries: _pc_libs,
+        requires: _pc_requires,
         subdirs: ['.'],
-        extra_cflags: [
-            '-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE',
-            '-DRGPOT_HAS_CPMD_FRONTEND=TRUE',
-        ],
+        extra_cflags: _pc_cflags,
         filebase: 'rgpot',
     )
 endif

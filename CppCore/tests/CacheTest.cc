@@ -145,3 +145,45 @@ TEST_CASE("Potential caching with rgpot", "[Potential]") {
     // We just check it didn't throw exceptions
   }
 }
+
+TEST_CASE("Cache keys separate parameter sets", "[Potential][cache]") {
+  // Two atoms 5 A apart: inside a 15 A cutoff, outside a 3 A cutoff, so
+  // the energies must differ and a shared cache entry would be visible.
+  rgpot::types::AtomMatrix positions(2, 3);
+  positions(0, 0) = 0.0;
+  positions(0, 1) = 0.0;
+  positions(0, 2) = 0.0;
+  positions(1, 0) = 5.0;
+  positions(1, 1) = 0.0;
+  positions(1, 2) = 0.0;
+  std::vector<int> types(2, 1);
+  std::array<std::array<double, 3>, 3> box = {
+      {{50, 0, 0}, {0, 50, 0}, {0, 0, 50}}};
+
+  auto potWide = std::make_shared<rgpot::LJPot>();
+  auto potNarrow =
+      std::make_shared<rgpot::LJPot>(rgpot::LJConfig{.cutoff = 3.0});
+
+  REQUIRE(potWide->paramsKey() != potNarrow->paramsKey());
+
+  std::string db_path = "/tmp/rgpot_test_rocksdb_params";
+  rocksdb::Options opts;
+  rocksdb::DestroyDB(db_path, opts);
+  auto pcache = rgpot::cache::PotentialCache(db_path);
+  potWide->set_cache(&pcache);
+  potNarrow->set_cache(&pcache);
+
+  auto [eWide, fWide, vWide] = (*potWide)(positions, types, box);
+  // Same positions, types, box, and PotType: only paramsKey separates the
+  // two entries. A shared entry would return eWide here.
+  auto [eNarrow, fNarrow, vNarrow] = (*potNarrow)(positions, types, box);
+
+  REQUIRE(eWide != eNarrow);
+  REQUIRE(eNarrow == 0.0); // pair beyond the 3 A cutoff contributes nothing
+
+  // Both entries persist independently.
+  auto [eWide2, fWide2, vWide2] = (*potWide)(positions, types, box);
+  auto [eNarrow2, fNarrow2, vNarrow2] = (*potNarrow)(positions, types, box);
+  REQUIRE(eWide2 == eWide);
+  REQUIRE(eNarrow2 == eNarrow);
+}

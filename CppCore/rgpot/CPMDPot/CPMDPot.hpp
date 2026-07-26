@@ -24,6 +24,13 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
+  /// The dlopen'd engine keeps global session state: serialize
+  /// process-wide.
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.reentrancy = Reentrancy::ProcessSerial};
+  }
+
+
   bool setParams(const ::CPMDParams::Reader &params);
 
   void getParams(::CPMDParams::Builder out) const;
