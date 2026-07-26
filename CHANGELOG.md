@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.0.1](https://github.com/OmniPotentRPC/rgpot/tree/3.0.1) - 2026-07-26
+
+### Fixed
+
+- The Python wheel builds the Fortran 2018 potentials. `[tool.meson-python.args]`
+  never passed `-Dwith_fortran_pots`, so a wheel carried a `librgpot` with no
+  Fortran-backed potential in it -- SW, EDIP, Lenosky, Tersoff, EAM-Al, FeHe,
+  CuH2, and TIP4P-H were all missing from the one artifact most users install.
+  The cibuildwheel configuration installs a Fortran compiler in the build
+  image to match, and the repair step vendors `libgfortran` as it would any
+  other dependency.
+
+
 ## [3.0.0](https://github.com/OmniPotentRPC/rgpot/tree/3.0.0) - 2026-07-26
 
 ### Added

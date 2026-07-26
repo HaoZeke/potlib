@@ -1,6 +1,6 @@
 [project]
 name = "rgpot"
-version = "3.0.0"
+version = "3.0.1"
 description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic multi-ABI dlopen; nanobind abi3)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -70,6 +70,13 @@ setup = [
   "-Dwith_rpc_client_only=false",
   "-Dwith_tests=false",
   "-Dwith_examples=false",
+  # The eight Fortran 2018 kernels (SW, EDIP, Lenosky, Tersoff, EAM-Al,
+  # FeHe, CuH2, TIP4P-H). Without this the wheel ships a librgpot with no
+  # Fortran-backed potentials at all -- the pots this library exists to
+  # host. Needs a Fortran compiler in the wheel build environment; the
+  # repair step vendors libgfortran into the wheel like any other
+  # dependency.
+  "-Dwith_fortran_pots=enabled",
   "-Dwith_metatomic=true",
   "-Dwith_xtb=false",
   "-Dwith_tblite=false",
@@ -84,3 +91,14 @@ dist = ["--include-subprojects"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.cibuildwheel]
+# manylinux images carry gcc/g++ but not gfortran, and the Fortran kernels
+# are part of the library's point.
+build-frontend = "build"
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
+
+[tool.cibuildwheel.macos]
+before-all = "brew list gcc >/dev/null 2>&1 || brew install gcc"
