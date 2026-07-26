@@ -296,20 +296,21 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
-      # Without this meson reports Unknown compiler(s): [['cl.exe']] -- the
-      # pixi env carries the toolchain packages but does not put cl.exe on
-      # PATH for the build step.
-      - name: Activate MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-          vsversion: "2022"
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           pixi-version: v0.70.2
           cache: true
           environments: default
           activate-environment: true
+      # After setup-pixi, never before: pixi's activation refuses an
+      # environment whose PATH has already been rewritten rather than
+      # appended. Without this step meson reports
+      # Unknown compiler(s): [['cl.exe']].
+      - name: Activate MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          vsversion: "2022"
       - name: Build & Test (Meson / MSVC)
         shell: bash
         run: |

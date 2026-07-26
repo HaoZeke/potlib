@@ -160,8 +160,8 @@ in
       "runs-on" = P.windows,
       steps = [
         S.checkout_minimal,
-        S.activate_msvc,
         S.setup_pixi_default "default",
+        S.activate_msvc,
         windows_meson_build_test,
       ],
     },
