@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import asyncio
 import argparse
+import math
 import subprocess
+import traceback
 import sys
 import os
 import capnp
@@ -67,9 +69,13 @@ async def run_client(port):
 
     print(f"Received Energy: {result.result.energy}")
     print(f"Received Forces: {list(result.result.forces)}")
-    assert result.result.energy == -0.67880756881223303
-    assert result.result.forces[0] == -7.556524918281001
-    assert result.result.forces[3] == 7.556524918281001
+    # CuH2 is the Fortran 2018 kernel now, and it agrees with the kernel it
+    # replaced to 1e-6 rather than bit for bit -- the same tolerance
+    # CuH2PotTest pins. Exact equality here was asserting a guarantee the
+    # rewrite never claimed.
+    assert math.isclose(result.result.energy, -0.678808, rel_tol=1e-6)
+    assert math.isclose(result.result.forces[0], -7.5565221, rel_tol=1e-6)
+    assert math.isclose(result.result.forces[3], 7.5565221, rel_tol=1e-6)
 
     # Basic physical sanity check
     if result.result.energy == 0.0 or np.isnan(result.result.energy):
@@ -250,11 +256,17 @@ def main():
     try:
         #  Run Client
         success = asyncio.run(capnp.run(run_client(args.port)))
-    except Exception as e:
-        print(f"Exception during test: {e}")
-        # Print server stderr to help debug
-        print("Server stderr:")
-        print(server_proc.stderr.read().decode())
+    except BaseException as e:
+        # Kill first, then drain: reading a live server's stderr blocks until
+        # it exits, which turned an assertion failure into a job that sat
+        # until the six-hour CI timeout. Print the type and traceback too --
+        # `{e}` alone is empty for AssertionError.
+        print(f"Exception during test: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        server_proc.kill()
+        out, err = server_proc.communicate(timeout=30)
+        print("Server stdout:", out.decode(errors="replace")[-4000:])
+        print("Server stderr:", err.decode(errors="replace")[-4000:])
         success = False
     finally:
         # Cleanup
