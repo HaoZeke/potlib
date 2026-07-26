@@ -160,7 +160,10 @@ in
       "runs-on" = P.windows,
       steps = [
         S.checkout_minimal,
-        S.setup_pixi_default "default",
+        # No activate-environment: the default env carries vs2022_win-64 and
+        # vswhere, whose activation rewrites PATH rather than appending, and
+        # setup-pixi refuses that. The build step runs through `pixi run`.
+        S.setup_pixi "default" false,
         S.activate_msvc,
         windows_meson_build_test,
       ],
