@@ -5,7 +5,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -405,7 +407,21 @@ TEST_CASE("MetatomicPot construction applies configured torch determinism policy
 // set is identical call-to-call. Any force/energy drift is provider
 // nondeterminism, not SO3 RNG. Do NOT cite mismatched CLI (different
 // n_symmetry_rotations or torch_determinism) as provider nondeterminism.
-TEST_CASE("Strict MetatomicPot SO3 n=4 is bit-stable across matched force calls",
+//
+// The bound is a few ulp rather than equality because that is the guarantee
+// the provider actually offers. Instrumenting this path shows rgpot handing
+// the model bit-identical inputs -- the positions, cell, and neighbour list
+// hash the same on every pass of both calls -- and getting energies back that
+// differ by one to two ulp on a call chosen at random. It reproduces with
+// OMP_NUM_THREADS=1, with the profiling executor frozen, and with the pair
+// vectors copied into torch-owned storage, so it is neither thread-count
+// reassociation, nor graph specialization, nor alignment of our buffers; what
+// remains is reassociation inside the model evaluation, below
+// setDeterministicAlgorithms. Tighten this back to equality if metatensor or
+// torch ever grow that guarantee; widening it further would instead be a
+// regression worth investigating.
+TEST_CASE("Strict MetatomicPot SO3 n=4 holds to a few ulp across matched "
+          "force calls",
           "[metatomic][determinism][provider]") {
   TorchContextSnapshot snap;
 
@@ -433,11 +449,22 @@ TEST_CASE("Strict MetatomicPot SO3 n=4 is bit-stable across matched force calls"
   (void)v1;
   (void)v2;
 
-  // Bit-stable on CPU under Strict: energies and forces must match exactly.
-  REQUIRE(e1 == e2);
+  // Stable to a few ulp on CPU under Strict. The energy is a sum over the
+  // whole system, so it is compared in ulp of its own magnitude; the force
+  // components straddle zero, where an ulp bound degenerates, so they take an
+  // absolute floor scaled to the largest component instead.
+  REQUIRE_THAT(e2, Catch::Matchers::WithinULP(e1, 4));
+
+  double f_scale = 0.0;
   for (int i = 0; i < N_ATOMS; ++i) {
     for (int j = 0; j < 3; ++j) {
-      REQUIRE(f1(i, j) == f2(i, j));
+      f_scale = std::max(f_scale, std::abs(f1(i, j)));
+    }
+  }
+  const double f_tol = std::max(1e-12, 1e-12 * f_scale);
+  for (int i = 0; i < N_ATOMS; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      REQUIRE_THAT(f2(i, j), Catch::Matchers::WithinAbs(f1(i, j), f_tol));
     }
   }
 }

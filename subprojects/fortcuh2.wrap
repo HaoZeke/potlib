@@ -1,6 +1,4 @@
 [wrap-git]
 directory=fortcuh2
 url=https://github.com/TheochemUI/fortran_cuh2_src.git
-revision=v0.0.2
-# Applied after clone: Darwin links fortcuh2 with the C driver (see packagefiles).
-patch_directory = fortcuh2
+revision=92236a64fe05852c1313dbc09cbb1c3581d104ee
