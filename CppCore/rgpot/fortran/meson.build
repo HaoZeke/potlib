@@ -19,25 +19,25 @@ _fpot_args = fc.get_supported_arguments(
 )
 
 fortran_pots_sources = files(
-    'rgpot_kinds.f90',
-    'rgpot_ferror.f90',
-    'rgpot_neighbors.f90',
-    'rgpot_sw.f90',
-    'rgpot_sw_capi.f90',
     'rgpot_cuh2.f90',
     'rgpot_cuh2_capi.f90',
     'rgpot_eam_al.f90',
     'rgpot_eam_al_capi.f90',
-    'rgpot_fehe.f90',
-    'rgpot_fehe_capi.f90',
-    'rgpot_water_h.f90',
-    'rgpot_water_h_capi.f90',
-    'rgpot_tersoff.f90',
-    'rgpot_tersoff_capi.f90',
     'rgpot_edip.f90',
     'rgpot_edip_capi.f90',
+    'rgpot_fehe.f90',
+    'rgpot_fehe_capi.f90',
+    'rgpot_ferror.f90',
+    'rgpot_kinds.f90',
     'rgpot_lenosky.f90',
     'rgpot_lenosky_capi.f90',
+    'rgpot_neighbors.f90',
+    'rgpot_sw.f90',
+    'rgpot_sw_capi.f90',
+    'rgpot_tersoff.f90',
+    'rgpot_tersoff_capi.f90',
+    'rgpot_water_h.f90',
+    'rgpot_water_h_capi.f90',
 )
 
 # C++ faces over the bind(c) entries.
