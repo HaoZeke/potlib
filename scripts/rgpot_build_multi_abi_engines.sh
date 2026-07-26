@@ -53,12 +53,16 @@ ensure_torch_prefix() {
   rm -rf "$prefix"
   mkdir -p "$prefix" "$ABI_ROOT/wheels-$maj"
   echo "  fetch torch $maj into $prefix"
-  # 1) try install for this interpreter
+  # 1) try install for this interpreter (pip, then uv)
   if "$PY" -m pip install -q "torch==${maj}.*" \
       --index-url https://download.pytorch.org/whl/cpu \
       --target "$prefix" 2>"$ABI_ROOT/pip-$maj.log"; then
     :
   elif "$PY" -m pip install -q "torch==${maj}.*" --target "$prefix" 2>>"$ABI_ROOT/pip-$maj.log"; then
+    :
+  elif command -v uv >/dev/null 2>&1 && uv pip install -q --python "$PY" --target "$prefix" \
+      "torch==${maj}.*" --index-url https://download.pytorch.org/whl/cpu \
+      2>>"$ABI_ROOT/pip-$maj.log"; then
     :
   else
     # 2) download a manylinux wheel for an older CPython tag and extract
