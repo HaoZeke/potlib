@@ -136,9 +136,18 @@ endif()
 
 if(NOT RGPOT_RPC_CLIENT_ONLY)
   # Basic sources
+  # The classical pots potserv can serve. Keep this in step with the arms in
+  # rgpot/rpc/server.cpp: the server names them unconditionally, so a missing
+  # source here surfaces as an undefined constructor at link time rather than
+  # as a smaller build.
   set(RGPOT_SOURCES
-      CppCore/rgpot/PotHelpers.cc CppCore/rgpot/units.cc
-      CppCore/rgpot/LennardJones/LJPot.cc CppCore/rgpot/CuH2/cuh2Utils.cc)
+      CppCore/rgpot/PotHelpers.cc
+      CppCore/rgpot/units.cc
+      CppCore/rgpot/LennardJones/LJPot.cc
+      CppCore/rgpot/LennardJones/LJClusterPot.cc
+      CppCore/rgpot/Morse/MorsePot.cc
+      CppCore/rgpot/ZBL/ZBLPot.cc
+      CppCore/rgpot/CuH2/cuh2Utils.cc)
 
   # NWChemPot / CPMDPot are pure dlopen consumers of the split nwchemc / cpmdc
   # engines (parity with meson). Cap'n Proto params live in the generated schema,
