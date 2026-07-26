@@ -7,6 +7,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.0.0](https://github.com/OmniPotentRPC/rgpot/tree/3.0.0) - 2026-07-26
+
+### Added
+
+- Pot-hosting groundwork for absorbing eOn's potential kernels:
+  `PotCaps` capability descriptors (`PotentialBase::caps()`) replace
+  caller-side thread-safety lists; `paramsKey()` parameter fingerprints
+  (FNV-1a + kernel-version salt) join the result-cache key so instances
+  with different parameters never share entries; `LJConfig` establishes
+  the plain-aggregate parameter convention; a `pot_bench` Catch2
+  microbenchmark harness gates future pot migrations; `potctl` locksteps
+  `pyproject.toml`. ([#57](https://github.com/OmniPotentRPC/rgpot/issues/57))
+- Eight potentials absorbed from eOn arrive as Fortran 2018 kernels under
+  `CppCore/rgpot/fortran/`: Stillinger-Weber, EDIP, Lenosky, Tersoff, EAM
+  aluminium, FeHe, CuH2, and TIP4P-H. Each is a rewrite rather than a
+  wrapper -- modules with `implicit none`, derived-type parameters in place
+  of COMMON blocks, kinds from `iso_fortran_env` asserted against the C
+  types at compile time, `intent` on every argument, `pure` kernels,
+  structured control flow, and status returns instead of `stop`.
+
+  Neighbours come from vesin through `rgpot_neighbors`, a CSR full-list
+  table carrying pair vectors and distances, and the vendored vesin Fortran
+  interface gained the C API's Verlet `skin` option so the kernels keep the
+  list caching their predecessors had. Pair sums are restated as gathers:
+  each atom accumulates the whole force acting on it and writes one column,
+  so the atom loops run under `do concurrent`. Bond-order and embedding
+  kernels reach the same form in three passes, since the environment
+  derivative is not known until its sum completes.
+
+  Each kernel carries a Fortran-only test (translation invariance, zero net
+  force, analytic forces against central differences of the energy) and is
+  pinned in `FortranPotsTest` to the reference energies of the kernels it
+  replaces. The kernel archives link under `--exclude-libs`, so no Fortran
+  symbol reaches the library interface; a test fails the suite if one ever
+  does.
+- Three classical potentials absorbed from eOn, always built: `MorsePot`
+  (pairwise Morse with the shifted cutoff, platinum defaults through
+  `MorseConfig`), `LJClusterPot` (12-6 Lennard-Jones on free boundaries,
+  `LJClusterConfig`), and `ZBLPot` (screened nuclear repulsion with the
+  LAMMPS switching function, `ZBLConfig{cut_inner, cut_global}`, which
+  rejects a cutoff pair outside `0 < cut_inner < cut_global`). All three
+  take their pairs from the shared `PairListCache`, carry `paramsKey()`
+  fingerprints, and appear in `pot_bench`. `PotType` gains `Morse`,
+  `LJCluster` and `ZBL`.
+
+### Changed
+
+- `LJPot` pair search goes through `rgpot::nlist::PairListCache` (header-only
+  port of eOn's PairListCache): Verlet-skin cached candidate lists in a
+  process-global proximity-matched pool, lazy list capture so one-shot
+  evaluations run a single fused scan, exact per-call MIC folding, and the
+  inverse-r2 pair math instead of `pow()`/`sqrt()`. Boxes where MIC caching
+  is unsound keep the historical per-call scan. ([#56](https://github.com/OmniPotentRPC/rgpot/issues/56))
+- One versioned `librgpot.so.3` umbrella: every pot builds as a PIC static
+  convenience library folded in via `link_whole`; only dlopen'd engine
+  plugins ship as separate shared objects. `rgpot.pc` always installs when
+  rgpot is the top-level project, exporting the umbrella with
+  `RGPOT_HAS_*` feature cflags. vesin resolves once at top level
+  (installed >=0.6 preferred, vendored `third_party/vesin` fallback with
+  the Fortran interface), and the new `with_fortran_pots` feature
+  decouples Fortran-backed potentials from the RPC role options.
+  Statistics counters in `registry<T>` are atomic, and public headers no
+  longer inject `AtomMatrix` at namespace scope. CI gains the first
+  Windows leg and an offline `--wrap-mode=nodownload` rehearsal of the
+  release-tarball build. ([#57](https://github.com/OmniPotentRPC/rgpot/issues/57))
+- The Cap'n Proto schema ships inside `librgpot` instead of a separate
+  `libptlrpc.so`. Consumers that bundle the umbrella alone -- pip wheels
+  especially -- no longer need a second shared object beside it, and
+  `rgpot.pc` correspondingly stops listing `-lptlrpc`; the symbols are
+  unchanged and still exported from `librgpot`. `potserv` and
+  `pot_client_bridge` take the generated translation unit from the shared
+  archive rather than compiling their own copy.
+- The CuH2 potential is the in-tree Fortran 2018 kernel
+  (`CppCore/rgpot/fortran/rgpot_cuh2.f90`), reached through
+  `rgpot::fortranpots::CuH2Pot` from `rgpot/fortran/FortranPots.hpp`. It
+  matches the energy and forces of the kernel it replaces to 1e-6 on the
+  geometry `CuH2PotTest` pins. `rgpot::CuH2Pot` and
+  `rgpot/CuH2/CuH2Pot.hpp` are gone, and with them the `fortcuh2`
+  subproject and its wrap-git entry, so a source build needs no download
+  for the Fortran pots and the offline `--wrap-mode=nodownload` CI leg
+  covers them. `rgpot/CuH2/cuh2Utils.hpp` keeps the slab-geometry helpers
+  unchanged. In-tree sources gate the Fortran pots on
+  `RGPOT_HAS_FORTRAN_POTS`, the same cflag `rgpot.pc` exports to
+  consumers.
+
+### Fixed
+
+- `potctl`'s lockstep check now covers `pyproject.toml`, so the Python
+  package version cannot drift away from meson, CMake, cargo, pixi, and
+  towncrier again. It had: 2.5.4 went to PyPI as a multi-ABI wheel set
+  (torch 2.7 through 2.13) while every other surface stayed at 2.5.3. All
+  six now read the same version, and the check fails the build when they
+  do not. ([#52](https://github.com/OmniPotentRPC/rgpot/issues/52))
+- Four link-layout defects in the umbrella build, each of which only
+  surfaced in a profile that combines the RPC stack with the Fortran
+  potentials:
+
+  - Every convenience archive carried its own copy of the vendored vesin
+    translation unit, because meson copies a static library's objects into
+    each static library that links it, so the umbrella saw multiple
+    definitions of vesin's thread-local error state. The archives take a
+    headers-only view now and the objects enter `librgpot` -- and each leaf
+    binary -- exactly once.
+  - `librgpot` linked without the Fortran runtime: it is a C++ target that
+    takes the kernels through `link_whole`, which leaves meson no Fortran
+    source to infer the runtime from. It is now named per compiler id.
+  - `ptlrpc_dep` exported the generated capnp `.cpp` as a dependency source,
+    compiling a second copy of that translation unit into every consumer.
+    Only the generated header propagates.
+  - The umbrella exported the RPC entry points only when something inside
+    `librgpot` happened to reference them; they are folded in with
+    `link_whole` now, since it is consumers that call them.
+- The RPC integration test compares the CuH2 energy and forces at the same
+  1e-6 tolerance `CuH2PotTest` uses, instead of asserting exact float
+  equality against values from the kernel the Fortran 2018 rewrite replaced.
+  Its error path also kills the server before draining its output: reading a
+  live server's stderr blocks until that process exits, so an assertion
+  failure did not report itself, it sat until the six-hour CI timeout. The
+  handler now prints the exception type and traceback as well, since
+  `AssertionError` stringifies to nothing.
+- The strict-determinism metatomic test no longer requires two matched force
+  calls to agree bit for bit, because the provider does not offer that.
+  Instrumenting the path shows rgpot handing the model identical inputs --
+  positions, cell, and neighbour list all hash the same on every SO3 pass of
+  both calls -- and getting energies back that differ by one to two ulp on a
+  call chosen at random. It reproduces with `OMP_NUM_THREADS=1`, with the
+  TorchScript profiling executor frozen, and with the pair vectors copied
+  into torch-owned storage, so it is neither thread-count reassociation, nor
+  graph specialization, nor alignment of the buffers rgpot passes in. The
+  test now bounds the energy at four ulp and the force components at an
+  absolute floor scaled to the largest component, which still fails on any
+  drift larger than the provider's own noise.
+- The vendored vesin Fortran interface builds under LLVM Flang on Windows.
+  It bound `vesin_neighbors` directly, which takes the device and options
+  structs by value; Flang cannot lower a by-value `BIND(C)` derived type on
+  the `x86_64-pc-windows-msvc` target and aborts the compiler outright
+  ("not yet implemented: passing VALUE BIND(C) derived type for this
+  target"), so no Fortran consumer of vesin could be built there at all.
+  vesin gains `vesin_neighbors_byref`, which takes both structs through
+  pointers and forwards them by value, and the Fortran module binds to that.
+  Marked as an upstream candidate alongside the other local vesin patches.
+
+
 ## [2.5.3](https://github.com/OmniPotentRPC/rgpot/tree/2.5.3) - 2026-07-20
 
 ### Fixed

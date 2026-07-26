@@ -116,7 +116,7 @@ if not get_option('with_rpc_client_only')
         include_directories: _incdirs,
         link_whole: [rgpot_core] + _linkto + _rpc_whole,
         version: meson.project_version(),
-        soversion: '2',
+        soversion: '3',
         install: not meson.is_subproject(),
     )
 
