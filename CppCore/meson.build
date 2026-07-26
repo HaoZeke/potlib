@@ -154,8 +154,7 @@ if rpc_enabled and not get_option('with_rpc_client_only')
         'potserv',
         ['rgpot/rpc/server.cpp'],
         link_with: [ptlrpc, _linkto],
-        dependencies: _deps + [capnp_rpc_dep, ptlrpc_hdr_dep, vesin_dep]
-        + fortran_rt_deps,
+        dependencies: _deps + [capnp_rpc_dep, ptlrpc_hdr_dep, vesin_dep] + fortran_rt_deps,
         cpp_args: _args,
         include_directories: _incdirs,
         link_language: 'cpp',

@@ -1,4 +1,4 @@
-// automatically generated 
+// automatically generated
 // vesin version: 0.6.0
 
 #include <cassert>
