@@ -255,6 +255,8 @@ if(RGPOT_BUILD_TESTS)
       add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endfunction()
 
+    add_pot_test(LJPotTest CppCore/tests/LJPotTest.cc)
+
     if(RGPOT_HAS_FORTRAN)
       add_pot_test(CuH2Test CppCore/tests/CuH2PotTest.cc)
     endif()

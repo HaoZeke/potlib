@@ -10,6 +10,7 @@
  */
 
 // clang-format off
+#include <cmath>
 #include <utility>
 #include <vector>
 #include <stdexcept>
@@ -28,9 +29,26 @@ namespace rgpot {
 class LJPot : public Potential<LJPot> {
 public:
   /**
+   * @brief Constructs the potential from well depth, cutoff and length scale.
+   * @param u0_ Well depth.
+   * @param cuttOffR_ Distance beyond which the potential is truncated.
+   * @param psi_ Distance at which the inter-particle potential is zero.
+   *
+   * @c cuttOffU is the potential evaluated at @c cuttOffR_ and is subtracted
+   * from every pair term, so the pair potential vanishes continuously at the
+   * cutoff. Members initialize in declaration order, so @c cuttOffU may read
+   * the three parameters above it.
+   */
+  LJPot(double u0_, double cuttOffR_, double psi_)
+      : Potential(PotType::LJ), u0{u0_}, cuttOffR{cuttOffR_}, psi{psi_},
+        cuttOffU{4 * u0 *
+                 (std::pow(psi / cuttOffR, 12) - std::pow(psi / cuttOffR, 6))} {
+  }
+
+  /**
    * @brief Default constructor initializing parameters.
    */
-  LJPot() : Potential(PotType::LJ), u0{1.0}, cuttOffR{15.0}, psi{1.0} {}
+  LJPot() : LJPot(1.0, 15.0, 1.0) {}
 
   /**
    * @brief Computes the forces and energy for a given configuration.
