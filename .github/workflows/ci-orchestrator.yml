@@ -306,7 +306,8 @@ jobs:
           pixi-version: v0.70.2
           cache: true
           # rpc feature brings capnproto (required for with_rpc=true).
-          environments: default,devbld
+          # space-separated: setup-pixi / pixi reject "default,devbld" as one name
+          environments: devbld
       # cl.exe still has to be on PATH for meson's compiler detection inside
       # `pixi run`; without this it reports Unknown compiler(s): [['cl.exe']].
       - name: Activate MSVC
