@@ -12,7 +12,14 @@ host_system = host_machine.system()
 # Add C++ compiler options
 _cppc_early = meson.get_compiler('cpp')
 if _cppc_early.get_id() == 'msvc' or _cppc_early.get_id() == 'clang-cl'
-    cpp_args = ['/W3']
+    # WIN32_LEAN_AND_MEAN / NOMINMAX: keep windows.h from defining COM
+    # symbols (e.g. IPrintDialogServices) that break Cap'n Proto templates
+    # under MSVC when any TU mixes windows.h with capnp headers.
+    cpp_args = [
+        '/W3',
+        '/DWIN32_LEAN_AND_MEAN',
+        '/DNOMINMAX',
+    ]
 else
     cpp_args = ['-Wall', '-Wextra', '-Wpedantic']
 endif

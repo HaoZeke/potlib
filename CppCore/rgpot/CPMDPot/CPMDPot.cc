@@ -1,11 +1,12 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 
+#include "rgpot/CPMDPot/CPMDPot.hpp"
+
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 #include <kj/array.h>
 
-#include "rgpot/CPMDPot/CPMDPot.hpp"
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/NWChemPot/DynLib.hpp"
 #include "rgpot/units.hpp"

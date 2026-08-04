@@ -1,12 +1,13 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 
+#include "rgpot/NWChemPot/NWChemPot.hpp"
+
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 #include <kj/array.h>
 
 #include "rgpot/NWChemPot/DynLib.hpp"
-#include "rgpot/NWChemPot/NWChemPot.hpp"
 #include "rgpot/NWChemPot/nwchem_c_abi.h"
 #include "rgpot/units.hpp"
 

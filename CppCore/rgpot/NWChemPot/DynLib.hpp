@@ -13,6 +13,12 @@
 #include <string>
 
 #if defined(_WIN32) || defined(_WIN64)
+// Cap'n Proto headers must not see full windows.h: commdlg defines
+// IPrintDialogServices, which then collides with capnp's Kind templates
+// (MSVC C2838 in generated-header-support.h / capability.h).
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
