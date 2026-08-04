@@ -9,15 +9,12 @@ potentials_schema_proj = subproject('potentials-schema')
 potentials_schema_canonical = potentials_schema_proj.get_variable(
     'potentials_capnp_file',
 )
-schema_sync_check = [
-    '-c',
-    # Normalize newlines so Windows checkouts (CRLF) still match the wrap tree (LF).
-    'import pathlib, sys; a=pathlib.Path(sys.argv[1]).read_bytes().replace(b"\r\n", b"\n"); b=pathlib.Path(sys.argv[2]).read_bytes().replace(b"\r\n", b"\n"); sys.exit(0 if a==b else "vendored Potentials.capnp diverges from pinned potentials-schema release")',
-]
+schema_sync_check = files('schema_sync_check.py')
 test(
     'schema-sync-canonical-rpc',
     python,
-    args: schema_sync_check + [
+    args: [
+        schema_sync_check,
         meson.current_source_dir() / 'Potentials.capnp',
         potentials_schema_canonical,
     ],
@@ -26,7 +23,8 @@ test(
 test(
     'schema-sync-canonical-core',
     python,
-    args: schema_sync_check + [
+    args: [
+        schema_sync_check,
         meson.project_source_root() / 'rgpot-core/schema/Potentials.capnp',
         potentials_schema_canonical,
     ],

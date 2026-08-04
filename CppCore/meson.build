@@ -108,10 +108,20 @@ if not get_option('with_rpc_client_only')
     if has_fortran
         _rgpot_link_args += _fortran_hide_args
     endif
+    _rgpot_srcs = []
+    _rgpot_cpp_args = _args
+    if host_system == 'windows'
+        # MSVC omits the import library when a DLL exports no symbols.
+        _rgpot_srcs += files('rgpot/win_export.cc')
+        _rgpot_cpp_args += [
+            '-DMESON_PROJECT_VERSION="@0@"'.format(meson.project_version()),
+        ]
+    endif
     rgpot = library(
         'rgpot',
+        _rgpot_srcs,
         dependencies: rgpot_deps,
-        cpp_args: _args,
+        cpp_args: _rgpot_cpp_args,
         link_args: _rgpot_link_args,
         include_directories: _incdirs,
         link_whole: [rgpot_core] + _linkto + _rpc_whole,
