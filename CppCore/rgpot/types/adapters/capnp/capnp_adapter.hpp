@@ -10,6 +10,7 @@
  * @c Eigen based @c AtomMatrix and other STL types.
  */
 
+#include <array>
 #include <vector>
 
 #include "rgpot/rpc/Potentials.capnp.h"

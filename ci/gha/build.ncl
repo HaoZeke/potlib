@@ -77,6 +77,7 @@ let windows_meson_build_test =
   # MSVC lib.exe must win over flang's llvm-ar (see win-flang-msvc.ini).
   export AR=lib
   pixi run -e devbld meson setup bbdir \
+    --buildtype=release \
     --native-file %{P.win_flang_msvc_native_file} \
     -Dwith_tests=true \
     -Dwith_examples=false \
