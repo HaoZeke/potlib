@@ -1,3 +1,6 @@
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_CPMDC_BUILD
+#endif
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/rpc/Potentials.capnp.h"
 
@@ -14,11 +17,6 @@
 #include <string>
 #include <vector>
 
-#if defined(_WIN32) || defined(_WIN64)
-#define RGPOT_FAKE_EXPORT __declspec(dllexport)
-#else
-#define RGPOT_FAKE_EXPORT
-#endif
 
 struct CPMDCSession {
   // Use bytes, not vector<capnp::word>: word is not default-constructible on
@@ -95,11 +93,11 @@ CPMDCResult ok_result(const char *message) {
 
 extern "C" {
 
-RGPOT_FAKE_EXPORT int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes) {
+int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes) {
   return has_flat_message(params_capnp, params_capnp_size_bytes) ? 0 : -1;
 }
 
-RGPOT_FAKE_EXPORT CPMDCResult cpmdc_energy_gradient(
+CPMDCResult cpmdc_energy_gradient(
     int n_atoms, const double *positions_ang, const int *atomic_numbers,
     const void *params_capnp, size_t params_capnp_size_bytes,
     double *grad_h_bohr) {
@@ -112,7 +110,7 @@ RGPOT_FAKE_EXPORT CPMDCResult cpmdc_energy_gradient(
   return fail_result("fake engine requires session result path");
 }
 
-RGPOT_FAKE_EXPORT CPMDCResult cpmdc_energy(int n_atoms, const double *positions_ang,
+CPMDCResult cpmdc_energy(int n_atoms, const double *positions_ang,
                          const int *atomic_numbers, const void *params_capnp,
                          size_t params_capnp_size_bytes) {
   (void)n_atoms;
@@ -157,7 +155,7 @@ int cpmdc_session_set_params(CPMDCSession *session, const void *params_capnp,
   return 0;
 }
 
-RGPOT_FAKE_EXPORT void cpmdc_session_destroy(CPMDCSession *session) { delete session; }
+void cpmdc_session_destroy(CPMDCSession *session) { delete session; }
 
 CPMDCResult cpmdc_session_energy_gradient(CPMDCSession *session, int n_atoms,
                                           const double *positions_ang,
@@ -193,7 +191,7 @@ CPMDCResult cpmdc_session_energy_forces(CPMDCSession *session, int n_atoms,
   return fail_result("fake engine requires session result path");
 }
 
-RGPOT_FAKE_EXPORT size_t cpmdc_potential_result_size_for_force_input(
+size_t cpmdc_potential_result_size_for_force_input(
     const void *force_input_capnp, size_t force_input_capnp_size_bytes) {
   if (!has_flat_message(force_input_capnp, force_input_capnp_size_bytes))
     return 0;
@@ -245,7 +243,7 @@ CPMDCResult cpmdc_session_calculate_forces(
   }
 }
 
-RGPOT_FAKE_EXPORT CPMDCResult cpmdc_session_calculate_result(
+CPMDCResult cpmdc_session_calculate_result(
     CPMDCSession *session, const void *force_input_capnp,
     size_t force_input_capnp_size_bytes, void *potential_result_capnp,
     size_t potential_result_capnp_capacity_bytes,
@@ -297,11 +295,11 @@ CPMDCResult cpmdc_calculate_result(const void *params_capnp,
   return result;
 }
 
-RGPOT_FAKE_EXPORT const char *cpmdc_version(void) { return "cpmdc-fake/0.2"; }
+const char *cpmdc_version(void) { return "cpmdc-fake/0.2"; }
 
-RGPOT_FAKE_EXPORT int cpmdc_available(void) { return 1; }
+int cpmdc_available(void) { return 1; }
 
-RGPOT_FAKE_EXPORT void cpmdc_finalize(void) {}
+void cpmdc_finalize(void) {}
 
 size_t cpmdc_feature_count(void) {
   return sizeof(kFeatures) / sizeof(kFeatures[0]);
@@ -320,18 +318,25 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
 }
 
 // Minimum-profile symbols (potentials-schema PROFILE.md) so the fake serves
-// as the ProfileLoader conformance target.
+// as the ProfileLoader conformance target. Not all of these appear in
+// cpmd_c_abi.h; export them explicitly for MSVC GetProcAddress.
 
-RGPOT_FAKE_EXPORT int cpmdc_abi_version(void) { return 0; }
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_FAKE_ONLY __declspec(dllexport)
+#else
+#define RGPOT_FAKE_ONLY
+#endif
 
-RGPOT_FAKE_EXPORT const char *cpmdc_last_error(void) { return ""; }
+RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
 
-RGPOT_FAKE_EXPORT int cpmdc_configure(const void *config_capnp,
+RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
+
+RGPOT_FAKE_ONLY int cpmdc_configure(const void *config_capnp,
                     size_t config_capnp_size_bytes) {
   return has_flat_message(config_capnp, config_capnp_size_bytes) ? 0 : -1;
 }
 
-RGPOT_FAKE_EXPORT CPMDCSession *cpmdc_session_create_from_config(
+RGPOT_FAKE_ONLY CPMDCSession *cpmdc_session_create_from_config(
     const void *config_capnp, size_t config_capnp_size_bytes) {
   if (!has_flat_message(config_capnp, config_capnp_size_bytes))
     return nullptr;
@@ -341,7 +346,7 @@ RGPOT_FAKE_EXPORT CPMDCSession *cpmdc_session_create_from_config(
   return session;
 }
 
-RGPOT_FAKE_EXPORT int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
+RGPOT_FAKE_ONLY int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
                             size_t config_capnp_size_bytes) {
   if (session == nullptr ||
       !has_flat_message(config_capnp, config_capnp_size_bytes))
@@ -351,7 +356,7 @@ RGPOT_FAKE_EXPORT int cpmdc_session_configure(CPMDCSession *session, const void 
   return 0;
 }
 
-RGPOT_FAKE_EXPORT CPMDCResult cpmdc_calculate_result_from_config(
+RGPOT_FAKE_ONLY CPMDCResult cpmdc_calculate_result_from_config(
     const void *config_capnp, size_t config_capnp_size_bytes,
     const void *force_input_capnp, size_t force_input_capnp_size_bytes,
     void *potential_result_capnp,
@@ -369,7 +374,7 @@ RGPOT_FAKE_EXPORT CPMDCResult cpmdc_calculate_result_from_config(
   return result;
 }
 
-RGPOT_FAKE_EXPORT int cpmdc_capabilities_result(void *capabilities_capnp,
+RGPOT_FAKE_ONLY int cpmdc_capabilities_result(void *capabilities_capnp,
                               size_t capabilities_capnp_capacity_bytes,
                               size_t *capabilities_capnp_size_bytes) {
   if (capabilities_capnp_size_bytes == nullptr)
