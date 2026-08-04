@@ -39,4 +39,3 @@
   no_fortran_native_file = "ci/gha/machines/no-fortran.ini",
   win_flang_msvc_native_file = "ci/gha/machines/win-flang-msvc.ini",
 }
-
