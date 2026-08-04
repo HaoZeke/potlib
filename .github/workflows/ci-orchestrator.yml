@@ -283,12 +283,12 @@ jobs:
   # --- Stage 2a': single Windows leg (explicit job, not a matrix axis) ---
   # Kept out of build_and_test on purpose: adding windows-latest to the
   # os x sys x rpc x cache matrix would take 16 legs to 24. meson only, MSVC
-  # from the default pixi env (vs2022_win-64), rpc/cache off, no potctl
-  # (ci-tools stages ubuntu/macos artifacts only). Fortran is suppressed via
-  # the native file: win-64 pixi ships flang, and the flang/MSVC kernel leg is
-  # a separate phase.
+  # from the default pixi env (vs2022_win-64), no potctl (ci-tools stages
+  # ubuntu/macos artifacts only). Fortran pots use Flang; the native file
+  # forces ar=lib so link.exe accepts flang COFF objects (not llvm-ar GNU
+  # archives / LNK1107). Cap'n Proto RPC is on (WIN32_LEAN_AND_MEAN fix).
   build_windows_meson:
-    name: meson / windows-2022 [MSVC RPC:false CACHE:false]
+    name: meson / windows-2022 [MSVC flang RPC:true CACHE:false]
     needs: [prepare]
     if: github.event_name != 'schedule'
     # windows-latest ships VS 18, where ilammy/msvc-dev-cmd fails (invalid
@@ -313,19 +313,22 @@ jobs:
         with:
           arch: x64
           vsversion: "2022"
-      - name: Build & Test (Meson / MSVC)
+      - name: Build & Test (Meson / MSVC + Flang kernels)
         shell: bash
         run: |
           set -euo pipefail
+          # MSVC lib.exe must win over flang's llvm-ar (see win-flang-msvc.ini).
+          export AR=lib
           pixi run meson setup bbdir \
-            --native-file ci/gha/machines/no-fortran.ini \
+            --native-file ci/gha/machines/win-flang-msvc.ini \
             -Dwith_tests=true \
             -Dwith_examples=false \
             -Dwith_xtensor=false \
-            -Dwith_eigen=false \
-            -Dwith_rpc=false \
+            -Dwith_eigen=true \
+            -Dwith_rpc=true \
+            -Dwith_fortran_pots=enabled \
             -Dwith_cache=false \
-            -Dpure_lib=true
+            -Dpure_lib=false
           pixi run meson compile -C bbdir
           pixi run meson test -C bbdir --print-errorlogs
 
