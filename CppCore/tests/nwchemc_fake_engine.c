@@ -3,18 +3,24 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_FAKE_EXPORT __declspec(dllexport)
+#else
+#define RGPOT_FAKE_EXPORT
+#endif
+
 static int has_flat_message(const void *params_capnp,
                             size_t params_capnp_size_bytes) {
   return params_capnp != NULL && params_capnp_size_bytes >= 8 &&
          (params_capnp_size_bytes % 8) == 0;
 }
 
-int nwchemc_set_params(const void *params_capnp,
+RGPOT_FAKE_EXPORT int nwchemc_set_params(const void *params_capnp,
                        size_t params_capnp_size_bytes) {
   return has_flat_message(params_capnp, params_capnp_size_bytes) ? 0 : -1;
 }
 
-NWChemCResult nwchemc_energy_gradient(
+RGPOT_FAKE_EXPORT NWChemCResult nwchemc_energy_gradient(
     int n_atoms, const double *positions_ang, const int *atomic_numbers,
     const void *params_capnp, size_t params_capnp_size_bytes,
     double *grad_h_bohr) {
@@ -39,6 +45,6 @@ NWChemCResult nwchemc_energy_gradient(
   return r;
 }
 
-const char *nwchemc_version(void) { return "nwchemc-fake/0.1"; }
+RGPOT_FAKE_EXPORT const char *nwchemc_version(void) { return "nwchemc-fake/0.1"; }
 
-int nwchemc_available(void) { return 1; }
+RGPOT_FAKE_EXPORT int nwchemc_available(void) { return 1; }

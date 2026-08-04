@@ -11,7 +11,8 @@ potentials_schema_canonical = potentials_schema_proj.get_variable(
 )
 schema_sync_check = [
     '-c',
-    'import filecmp, sys; sys.exit(0 if filecmp.cmp(sys.argv[1], sys.argv[2], shallow=False) else "vendored Potentials.capnp diverges from pinned potentials-schema release")',
+    # Normalize newlines so Windows checkouts (CRLF) still match the wrap tree (LF).
+    'import pathlib, sys; a=pathlib.Path(sys.argv[1]).read_bytes().replace(b"\r\n", b"\n"); b=pathlib.Path(sys.argv[2]).read_bytes().replace(b"\r\n", b"\n"); sys.exit(0 if a==b else "vendored Potentials.capnp diverges from pinned potentials-schema release")',
 ]
 test(
     'schema-sync-canonical-rpc',
@@ -93,7 +94,7 @@ pot_bridge = library(
     ['pot_bridge.cc'],
     link_with: ptlrpc,
     dependencies: [capnp_rpc_dep, ptlrpc_hdr_dep],
-    cpp_args: _args,
+    cpp_args: _args + ['-DPOT_BRIDGE_BUILD'],
     # gen_rpc outputs live in the build dir; include it explicitly so
     # Potentials.capnp.h is found even when only pot_bridge.cc is compiled first.
     include_directories: _incdirs + [include_directories('.')],
