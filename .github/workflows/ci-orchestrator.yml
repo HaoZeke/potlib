@@ -305,7 +305,8 @@ jobs:
         with:
           pixi-version: v0.70.2
           cache: true
-          environments: default
+          # rpc feature brings capnproto (required for with_rpc=true).
+          environments: default,devbld
       # cl.exe still has to be on PATH for meson's compiler detection inside
       # `pixi run`; without this it reports Unknown compiler(s): [['cl.exe']].
       - name: Activate MSVC
@@ -319,7 +320,7 @@ jobs:
           set -euo pipefail
           # MSVC lib.exe must win over flang's llvm-ar (see win-flang-msvc.ini).
           export AR=lib
-          pixi run meson setup bbdir \
+          pixi run -e devbld meson setup bbdir \
             --native-file ci/gha/machines/win-flang-msvc.ini \
             -Dwith_tests=true \
             -Dwith_examples=false \
@@ -329,8 +330,8 @@ jobs:
             -Dwith_fortran_pots=enabled \
             -Dwith_cache=false \
             -Dpure_lib=false
-          pixi run meson compile -C bbdir
-          pixi run meson test -C bbdir --print-errorlogs
+          pixi run -e devbld meson compile -C bbdir
+          pixi run -e devbld meson test -C bbdir --print-errorlogs
 
   # --- Stage 2a'': offline source-build rehearsal (conda-forge parity) ---
   # Builds the `git archive` tree (tracked files, no .git, no checked-out wrap
