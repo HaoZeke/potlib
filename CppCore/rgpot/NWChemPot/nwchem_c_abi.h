@@ -17,6 +17,12 @@
 extern "C" {
 #endif
 
+#if defined(RGPOT_NWCHEMC_BUILD) && (defined(_WIN32) || defined(_WIN64))
+#define RGPOT_NWCHEMC_API __declspec(dllexport)
+#else
+#define RGPOT_NWCHEMC_API
+#endif
+
 /** Result of energy+gradient (atomic units). */
 typedef struct NWChemCResult {
   int ok;            /**< 1 success, 0 failure */
@@ -29,7 +35,7 @@ typedef struct NWChemCResult {
  *
  * @return 0 on success, non-zero if embed unavailable or params are invalid
  */
-int nwchemc_set_params(const void *params_capnp,
+RGPOT_NWCHEMC_API int nwchemc_set_params(const void *params_capnp,
                        size_t params_capnp_size_bytes);
 
 /**
@@ -42,16 +48,16 @@ int nwchemc_set_params(const void *params_capnp,
  * @param params_capnp_size_bytes size of params_capnp in bytes
  * @param grad_h_bohr             out n_atoms*3 Hartree/Bohr, row-major
  */
-NWChemCResult nwchemc_energy_gradient(
+RGPOT_NWCHEMC_API NWChemCResult nwchemc_energy_gradient(
     int n_atoms, const double *positions_ang, const int *atomic_numbers,
     const void *params_capnp, size_t params_capnp_size_bytes,
     double *grad_h_bohr);
 
 /** Engine version string (static buffer). */
-const char *nwchemc_version(void);
+RGPOT_NWCHEMC_API const char *nwchemc_version(void);
 
 /** 1 if real embed (RGPOT_HAS_NWCHEM), 0 if stub. */
-int nwchemc_available(void);
+RGPOT_NWCHEMC_API int nwchemc_available(void);
 
 #ifdef __cplusplus
 }

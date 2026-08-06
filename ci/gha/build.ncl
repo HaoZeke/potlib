@@ -74,19 +74,23 @@ in
 let windows_meson_build_test =
   S.run_bash m%"
   set -euo pipefail
-  pixi run meson setup bbdir \
-    --native-file %{P.no_fortran_native_file} \
+  # MSVC lib.exe must win over flang's llvm-ar (see win-flang-msvc.ini).
+  export AR=lib
+  pixi run -e devbld meson setup bbdir \
+    --buildtype=release \
+    --native-file %{P.win_flang_msvc_native_file} \
     -Dwith_tests=true \
     -Dwith_examples=false \
     -Dwith_xtensor=false \
-    -Dwith_eigen=false \
-    -Dwith_rpc=false \
+    -Dwith_eigen=true \
+    -Dwith_rpc=true \
+    -Dwith_fortran_pots=enabled \
     -Dwith_cache=false \
-    -Dpure_lib=true
-  pixi run meson compile -C bbdir
-  pixi run meson test -C bbdir --print-errorlogs
+    -Dpure_lib=false
+  pixi run -e devbld meson compile -C bbdir
+  pixi run -e devbld meson test -C bbdir --print-errorlogs
 "%
-  & { name = "Build & Test (Meson / MSVC)" }
+  & { name = "Build & Test (Meson / MSVC + Flang kernels)" }
 in
 
 let nodownload_export =
@@ -151,19 +155,17 @@ in
     },
     # Single explicit Windows leg, deliberately NOT folded into the
     # os x sys x rpc x cache matrix above (that would take 16 legs to 24).
-    # meson only, MSVC from the default pixi env (vs2022_win-64); no potctl
-    # artifact, since ci-tools builds ubuntu/macos only. Fortran off via the
-    # no-fortran native file: win-64 pixi ships flang, and the flang/MSVC
-    # kernel leg is a separate phase.
+    # meson only, MSVC + Flang kernels + Cap'n Proto RPC (WIN32_LEAN_AND_MEAN).
+    # Native file forces ar=lib so link.exe accepts flang COFF objects.
     build_windows_meson = {
-      name = "meson / windows-2022 [MSVC RPC:false CACHE:false]",
+      name = "meson / windows-2022 [MSVC flang RPC:true CACHE:false]",
       "runs-on" = P.windows,
       steps = [
         S.checkout_minimal,
-        # No activate-environment: the default env carries vs2022_win-64 and
-        # vswhere, whose activation rewrites PATH rather than appending, and
-        # setup-pixi refuses that. The build step runs through `pixi run`.
-        S.setup_pixi "default" false,
+        # No activate-environment: vs2022_win-64/vswhere rewrite PATH and
+        # setup-pixi refuses non-append activation. Use `pixi run -e devbld`.
+        # environments is space-separated (comma forms one invalid name).
+        S.setup_pixi "devbld" false,
         S.activate_msvc,
         windows_meson_build_test,
       ],

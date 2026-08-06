@@ -1,3 +1,6 @@
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_CPMDC_BUILD
+#endif
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/rpc/Potentials.capnp.h"
 
@@ -13,6 +16,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+
 
 struct CPMDCSession {
   // Use bytes, not vector<capnp::word>: word is not default-constructible on
@@ -314,18 +318,25 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
 }
 
 // Minimum-profile symbols (potentials-schema PROFILE.md) so the fake serves
-// as the ProfileLoader conformance target.
+// as the ProfileLoader conformance target. Not all of these appear in
+// cpmd_c_abi.h; export them explicitly for MSVC GetProcAddress.
 
-int cpmdc_abi_version(void) { return 0; }
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_FAKE_ONLY __declspec(dllexport)
+#else
+#define RGPOT_FAKE_ONLY
+#endif
 
-const char *cpmdc_last_error(void) { return ""; }
+RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
 
-int cpmdc_configure(const void *config_capnp,
+RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
+
+RGPOT_FAKE_ONLY int cpmdc_configure(const void *config_capnp,
                     size_t config_capnp_size_bytes) {
   return has_flat_message(config_capnp, config_capnp_size_bytes) ? 0 : -1;
 }
 
-CPMDCSession *cpmdc_session_create_from_config(
+RGPOT_FAKE_ONLY CPMDCSession *cpmdc_session_create_from_config(
     const void *config_capnp, size_t config_capnp_size_bytes) {
   if (!has_flat_message(config_capnp, config_capnp_size_bytes))
     return nullptr;
@@ -335,7 +346,7 @@ CPMDCSession *cpmdc_session_create_from_config(
   return session;
 }
 
-int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
+RGPOT_FAKE_ONLY int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
                             size_t config_capnp_size_bytes) {
   if (session == nullptr ||
       !has_flat_message(config_capnp, config_capnp_size_bytes))
@@ -345,7 +356,7 @@ int cpmdc_session_configure(CPMDCSession *session, const void *config_capnp,
   return 0;
 }
 
-CPMDCResult cpmdc_calculate_result_from_config(
+RGPOT_FAKE_ONLY CPMDCResult cpmdc_calculate_result_from_config(
     const void *config_capnp, size_t config_capnp_size_bytes,
     const void *force_input_capnp, size_t force_input_capnp_size_bytes,
     void *potential_result_capnp,
@@ -363,7 +374,7 @@ CPMDCResult cpmdc_calculate_result_from_config(
   return result;
 }
 
-int cpmdc_capabilities_result(void *capabilities_capnp,
+RGPOT_FAKE_ONLY int cpmdc_capabilities_result(void *capabilities_capnp,
                               size_t capabilities_capnp_capacity_bytes,
                               size_t *capabilities_capnp_size_bytes) {
   if (capabilities_capnp_size_bytes == nullptr)

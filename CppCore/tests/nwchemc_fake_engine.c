@@ -1,3 +1,6 @@
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_NWCHEMC_BUILD
+#endif
 #include "nwchem_c_abi.h"
 
 #include <stddef.h>

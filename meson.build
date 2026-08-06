@@ -12,7 +12,14 @@ host_system = host_machine.system()
 # Add C++ compiler options
 _cppc_early = meson.get_compiler('cpp')
 if _cppc_early.get_id() == 'msvc' or _cppc_early.get_id() == 'clang-cl'
-    cpp_args = ['/W3']
+    # WIN32_LEAN_AND_MEAN / NOMINMAX: keep windows.h from defining COM
+    # symbols (e.g. IPrintDialogServices) that break Cap'n Proto templates
+    # under MSVC when any TU mixes windows.h with capnp headers.
+    cpp_args = [
+        '/W3',
+        '/DWIN32_LEAN_AND_MEAN',
+        '/DNOMINMAX',
+    ]
 else
     cpp_args = ['-Wall', '-Wextra', '-Wpedantic']
 endif
@@ -131,24 +138,58 @@ endif
 # Fortran runtime for the umbrella. librgpot is a C++ target that takes the
 # kernels through link_whole, which leaves meson no Fortran source of its
 # own to infer the runtime from.
+#
+# Windows + MSVC + Flang: flang-new embeds /DEFAULTLIB:FortranRuntime.dynamic.lib
+# (and FortranDecimal.dynamic.lib) in COFF objects. Those libs live next to the
+# compiler under Library/lib on conda-forge / pixi. Search that dir so link.exe
+# gets full paths rather than LNK1104 on a bare DEFAULTLIB name.
 fortran_rt_deps = []
 if has_fortran
     _fc = meson.get_compiler('fortran')
     _fc_id = _fc.get_id()
     _fc_rt_names = []
+    _fc_rt_dirs = []
     if _fc_id == 'gcc'
         _fc_rt_names = ['gfortran']
     elif _fc_id == 'llvm-flang' or _fc_id == 'flang'
-        _fc_rt_names = ['flang_rt.runtime', 'FortranRuntime', 'flang']
+        if host_system == 'windows'
+            _fc_rt_names = [
+                'FortranRuntime.dynamic',
+                'FortranDecimal.dynamic',
+                'FortranRuntime.static',
+                'FortranDecimal.static',
+                'FortranRuntime',
+                'FortranDecimal',
+                'flang_rt.runtime',
+                'flang',
+            ]
+            _fs = import('fs')
+            _fc_bin = _fc.cmd_array()[0]
+            if _fs.is_absolute(_fc_bin) or _fs.exists(_fc_bin)
+                _fc_bindir = _fs.parent(_fc_bin)
+                # .../Library/bin -> .../Library/lib
+                _fc_rt_dirs += [_fs.parent(_fc_bindir) / 'lib']
+                # .../bin -> .../lib (some layouts)
+                _fc_rt_dirs += [_fc_bindir / '..' / 'lib']
+            endif
+        else
+            _fc_rt_names = ['flang_rt.runtime', 'FortranRuntime', 'flang']
+        endif
     elif _fc_id == 'intel-llvm' or _fc_id == 'intel'
         _fc_rt_names = ['ifcoremt']
     endif
     foreach _n : _fc_rt_names
-        _rt = _fc.find_library(_n, required: false)
+        if _fc_rt_dirs.length() > 0
+            _rt = _fc.find_library(_n, dirs: _fc_rt_dirs, required: false)
+        else
+            _rt = _fc.find_library(_n, required: false)
+        endif
         if _rt.found()
             fortran_rt_deps += _rt
-            message('fortran runtime: -l' + _n)
-            break
+            message('fortran runtime: ' + _n)
+            if host_system != 'windows'
+                break
+            endif
         endif
     endforeach
 endif

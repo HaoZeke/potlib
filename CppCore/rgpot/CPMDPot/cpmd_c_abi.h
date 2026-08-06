@@ -6,6 +6,12 @@
 extern "C" {
 #endif
 
+#if defined(RGPOT_CPMDC_BUILD) && (defined(_WIN32) || defined(_WIN64))
+#define RGPOT_CPMDC_API __declspec(dllexport)
+#else
+#define RGPOT_CPMDC_API
+#endif
+
 /**
  * @file cpmd_c_abi.h
  * @brief Stable C ABI for configuring and evaluating embedded OpenCPMD.
@@ -54,7 +60,7 @@ typedef struct CPMDCFeatureEntry {
  * @param params_capnp_size_bytes Size of `params_capnp` in bytes.
  * @return 0 on success, -1 on parse or configuration failure.
  */
-int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes);
+RGPOT_CPMDC_API int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes);
 
 /**
  * @brief Compute energy and nuclear gradient for an atomic configuration.
@@ -62,7 +68,7 @@ int cpmdc_set_params(const void *params_capnp, size_t params_capnp_size_bytes);
  * Positions are Angstrom; gradient is Hartree/Bohr (CPMD ionic forces are
  * negated into a nuclear gradient for API symmetry with nwchemc).
  */
-CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
+RGPOT_CPMDC_API CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
                                   const int *atomic_numbers,
                                   const void *params_capnp,
                                   size_t params_capnp_size_bytes,
@@ -71,14 +77,14 @@ CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
 /**
  * @brief Compute total energy only (no gradient allocation).
  */
-CPMDCResult cpmdc_energy(int n_atoms, const double *positions_ang,
+RGPOT_CPMDC_API CPMDCResult cpmdc_energy(int n_atoms, const double *positions_ang,
                          const int *atomic_numbers, const void *params_capnp,
                          size_t params_capnp_size_bytes);
 
 /**
  * @brief Compute energy and nuclear forces (negative gradient, Hartree/Bohr).
  */
-CPMDCResult cpmdc_energy_forces(int n_atoms, const double *positions_ang,
+RGPOT_CPMDC_API CPMDCResult cpmdc_energy_forces(int n_atoms, const double *positions_ang,
                                 const int *atomic_numbers,
                                 const void *params_capnp,
                                 size_t params_capnp_size_bytes,
@@ -90,28 +96,28 @@ CPMDCResult cpmdc_energy_forces(int n_atoms, const double *positions_ang,
  * The session owns a copy of the serialized message so callers may release the
  * input buffer after this call returns.
  */
-CPMDCSession *cpmdc_session_create(const void *params_capnp,
+RGPOT_CPMDC_API CPMDCSession *cpmdc_session_create(const void *params_capnp,
                                    size_t params_capnp_size_bytes);
 
 /**
  * @brief Replace Cap'n Proto parameters before the session accepts topology.
  */
-int cpmdc_session_set_params(CPMDCSession *session, const void *params_capnp,
+RGPOT_CPMDC_API int cpmdc_session_set_params(CPMDCSession *session, const void *params_capnp,
                              size_t params_capnp_size_bytes);
 
 /** @brief Release a persistent evaluation session. */
-void cpmdc_session_destroy(CPMDCSession *session);
+RGPOT_CPMDC_API void cpmdc_session_destroy(CPMDCSession *session);
 
-CPMDCResult cpmdc_session_energy_gradient(CPMDCSession *session, int n_atoms,
+RGPOT_CPMDC_API CPMDCResult cpmdc_session_energy_gradient(CPMDCSession *session, int n_atoms,
                                           const double *positions_ang,
                                           const int *atomic_numbers,
                                           double *grad_h_bohr);
 
-CPMDCResult cpmdc_session_energy(CPMDCSession *session, int n_atoms,
+RGPOT_CPMDC_API CPMDCResult cpmdc_session_energy(CPMDCSession *session, int n_atoms,
                                  const double *positions_ang,
                                  const int *atomic_numbers);
 
-CPMDCResult cpmdc_session_energy_forces(CPMDCSession *session, int n_atoms,
+RGPOT_CPMDC_API CPMDCResult cpmdc_session_energy_forces(CPMDCSession *session, int n_atoms,
                                         const double *positions_ang,
                                         const int *atomic_numbers,
                                         double *forces_h_bohr);
@@ -122,7 +128,7 @@ CPMDCResult cpmdc_session_energy_forces(CPMDCSession *session, int n_atoms,
  * Session keeps persistent `CPMDParams`; each call supplies geometry. Returned
  * energy/forces use CPMD native units: Hartree and Hartree/Bohr.
  */
-CPMDCResult cpmdc_session_calculate_forces(
+RGPOT_CPMDC_API CPMDCResult cpmdc_session_calculate_forces(
     CPMDCSession *session, const void *force_input_capnp,
     size_t force_input_capnp_size_bytes, double *forces_h_bohr,
     size_t forces_len);
@@ -138,7 +144,7 @@ CPMDCResult cpmdc_session_calculate_forces(
  * writes the required byte count to `potential_result_capnp_size_bytes`, and
  * does not evaluate CPMD.
  */
-CPMDCResult cpmdc_session_calculate_result(
+RGPOT_CPMDC_API CPMDCResult cpmdc_session_calculate_result(
     CPMDCSession *session, const void *force_input_capnp,
     size_t force_input_capnp_size_bytes, void *potential_result_capnp,
     size_t potential_result_capnp_capacity_bytes,
@@ -150,7 +156,7 @@ CPMDCResult cpmdc_session_calculate_result(
  * Multi-step callers should create one session and call
  * `cpmdc_session_calculate_result()` per step.
  */
-CPMDCResult cpmdc_calculate_result(const void *params_capnp,
+RGPOT_CPMDC_API CPMDCResult cpmdc_calculate_result(const void *params_capnp,
                                    size_t params_capnp_size_bytes,
                                    const void *force_input_capnp,
                                    size_t force_input_capnp_size_bytes,
@@ -164,21 +170,21 @@ CPMDCResult cpmdc_calculate_result(const void *params_capnp,
  * Parses geometry only; does not initialize or evaluate CPMD. Returns 0 when
  * the message is invalid or too large for the C ABI.
  */
-size_t cpmdc_potential_result_size_for_force_input(
+RGPOT_CPMDC_API size_t cpmdc_potential_result_size_for_force_input(
     const void *force_input_capnp, size_t force_input_capnp_size_bytes);
 
 /** @brief Compiled library version string. */
-const char *cpmdc_version(void);
+RGPOT_CPMDC_API const char *cpmdc_version(void);
 
 /** @brief 1 when the embedded OpenCPMD runtime is available. */
-int cpmdc_available(void);
+RGPOT_CPMDC_API int cpmdc_available(void);
 
 /** @brief Finalize an owned embedded CPMD runtime. */
-void cpmdc_finalize(void);
+RGPOT_CPMDC_API void cpmdc_finalize(void);
 
-size_t cpmdc_feature_count(void);
-const CPMDCFeatureEntry *cpmdc_feature_table(void);
-const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id);
+RGPOT_CPMDC_API size_t cpmdc_feature_count(void);
+RGPOT_CPMDC_API const CPMDCFeatureEntry *cpmdc_feature_table(void);
+RGPOT_CPMDC_API const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id);
 
 #ifdef __cplusplus
 }

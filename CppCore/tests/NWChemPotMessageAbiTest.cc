@@ -68,6 +68,10 @@ TEST_CASE("NWChemPot passes serialized NWChemParams to nwchemc engine",
 
 TEST_CASE("NWChemPot preserves typed DFT convergence parameters",
           "[nwchem][abi]") {
+  if (!rgpot::NWChemPot::probe_available()) {
+    SKIP("libnwchemc not available");
+  }
+
   ::capnp::MallocMessageBuilder input_message;
   auto input = input_message.initRoot<::NWChemParams>();
   input.setTheory("dft");
