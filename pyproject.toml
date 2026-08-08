@@ -150,6 +150,9 @@ repair-wheel-command = """
 """
 
 [tool.cibuildwheel.macos]
+# The brew gcc gfortran runtime (libgfortran/libquadmath) is built for
+# macOS 14; delocate refuses to stamp an 11.0 wheel around it.
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
 before-all = "brew list gcc >/dev/null 2>&1 || brew install gcc"
 # Same librgpot search-path story as Linux. Exclude torch/metatomic dylibs:
 # they ship with the pip torch / metatomic-torch wheels, not inside rgpot.
