@@ -62,6 +62,13 @@ requires = [
 ]
 build-backend = "mesonpy"
 
+# The abi3 wheel tag is a declaration, not a detection: meson-python names
+# the wheel abi3 only when this is set, no matter that the module builds as
+# _core.abi3.so. Reverted automatically wherever the build passes
+# -Dpython.allow_limited_api=false (the cp310/cp311 cibuildwheel override).
+[tool.meson-python]
+limited-api = true
+
 # Wheel keeps dlopen Metatomic path: engine plugin + thin frontend (not LJ-only).
 [tool.meson-python.args]
 setup = [
@@ -96,18 +103,21 @@ python_files = ["test_*.py"]
 # manylinux images carry gcc/g++ but not gfortran, and the Fortran kernels
 # are part of the library's point.
 build-frontend = "build"
-# The extension goes stable-ABI (Py_LIMITED_API 3.12) only when the build
-# Python is >= 3.12, so cp312 yields one abi3 wheel for every 3.12+ CPython;
-# 3.10 and 3.11 need their own version-specific wheels.
-# Space-separated string, not a TOML array: cibuildwheel 3.2.1 took only
-# the first list element (cp310-*), so 3.0.2 published a cp310 wheel and
-# cookbook python=3.13 could not install it. cp312 is the abi3 build
-# (Py_LIMITED_API 3.12) that covers 3.12+.
+# cp312 is the stable-ABI build: meson gates Py_LIMITED_API on build
+# Python >= 3.12, and tool.meson-python.limited-api turns that into a
+# cp312-abi3 tag covering every 3.12+ CPython. cp310/cp311 build native
+# wheels with the limited API switched off via the override below.
 build = "cp310-* cp311-* cp312-*"
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 # Prove the kernels are in the artifact rather than trusting the flag: a
 # wheel whose librgpot has no bind(c) entry points is the bug 3.0.1 fixed.
 test-command = "python -c \"import rgpot; print(rgpot.__file__)\""
+
+# meson skips the limited_api kwarg under these interpreters anyway; the
+# explicit -D flag makes meson-python drop the abi3 tag to match.
+[[tool.cibuildwheel.overrides]]
+select = "cp310-* cp311-*"
+config-settings = "setup-args=-Dpython.allow_limited_api=false"
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
