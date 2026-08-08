@@ -62,6 +62,13 @@ requires = [
 ]
 build-backend = "mesonpy"
 
+# The abi3 wheel tag is a declaration, not a detection: meson-python names
+# the wheel abi3 only when this is set, no matter that the module builds as
+# _core.abi3.so. Reverted automatically wherever the build passes
+# -Dpython.allow_limited_api=false (the cp310/cp311 cibuildwheel override).
+[tool.meson-python]
+limited-api = true
+
 # Wheel keeps dlopen Metatomic path: engine plugin + thin frontend (not LJ-only).
 [tool.meson-python.args]
 setup = [
@@ -96,12 +103,21 @@ python_files = ["test_*.py"]
 # manylinux images carry gcc/g++ but not gfortran, and the Fortran kernels
 # are part of the library's point.
 build-frontend = "build"
-# abi3 via nanobind: one wheel per platform covers every supported CPython.
-build = "cp310-*"
+# cp312 is the stable-ABI build: meson gates Py_LIMITED_API on build
+# Python >= 3.12, and tool.meson-python.limited-api turns that into a
+# cp312-abi3 tag covering every 3.12+ CPython. cp310/cp311 build native
+# wheels with the limited API switched off via the override below.
+build = "cp310-* cp311-* cp312-*"
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 # Prove the kernels are in the artifact rather than trusting the flag: a
 # wheel whose librgpot has no bind(c) entry points is the bug 3.0.1 fixed.
 test-command = "python -c \"import rgpot; print(rgpot.__file__)\""
+
+# meson skips the limited_api kwarg under these interpreters anyway; the
+# explicit -D flag makes meson-python drop the abi3 tag to match.
+[[tool.cibuildwheel.overrides]]
+select = "cp310-* cp311-*"
+config-settings = "setup-args=-Dpython.allow_limited_api=false"
 
 [tool.cibuildwheel.linux]
 before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
@@ -134,6 +150,9 @@ repair-wheel-command = """
 """
 
 [tool.cibuildwheel.macos]
+# The brew gcc gfortran runtime (libgfortran/libquadmath) is built for
+# macOS 14; delocate refuses to stamp an 11.0 wheel around it.
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
 before-all = "brew list gcc >/dev/null 2>&1 || brew install gcc"
 # Same librgpot search-path story as Linux. Exclude torch/metatomic dylibs:
 # they ship with the pip torch / metatomic-torch wheels, not inside rgpot.
