@@ -108,11 +108,15 @@ jobs:
           mkdir -p upload
           find dist -type f \( -name '*.whl' -o -name '*.tar.gz' \) -exec cp -v {} upload/ \;
           ls -la upload/
-      # A tag publishes to PyPI; a manual run defaults to TestPyPI so the
-      # upload can be rehearsed before the irreversible one.
+      # OIDC trusted publisher is not registered for this project
+      # (invalid-publisher on pypi-rgpot / testpypi-rgpot). Use the
+      # environment PYPI_TOKEN until that publisher exists; keep
+      # id-token: write so a later OIDC switch is one-line.
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
           packages-dir: upload/
           repository-url: ${{ (github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi') && 'https://test.pypi.org/legacy/' || '' }}
           skip-existing: true
