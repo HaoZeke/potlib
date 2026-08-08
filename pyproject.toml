@@ -96,8 +96,10 @@ python_files = ["test_*.py"]
 # manylinux images carry gcc/g++ but not gfortran, and the Fortran kernels
 # are part of the library's point.
 build-frontend = "build"
-# abi3 via nanobind: one wheel per platform covers every supported CPython.
-build = "cp310-*"
+# The extension goes stable-ABI (Py_LIMITED_API 3.12) only when the build
+# Python is >= 3.12, so cp312 yields one abi3 wheel for every 3.12+ CPython;
+# 3.10 and 3.11 need their own version-specific wheels.
+build = ["cp310-*", "cp311-*", "cp312-*"]
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 # Prove the kernels are in the artifact rather than trusting the flag: a
 # wheel whose librgpot has no bind(c) entry points is the bug 3.0.1 fixed.
