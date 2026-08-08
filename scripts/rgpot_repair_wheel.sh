@@ -21,7 +21,15 @@ engine_rpath_for_maj() {
 }
 
 CORE_RPATH='$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
-POT_RPATH='$ORIGIN'
+# librgpot lives under .rgpot.mesonpy.libs/. $ORIGIN alone cannot see
+# site-packages/torch. RGPOT_TORCH_MAJOR adds the metatensor-torch ABI dir.
+_maj="${RGPOT_TORCH_MAJOR:-}"
+UMBRELLA_RPATH='$ORIGIN:$ORIGIN/../torch/lib:$ORIGIN/../metatensor/lib:$ORIGIN/../vesin/lib'
+if [[ -n "$_maj" ]]; then
+  UMBRELLA_RPATH+=":\$ORIGIN/../metatensor_torch/torch-${_maj}/lib"
+  UMBRELLA_RPATH+=":\$ORIGIN/../metatomic/torch/torch-${_maj}/lib"
+  UMBRELLA_RPATH+=":\$ORIGIN/../metatensor/torch/torch-${_maj}/lib"
+fi
 
 while IFS= read -r -d '' so; do
   base=$(basename "$so")
@@ -50,10 +58,26 @@ while IFS= read -r -d '' so; do
   elif [[ "$base" == _core* ]]; then
     echo "patchelf core $(basename "$so")"
     patchelf --set-rpath "$CORE_RPATH" "$so"
+  elif [[ "$base" == librgpot.so* ]]; then
+    echo "patchelf umbrella $rel"
+    patchelf --set-rpath "$UMBRELLA_RPATH" "$so"
   elif [[ "$so" == *".rgpot.mesonpy.libs"* ]]; then
-    patchelf --set-rpath "$POT_RPATH" "$so" 2>/dev/null || true
+    patchelf --set-rpath '$ORIGIN' "$so" 2>/dev/null || true
   fi
 done < <(find "$WORK" -type f \( -name '*.so' -o -name '*.so.*' \) -print0)
+
+# zip/pip cannot store ELF soname symlinks. meson installs
+# librgpot.so.3.0.1 (SONAME librgpot.so.3); _core NEEDs that name.
+# Copy (not ln) so a second repair pass and pip extract both see real files.
+LIBS=$(find "$WORK" -type d -name '.rgpot.mesonpy.libs' -print -quit)
+if [[ -n "$LIBS" ]]; then
+  real=$(find "$LIBS" -maxdepth 1 -type f -name 'librgpot.so.*.*' | head -1 || true)
+  if [[ -n "$real" ]]; then
+    cp -f "$real" "$LIBS/librgpot.so.3"
+    cp -f "$real" "$LIBS/librgpot.so"
+    echo "soname copies $(basename "$real") -> librgpot.so.3 + librgpot.so"
+  fi
+fi
 
 bad=0
 while IFS= read -r -d '' so; do

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace std::string_literals;
@@ -18,6 +19,38 @@ using namespace std::string_literals;
 namespace rgpot {
 
 namespace {
+
+// metatensor-torch 0.10.3 Module::to() first moves jit tensors, then walks
+// every attribute when `_mts_buffer_names` is missing. Exported PET-MAD
+// stores mixed dicts as ordinary attrs; empty containers count as
+// non-metatensor and throw. Weights are already moved. Swallow only that
+// mixed-dict error. Do not register `_mts_buffer_names` on scripted
+// modules: register_attribute corrupts JIT object slots (ivalue getSlot).
+bool is_mixed_mts_to_error(const c10::Error &e) {
+  const std::string w = e.what_without_backtrace();
+  return w.find("metatensor and non-metatensor") != std::string::npos;
+}
+
+void move_atomistic_model(metatensor_torch::Module &model, torch::Device device) {
+  try {
+    model.to(device);
+  } catch (const c10::Error &e) {
+    if (!is_mixed_mts_to_error(e)) {
+      throw;
+    }
+  }
+}
+
+void move_atomistic_model(metatensor_torch::Module &model,
+                          torch::ScalarType dtype) {
+  try {
+    model.to(dtype);
+  } catch (const c10::Error &e) {
+    if (!is_mixed_mts_to_error(e)) {
+      throw;
+    }
+  }
+}
 
 // Haar-uniform SO(3) sample from a SEEDED CPU generator. The seed is the
 // pass index, so every force call averages over the SAME orientation set:
@@ -178,12 +211,12 @@ MetatomicPot::MetatomicPot(const MetatomicConfig &config)
     }
   }
 
-  m_model.to(m_device);
+  move_atomistic_model(m_model, m_device);
   if (!m_config.dtype_override.empty() &&
       m_dtype != (m_capabilities->dtype() == "float64" ? torch::kFloat64
                                                        : torch::kFloat32)) {
     try {
-      m_model.to(m_dtype);
+      move_atomistic_model(m_model, m_dtype);
     } catch (const std::exception &) {
       if (m_capabilities->dtype() == "float64") {
         m_dtype = torch::kFloat64;
