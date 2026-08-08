@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.1.0](https://github.com/OmniPotentRPC/rgpot/tree/3.1.0) - 2026-08-08
+
+### Added
+
+- A wheels workflow builds and publishes the Python package. rgpot had none:
+  2.5.4 reached PyPI hand-built from a branch, with no tag and no
+  main-branch source behind it, which is how the version surfaces drifted
+  apart in the first place. A `v*` tag now builds manylinux and macOS
+  wheels plus an sdist with cibuildwheel and publishes them; a manual run
+  defaults to TestPyPI so an upload can be rehearsed before the
+  irreversible one.
+
+  The build step refuses a wheel whose `librgpot` carries fewer than the
+  eight Fortran `bind(c)` entry points, so the potentials cannot silently
+  fall out of the artifact again.
+- The RPC server accepts `Metatomic:<model.pt>[:<device>]`, carrying the
+  execution device through to `MetatomicConfig`, so an accelerated node
+  serves the model on `cuda` while the path-only form keeps its current
+  behaviour. Verified serving PET-MAD on an A100.
+
+### Fixed
+
+- The cp312 wheel now carries the `abi3` tag: `tool.meson-python.limited-api`
+  declares the stable-ABI build to meson-python, so one cp312-abi3 wheel
+  installs on every CPython >= 3.12 instead of 3.12 alone.
+- The metatomic torch dependency links on macOS. Its link arguments carried
+  `-rpath-link` and `--as-needed`, which are GNU ld only: Apple's linker
+  rejects them outright, so any Darwin build with `-Dwith_metatomic=true`
+  died with "unknown options" while producing `librgpot.3.dylib`. Those
+  flags now apply on GNU linkers only; Apple's resolves the dylibs from the
+  library path and their install names.
+- Wheel publish falls back to the `pypi-rgpot` / `testpypi-rgpot`
+  `PYPI_TOKEN` until a matching trusted publisher is registered.
+
+  cibuildwheel `build` must be a space-separated string so cp310, cp311,
+  and the cp312 abi3 wheel all ship (a TOML array only built cp310).
+
+
 ## [3.0.2](https://github.com/OmniPotentRPC/rgpot/tree/3.0.2) - 2026-08-08
 
 ### Fixed
