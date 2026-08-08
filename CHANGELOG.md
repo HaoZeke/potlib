@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.0.2](https://github.com/OmniPotentRPC/rgpot/tree/3.0.2) - 2026-08-08
+
+### Fixed
+
+- Windows MSVC builds Cap'n Proto with lean windows.h defines, and links Flang pot kernels through MSVC lib.exe archives so llvm-ar no longer triggers LNK1107. ([#61](https://github.com/OmniPotentRPC/rgpot/issues/61))
+- MetatomicPot no longer fails to load exported PET-MAD (and similar) models on metatensor-torch 0.10.3: scripted modules without `_mts_buffer_names` no longer trip the mixed-dict `.to()` walk.
+- Python 3.x wheels import without torch: fat MetatomicPot is no longer
+  `link_whole`'d into `librgpot` when `with_python` (engine stays dlopen-only),
+  and the repair step ships `librgpot.so.3` (mesonpy zip dropped the soname link)
+  plus a RUNPATH into site-packages torch/metatensor/vesin.
+
+
 ## [3.0.1](https://github.com/OmniPotentRPC/rgpot/tree/3.0.1) - 2026-07-26
 
 ### Fixed
