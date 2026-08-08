@@ -25,6 +25,7 @@ xtbbld = { features = ["xtb"] }
 tblitebld = { features = ["tblite"] }
 tbbld = { features = ["xtb", "tblite"] }
 metatomicbld = { features = ["metatomic"] }
+nwbld = { features = ["rpc", "metatomic"] }
 [feature.cache.dependencies]
 rocksdb = ">=10.9.1,<11"
 xxhash = ">=0.8.3,<0.9"
