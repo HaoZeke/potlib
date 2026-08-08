@@ -80,7 +80,11 @@ if not get_option('with_rpc_client_only')
     # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
     subdir('rgpot/MetatomicPot')
     _linkto += [metatomic_dlopen]
-    if has_metatomic
+    # Fat MetatomicPot NEEDs torch. Folding it into the umbrella makes
+    # `import rgpot` (LJ / dlopen) require libtorch — the pip contract is
+    # numpy-only until `rgpot[metatomic]`. The wheel still *builds* the
+    # engine plugin (has_metatomic); it is dlopen'd, not linked.
+    if has_metatomic and not get_option('with_python')
         rgpotentials += [metatomicpot]
     endif
 
