@@ -312,8 +312,12 @@ int main(int argc, char *argv[]) {
         nw_params.setBasis(nw_basis);
       if (!nw_theory.empty())
         nw_params.setTheory(nw_theory);
-      if (!nw_xc.empty())
-        nw_params.setScfType(nw_xc);
+      if (!nw_xc.empty()) {
+        // The xc directive rides the raw input-block escape hatch; the
+        // scfType field is the HF reference choice, not the functional.
+        auto nw_blocks = nw_params.initInputBlocks(1);
+        nw_blocks.set(0, std::string("dft\n  xc " + nw_xc + "\nend"));
+      }
       std::cout << "  basis='" << nw_basis << "' theory='" << nw_theory
                 << "' xc='" << nw_xc << "'" << std::endl;
       nw = std::make_unique<rgpot::NWChemPot>(nw_params.asReader());
