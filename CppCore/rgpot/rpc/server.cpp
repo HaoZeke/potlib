@@ -315,8 +315,12 @@ int main(int argc, char *argv[]) {
       if (!nw_xc.empty()) {
         // The xc directive rides the raw input-block escape hatch; the
         // scfType field is the HF reference choice, not the functional.
+        // The iteration cap bounds a pathological geometry's SCF: the
+        // engine returns a convergence failure the driver refuses and
+        // moves past, instead of one stuck call eating the RPC budget.
         auto nw_blocks = nw_params.initInputBlocks(1);
-        nw_blocks.set(0, std::string("dft\n  xc " + nw_xc + "\nend"));
+        nw_blocks.set(0, std::string("dft\n  xc " + nw_xc +
+                                     "\n  iterations 60\nend"));
       }
       std::cout << "  basis='" << nw_basis << "' theory='" << nw_theory
                 << "' xc='" << nw_xc << "'" << std::endl;
