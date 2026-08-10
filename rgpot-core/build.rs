@@ -1,6 +1,6 @@
 use std::env;
 
-#[cfg(any(feature = "gen-header", feature = "rpc"))]
+#[cfg(any(feature = "gen-header", feature = "schema"))]
 use std::path::PathBuf;
 
 /// Generate C header via cbindgen (only when `gen-header` feature is active).
@@ -53,11 +53,11 @@ fn main() {
     #[cfg(feature = "gen-header")]
     generate_c_header(&crate_dir);
 
-    #[cfg(feature = "rpc")]
+    #[cfg(feature = "schema")]
     compile_capnp_schema(&crate_dir);
 }
 
-#[cfg(feature = "rpc")]
+#[cfg(feature = "schema")]
 fn compile_capnp_schema(crate_dir: &str) {
     // Prefer the bundled schema (works on crates.io).
     // Fall back to the monorepo location for local development.

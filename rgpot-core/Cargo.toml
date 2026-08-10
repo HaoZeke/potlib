@@ -17,7 +17,9 @@ crate-type = ["staticlib", "cdylib", "lib"]
 
 [features]
 default = []
-rpc = ["dep:capnp", "dep:capnp-rpc", "dep:capnpc", "dep:tokio", "dep:tokio-util", "dep:futures"]
+schema = ["dep:capnp", "dep:capnpc"]
+profile = ["schema", "dep:libloading"]
+rpc = ["schema", "dep:capnp-rpc", "dep:tokio", "dep:tokio-util", "dep:futures"]
 cache = []
 gen-header = ["dep:cbindgen"]
 
@@ -28,7 +30,8 @@ dlpk = { version = "0.1.5" }
 # this one shared crate. Sharing the crate (rlib) with downstream consumers such as
 # anneal-core avoids the two-Rust-runtime conflict a separate libeindir_core.a causes.
 eindir-core = { version = "0.5.0", features = ["capi"] }
-capnp = { version = "0.20", optional = true }
+capnp = { version = "0.20", features = ["unaligned"], optional = true }
+libloading = { version = "0.8", optional = true }
 capnp-rpc = { version = "0.20", optional = true }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros"], optional = true }
 tokio-util = { version = "0.7", features = ["compat"], optional = true }
