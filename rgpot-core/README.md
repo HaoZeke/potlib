@@ -27,7 +27,7 @@ for device-agnostic interoperability (CPU, CUDA, ROCm).
 
 ```toml
 [dependencies]
-rgpot-core = "3.1"
+rgpot-core = "3.0.2"
 ```
 
 Enable the in-process profile loader for backends such as `nwchemc` and
@@ -35,14 +35,14 @@ Enable the in-process profile loader for backends such as `nwchemc` and
 
 ```toml
 [dependencies]
-rgpot-core = { version = "3.1", features = ["profile"] }
+rgpot-core = { version = "3.0.2", features = ["profile"] }
 ```
 
 Enable the RPC client and server:
 
 ```toml
 [dependencies]
-rgpot-core = { version = "3.1", features = ["rpc"] }
+rgpot-core = { version = "3.0.2", features = ["rpc"] }
 ```
 
 ## Documentation

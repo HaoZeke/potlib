@@ -423,7 +423,7 @@ mod tests {
     fn fused_value_and_gradient_executes_one_force_request() {
         let n_atoms = 2usize;
         let atmnrs = [1i32, 1];
-        let box_ = [10.0f64, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0];
+        let box_ = [10.0f64, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
         let mut calls = 0usize;
         let pot = unsafe {
             rgpot_potential_new_eindir(
