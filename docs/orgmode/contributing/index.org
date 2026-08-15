@@ -8,8 +8,8 @@ the tools better for everyone.
 
 * Communication and Conduct
 We value a respectful and inclusive community.
-All contributors must follow our [[https://rgpycrumbs.rgoswami.me/
-code_of_conduct.html][Code of Conduct]].
+All contributors must follow our
+[[https://rgpycrumbs.rgoswami.me/ code_of_conduct.html][Code of Conduct]].
 
 * Getting Started
 Please review the technical requirements before submitting a Pull Request:
