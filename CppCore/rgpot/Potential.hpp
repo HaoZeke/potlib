@@ -73,6 +73,24 @@ public:
   [[nodiscard]] virtual PotCaps caps() const noexcept { return {}; }
 
   /**
+   * @brief Evaluate a batch of independent systems in one call.
+   *
+   * Callers running multi-system methods (NEB images, dimer endpoints)
+   * use this instead of a loop over @c operator(), so a kernel that can
+   * evaluate many systems at once -- a GPU model batching into a single
+   * forward pass, say -- gets the chance to.
+   *
+   * Every kernel supports this call. @c caps().batched reports whether it
+   * is served natively or by the default per-system loop, which callers
+   * read when deciding whether batching is worth the marshalling.
+   *
+   * Results land in @c batch.out; see ForceBatch for the buffer contract.
+   */
+  virtual void forceBatch(const ForceBatch & /*batch*/) {
+    throw std::runtime_error("PotentialBase::forceBatch called directly");
+  }
+
+  /**
    * @brief Fingerprint of the potential's parameter set.
    *
    * Mixed into the result-cache key so results never cross parameter
@@ -164,19 +182,7 @@ public:
     ForceOut fo{.F = forces.data(), .energy = 0.0, .variance = 0.0};
 
 #ifdef RGPOT_HAS_CACHE
-    // Hashing
-    size_t hash_val = 0;
-    hash_val ^= XXH3_64bits(fi.pos, fi.nAtoms * 3 * sizeof(double));
-    hash_val ^= XXH3_64bits(fi.atmnrs, fi.nAtoms * sizeof(int));
-    hash_val ^= XXH3_64bits(fi.box, 9 * sizeof(double));
-    size_t type_val = static_cast<size_t>(m_type);
-    hash_val ^= XXH3_64bits(&type_val, sizeof(size_t));
-    // Parameter fingerprint: two instances of one PotType with different
-    // configs must never share cache entries.
-    uint64_t params_val = paramsKey();
-    hash_val ^= XXH3_64bits(&params_val, sizeof(params_val));
-
-    rgpot::cache::KeyHash key(hash_val);
+    rgpot::cache::KeyHash key = cacheKey(fi);
 
     // Cache Read
     if (_cache) {
@@ -212,8 +218,123 @@ public:
    */
   virtual void forceImpl(const ForceInput &in, ForceOut *out) const = 0;
 
+  /**
+   * @brief Batched counterpart of @c forceImpl.
+   *
+   * The default evaluates the systems one at a time, so every kernel
+   * answers a batch call correctly without writing anything. Override it
+   * where the kernel can do better than a loop -- one model forward pass
+   * over all systems, one device transfer, one neighbour-list build
+   * across a shared topology -- and set @c caps().batched so callers know
+   * the difference.
+   *
+   * An override must fill @c batch.out[i] for every i from @c batch.in[i]
+   * and treat the systems as independent: no ordering, no shared state,
+   * and no assumption that they have equal atom counts.
+   */
+  virtual void forceBatchImpl(const ForceBatch &batch) const {
+    for (size_t i = 0; i < batch.nSystems; ++i) {
+      static_cast<const Derived *>(this)->forceImpl(batch.in[i],
+                                                    &batch.out[i]);
+    }
+  }
+
+  /**
+   * @brief Cache-aware batch entry point.
+   *
+   * Keeps the per-system semantics of @c operator(): each system is
+   * hashed and looked up on its own, only the misses reach the kernel,
+   * and each computed result is written back. Batching therefore composes
+   * with caching rather than defeating it -- a band where two images have
+   * not moved sends only the rest to the kernel.
+   */
+  void forceBatch(const ForceBatch &batch) override {
+    if (batch.nSystems == 0) {
+      return;
+    }
+#ifdef RGPOT_HAS_CACHE
+    if (_cache) {
+      std::vector<size_t> misses;
+      std::vector<rgpot::cache::KeyHash> keys;
+      misses.reserve(batch.nSystems);
+      keys.reserve(batch.nSystems);
+
+      for (size_t i = 0; i < batch.nSystems; ++i) {
+        keys.push_back(cacheKey(batch.in[i]));
+        auto hit = _cache->find(keys[i]);
+        if (hit) {
+          types::AtomMatrix forces =
+              types::AtomMatrix::Zero(batch.in[i].nAtoms, 3);
+          _cache->deserialize_hit(*hit, batch.out[i].energy, forces);
+          std::memcpy(batch.out[i].F, forces.data(),
+                      forces.size() * sizeof(double));
+          batch.out[i].variance = 0.0;
+        } else {
+          misses.push_back(i);
+        }
+      }
+
+      if (misses.empty()) {
+        return;
+      }
+
+      // Compact the misses so the kernel sees one contiguous batch.
+      std::vector<ForceInput> missIn;
+      std::vector<ForceOut> missOut;
+      missIn.reserve(misses.size());
+      missOut.reserve(misses.size());
+      for (size_t idx : misses) {
+        missIn.push_back(batch.in[idx]);
+        missOut.push_back(batch.out[idx]);
+      }
+      ForceBatch missBatch{
+          .nSystems = missIn.size(), .in = missIn.data(), .out = missOut.data()};
+      static_cast<Derived *>(this)->forceBatchImpl(missBatch);
+
+      for (size_t j = 0; j < misses.size(); ++j) {
+        const size_t idx = misses[j];
+        batch.out[idx].energy = missOut[j].energy;
+        batch.out[idx].variance = missOut[j].variance;
+        registry<Derived>::incrementForceCalls();
+        types::AtomMatrix forces =
+            types::AtomMatrix::Zero(batch.in[idx].nAtoms, 3);
+        std::memcpy(forces.data(), batch.out[idx].F,
+                    forces.size() * sizeof(double));
+        _cache->add_serialized(keys[idx], batch.out[idx].energy, forces);
+      }
+      return;
+    }
+#endif
+    static_cast<Derived *>(this)->forceBatchImpl(batch);
+    for (size_t i = 0; i < batch.nSystems; ++i) {
+      registry<Derived>::incrementForceCalls();
+    }
+  }
+
 private:
 #ifdef RGPOT_HAS_CACHE
+  /**
+   * @brief Result-cache key for one system.
+   *
+   * Shared by the single and batched entry points so the two can never
+   * disagree about what identifies a result. Mixes the geometry, the
+   * species, the cell, the potential type and the parameter fingerprint,
+   * so neither a different config nor a different kernel can collide.
+   */
+  [[nodiscard]] rgpot::cache::KeyHash cacheKey(const ForceInput &fi) const {
+    size_t hash_val = 0;
+    hash_val ^= XXH3_64bits(fi.pos, fi.nAtoms * 3 * sizeof(double));
+    hash_val ^= XXH3_64bits(fi.atmnrs, fi.nAtoms * sizeof(int));
+    hash_val ^= XXH3_64bits(fi.box, 9 * sizeof(double));
+    size_t type_val = static_cast<size_t>(m_type);
+    hash_val ^= XXH3_64bits(&type_val, sizeof(size_t));
+    // Parameter fingerprint: two instances of one PotType with different
+    // configs must never share cache entries.
+    uint64_t params_val = paramsKey();
+    hash_val ^= XXH3_64bits(&params_val, sizeof(params_val));
+    return rgpot::cache::KeyHash(hash_val);
+  }
+
   rgpot::cache::PotentialCache *_cache =
       nullptr; //!< Pointer to the optional calculation cache.
 #endif

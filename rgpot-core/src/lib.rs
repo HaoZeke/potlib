@@ -54,7 +54,7 @@ pub mod potential;
 pub mod eindir;
 pub mod c_api;
 
-#[cfg(feature = "rpc")]
+#[cfg(feature = "schema")]
 #[allow(dead_code, non_snake_case, unused_parens, clippy::all)]
 /// Auto-generated Cap'n Proto schema bindings for the RPC wire protocol.
 ///
@@ -64,6 +64,9 @@ pub mod c_api;
 pub mod Potentials_capnp {
     include!(concat!(env!("OUT_DIR"), "/Potentials_capnp.rs"));
 }
+
+#[cfg(feature = "profile")]
+pub mod profile;
 
 #[cfg(feature = "rpc")]
 pub mod rpc;

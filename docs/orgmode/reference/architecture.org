@@ -40,7 +40,8 @@ Existing C++ potentials remain callable through an FFI callback mechanism.
 The Rust crate is the single source of truth for the public API.
 It defines:
 
-- =rgpot_force_input_t= and =rgpot_force_out_t= :: =#[repr(C)]= structs mirroring
+- =rgpot_force_input_t= and =rgpot_force_out_t= :: =#[repr(C)]= structs
+  mirroring
 the legacy C++ =ForceInput= / =ForceOut= from =ForceStructs.hpp=.
 These are the canonical data exchange types across the FFI boundary.
 
@@ -72,8 +73,8 @@ The RPC module reuses the existing =Potentials.capnp= schema shared with the C+
 + server.
 - =cache= :: Reserved for future caching integration.
 - =gen-header= :: Enables C header generation via =cbindgen=.
-Used only during development; run =pixi r gen-header= to regenerate =include/
-rgpot.h=.
+Used only during development; run =pixi r gen-header= to regenerate
+=include/ rgpot.h=.
 
 **** Cap'n Proto Schema Sharing
 
@@ -123,10 +124,12 @@ Key methods:
   - =calculate(const InputSpec&)= :: Invokes the potential and returns a
 =CalcResult=.
 Throws =rgpot::Error= on failure.
-  - =from_impl<Impl>(impl)= :: Template factory that wraps any C++ potential object
+  - =from_impl<Impl>(impl)= :: Template factory that wraps any C++ potential
+    object
 with a compatible =forceImpl= method.
 Generates a type-safe trampoline function automatically.
-  - =from_callback(fn, user_data, free_fn)= :: Low-level factory taking an explicit
+  - =from_callback(fn, user_data, free_fn)= :: Low-level factory taking an
+    explicit
 C function pointer.
 
 - =rpc_client.hpp= :: RAII wrapper around =rgpot_rpc_client_t*=.
@@ -176,14 +179,10 @@ Same config pattern as =XTBPot=.
 Lighter weight than xtb but fewer methods.
 
 - =MetatomicPot= (=-Dwith_metatomic=true=) :: Pre-trained ML atomistic models
-via [[https://github.com/metatensor/metatomic][metatomic]]/PyTorch, loaded
-*directly* as TorchScript (=.pt=) in C++ with no Python at evaluation time.
-Uses [[https://github.com/Luthaf/vesin][vesin]] *0.5+* for neighbor lists and
-PyTorch autograd for forces. Pass CPU as =VesinDevice{VesinCPU, 0}= (=struct
-{ VesinDeviceKind type; int device_id; }=; =VesinCPU= alone is only the kind
-enum). Thread-safe via internal mutex; caches the atomic-types tensor across
-geometry steps. Configurable device (CPU/CUDA), dtype override, length unit,
-consistency checks, and =torch_determinism= via =MetatomicConfig=.
+via
+[[https://github.com/metatensor/metatomic][metatomic]]/PyTorch, loaded *directly* as TorchScript (=.pt=) in C++ with no Python at evaluation time. Uses [[https://github.com/Luthaf/vesin][vesin]] *0.5+* for neighbor lists and PyTorch autograd for forces. Pass CPU as =VesinDevice{VesinCPU, 0}= (=struct { VesinDeviceKind type; int device_id; }=; =VesinCPU= alone is only the kind enum). Thread-safe via internal mutex; caches the atomic-types tensor across geometry steps. Configurable device (CPU/CUDA),
+dtype override, length unit, consistency checks, and =torch_determinism= via
+=MetatomicConfig=.
 =TorchDeterminismPolicy::Fast= (default) does not touch process-global LibTorch
 state.
 =Strict= calls =apply_torch_determinism_policy=, which sets
@@ -195,17 +194,18 @@ uninitialized memory deterministically.
 Those flags are process-global: they affect every Torch user in the process, and
 Fast does not restore a previous Strict setting.
 CUDA host processes that need bit-stable cuBLAS must also export
-=CUBLAS_WORKSPACE_CONFIG=:4096:8= (or =:16:8=) *before* the first cuBLAS call
-— that is process environment, not =at::globalContext()= (see NVIDIA cuBLAS
-reproducibility and =alertCuBLASConfigNotDeterministic=). On the RPC server pass
-=Metatomic:/path/to/model.pt=. Build with the =metatomicbld= pixi env (linux-64;
-pulls torch, metatomic-torch, and vesin =>=0.5.2,<0.6= from PyPI).
+=CUBLAS_WORKSPACE_CONFIG=:4096:8= (or =:16:8=) *before* the first cuBLAS call —
+that is process environment, not =at::globalContext()= (see NVIDIA cuBLAS
+reproducibility and =alertCuBLASConfigNotDeterministic=).
+On the RPC server pass =Metatomic:/path/to/model.pt=.
+Build with the =metatomicbld= pixi env (linux-64; pulls torch, metatomic-torch,
+and vesin =>=0.5.2,<0.6= from PyPI).
 CI job =potentials_metatomic= in =ci- orchestrator.yml=.
 
 The *pip* product (=rgpot= on PyPI) does not link Metatomic into the Python
 extension.
-It =dlopen=s a portable =libmetatomic_engine.so= chosen from =rgpot/lib/torch-
-X.Y/= for the installed torch major.
+It =dlopen=s a portable =libmetatomic_engine.so= chosen from
+=rgpot/lib/torch- X.Y/= for the installed torch major.
 Supported torch majors for bundled engines start at *2.7* (wheels ship 2.7–
 2.13).
 See:
@@ -222,11 +222,11 @@ controlled by Meson options.
 
 Always-built frontend (=NWChemPot.cc=) that serializes =NWChemParams= and
 =dlopen=s =libnwchemc= (via =DynLib.hpp=).
-Stable consumer C-ABI contract in =nwchem_c_abi.h= uses =nwchemc_*= symbols and
-flat Cap'n Proto message bytes; =nwchem_c_abi_stub.c= is a no-op ABI linked by
-the conformance test only. rgpot is a pure consumer: the engine implementation
-(NWChem embed + Fortran) lives in the split =https://github.com/OmniPotentRPC/
-nwchemc= project, not in rgpot.
+Stable consumer C-ABI contract in =nwchem_c_abi.h= uses
+=nwchemc_*= symbols and flat Cap'n Proto message bytes; =nwchem_c_abi_stub.c= is
+a no-op ABI linked by the conformance test only. rgpot is a pure consumer: the
+engine implementation (NWChem embed + Fortran) lives in the split
+=https://github.com/OmniPotentRPC/ nwchemc= project, not in rgpot.
 RPC schema adds =NWChemParams=, =PotentialConfig=, and =configure @1= on
 =Potential=; =potserv <port> NWChem=.
 Runtime: =NWCHEMC_LIBRARY=, =RGPOT_NWCHEMC_ENGINE=, =NWCHEM_TOP=.
@@ -234,14 +234,15 @@ Details: =CppCore/rgpot/NWChemPot/README.md=.
 
 **** Units (=rgpot/units.hpp=)
 
-rgpot's internal unit system is *energy = eV*, *length = Angstrom*, *force =
-eV/Angstrom*.
+rgpot's internal unit system is *energy = eV*, *length = Angstrom*,
+*force = eV/Angstrom*.
 
 - *Compile-time constants* (CODATA 2018): =BOHR_TO_ANGSTROM=, =HARTREE_TO_EV=,
 =HARTREE_BOHR_TO_EV_ANGSTROM=, =NEG_GRAD_TO_FORCE=, Boltzmann constants, etc.
 Used by XTBPot/TBLitePot (Bohr/Hartree backends) and any caller that wants zero-
 overhead conversion.
-- *Runtime expression parser* (=unit_conversion_factor(from, to)=): Shunting-Yard
+- *Runtime expression parser* (=unit_conversion_factor(from, to)=):
+  Shunting-Yard
 algorithm with SI dimensional analysis, derived from metatomic-torch (PR #173).
 Accepts compound expressions such as ="kJ/mol"=, ="eV/angstrom^3"=, or
 ="(eV*u)^(1/2)"=.
@@ -258,17 +259,20 @@ converts energy and forces into the caller's requested units on the response.
 
 The project uses a two-tier error strategy:
 
-1. *Across the FFI boundary* :: Status codes (=rgpot_status_t=) plus a thread-local
+1. *Across the FFI boundary* :: Status codes (=rgpot_status_t=) plus a
+   thread-local
 error message (=rgpot_last_error()=).
 No exceptions cross FFI.
-Every Rust =extern "C"= function wraps its body in =catch_unwind= to convert
-panics to =RGPOT_INTERNAL_ERROR=.
+Every Rust =extern "C"= function wraps its body in
+=catch_unwind= to convert panics to =RGPOT_INTERNAL_ERROR=.
 
-2. *Within C++* :: The RAII wrappers call =details::check_status()= which maps non-
+2. *Within C++* :: The RAII wrappers call =details::check_status()= which maps
+   non-
 success codes to =rgpot::Error= exceptions.
 C++ consumers work with exceptions as usual.
 
-3. *Within Rust* :: Standard =Result= types internally, converted to status codes
+3. *Within Rust* :: Standard =Result= types internally, converted to status
+   codes
 at the =extern "C"= boundary.
 
 ** Adding a New Potential
@@ -307,8 +311,8 @@ rgpot_potential_t *pot = rgpot_potential_new(my_trampoline, my_data, NULL);
 
 *** Meson
 
-The Rust crate is built via a =custom_target= in =meson.build=, gated behind the
-=with_rust_core= option:
+The Rust crate is built via a
+=custom_target= in =meson.build=, gated behind the =with_rust_core= option:
 
 #+begin_src bash
 meson setup bbdir -Dwith_rust_core=true

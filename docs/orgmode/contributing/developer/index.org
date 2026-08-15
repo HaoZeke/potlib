@@ -64,8 +64,8 @@ pixi r gen-header
 git diff rgpot-core/include/rgpot.h  # review changes
 #+end_src
 
-The =gen-header= feature is excluded from default builds and from =cargo
-publish= to avoid modifying the source tree during packaging.
+The =gen-header= feature is excluded from default builds and from
+=cargo publish= to avoid modifying the source tree during packaging.
 
 ** Building Documentation
 

@@ -35,4 +35,22 @@ typedef struct {
   // Variance here is 0 when not needed and that's OK
 } ForceOut;
 
+/**
+ * @brief One batch of independent systems for a single evaluation call.
+ * @ingroup rgpot
+ *
+ * Systems in a batch share nothing: each carries its own atom count, cell
+ * and species list, so a caller may batch NEB images of one system or a
+ * set of unrelated structures. `in` and `out` are parallel arrays of
+ * length `nSystems`, and `out[i]` corresponds to `in[i]`.
+ *
+ * The caller owns both arrays and every buffer they point at, including
+ * each `out[i].F`, which must have room for `3 * in[i].nAtoms` doubles.
+ */
+typedef struct {
+  size_t nSystems;      //!< Number of independent systems in this batch.
+  const ForceInput *in; //!< Array of nSystems inputs.
+  ForceOut *out;        //!< Array of nSystems result slots.
+} ForceBatch;
+
 } // namespace rgpot
