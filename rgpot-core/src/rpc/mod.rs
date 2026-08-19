@@ -38,5 +38,36 @@
 /// convenient `rpc::schema` alias.
 pub use crate::Potentials_capnp as schema;
 
+/// Stable family name for the rgpot Cap'n Proto protocol.
+pub const PROTOCOL_FAMILY: &str = "rgpot.potentials";
+/// Wire-incompatible protocol revision.
+pub const PROTOCOL_MAJOR: u16 = 1;
+/// Additive wire-compatible protocol revision.
+pub const PROTOCOL_MINOR: u16 = 0;
+/// Cap'n Proto schema id declared by `Potentials.capnp`.
+pub const SCHEMA_ID: &str = "bd1f89fa17369103";
+
+/// Return whether a remote endpoint can speak this protocol family.
+pub fn protocol_compatible(family: &str, major: u16, minor: u16) -> bool {
+    family == PROTOCOL_FAMILY && major == PROTOCOL_MAJOR && minor <= PROTOCOL_MINOR
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_additive_minor_revisions() {
+        assert!(protocol_compatible(PROTOCOL_FAMILY, PROTOCOL_MAJOR, 0));
+    }
+
+    #[test]
+    fn rejects_other_families_and_major_revisions() {
+        assert!(!protocol_compatible("other.protocol", PROTOCOL_MAJOR, 0));
+        assert!(!protocol_compatible(PROTOCOL_FAMILY, PROTOCOL_MAJOR + 1, 0));
+        assert!(!protocol_compatible(PROTOCOL_FAMILY, PROTOCOL_MAJOR, PROTOCOL_MINOR + 1));
+    }
+}
+
 pub mod client;
 pub mod server;

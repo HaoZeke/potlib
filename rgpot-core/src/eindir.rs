@@ -44,8 +44,35 @@ use crate::types::{rgpot_force_input_t, rgpot_force_out_t};
 pub use eindir_core::ffi::eindir_status_t;
 pub use eindir_core::ffi::{
     eindir_objective_eval, eindir_objective_grad, eindir_objective_has_grad,
-    eindir_objective_t, EindirEvalFn, EindirFreeFn, EindirGradFn,
+    eindir_objective_t, eindir_abi_stamp_t, EindirEvalFn, EindirFreeFn, EindirGradFn,
 };
+
+/// Return the eindir ABI stamp used by the embedded objective base.
+#[unsafe(no_mangle)]
+pub extern "C" fn rgpot_eindir_abi_stamp() -> eindir_abi_stamp_t {
+    eindir_core::ffi::eindir_core_abi_stamp()
+}
+
+/// Check whether an eindir ABI stamp can be consumed by this rgpot build.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rgpot_eindir_abi_compatible(
+    stamp: *const eindir_abi_stamp_t,
+) -> i32 {
+    unsafe { eindir_core::ffi::eindir_core_abi_compatible(stamp) }
+}
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+
+    #[test]
+    fn reports_the_shared_eindir_abi_stamp() {
+        let stamp = rgpot_eindir_abi_stamp();
+        assert_eq!(stamp.abi_major, 1);
+        assert_eq!(stamp.objective_layout, 1);
+        assert_eq!(unsafe { rgpot_eindir_abi_compatible(&stamp) }, 1);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // rgpot_potential_t: rgpot_potential_t* IS-A eindir_objective_t*
