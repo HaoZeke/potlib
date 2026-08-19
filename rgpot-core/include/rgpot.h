@@ -62,8 +62,6 @@ typedef enum rgpot_status_t {
   RGPOT_BUFFER_SIZE_ERROR = 4,
 } rgpot_status_t;
 
-typedef struct FusedEvaluation FusedEvaluation;
-
 #if defined(RGPOT_HAS_RPC)
 /**
  * RPC client that connects to a remote rgpot server.
@@ -184,9 +182,9 @@ typedef struct rgpot_potential_t {
    */
   double box_matrix[9];
   /**
-   * Energy/gradient result shared by a matching eval-then-grad request.
+   * Opaque cache pointer shared by a matching eval-then-grad request.
    */
-  Mutex<Option<FusedEvaluation>> fused_cache;
+  void *fused_cache;
 } rgpot_potential_t;
 
 #if (defined(RGPOT_HAS_RPC) && defined(RGPOT_HAS_RPC))

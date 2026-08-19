@@ -100,13 +100,19 @@ pub struct rgpot_potential_t {
     pub atomic_numbers: *mut i32,
     /// Box matrix (column-major, 3x3), copied at construction.
     pub box_matrix: [f64; 9],
-    /// Energy/gradient result shared by a matching eval-then-grad request.
-    fused_cache: Mutex<Option<FusedEvaluation>>,
+    /// Opaque cache pointer shared by a matching eval-then-grad request.
+    pub fused_cache: *mut c_void,
 }
+
+type FusedCache = Mutex<Option<FusedEvaluation>>;
 
 struct FusedEvaluation {
     positions: Vec<f64>,
     gradient: Vec<f64>,
+}
+
+unsafe fn fused_cache<'a>(pot: &'a rgpot_potential_t) -> &'a FusedCache {
+    unsafe { &*(pot.fused_cache as *const FusedCache) }
 }
 
 // Safety: user pointers are opaque; caller guarantees thread safety.
@@ -166,12 +172,12 @@ unsafe extern "C" fn rgpot_eval_cb(
         rgpot_tensor_free(input.box_matrix);
     }
     if status != rgpot_status_t::RGPOT_SUCCESS {
-        *pot.fused_cache
+        *fused_cache(pot)
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
         return eindir_status_t::EINDIR_INTERNAL_ERROR;
     }
-    *pot.fused_cache
+    *fused_cache(pot)
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner()) = fused;
     unsafe { *value_out = output.energy };
@@ -187,8 +193,7 @@ unsafe extern "C" fn rgpot_grad_cb(
     let xt = unsafe { &(*x).dl_tensor };
     let n = pot.n_atoms * 3;
     let x_data = unsafe { std::slice::from_raw_parts(xt.data as *const f64, n) };
-    let cached = pot
-        .fused_cache
+    let cached = fused_cache(pot)
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .take();
@@ -317,7 +322,7 @@ pub unsafe extern "C" fn rgpot_potential_new_eindir(
         n_atoms,
         atomic_numbers: atmnrs,
         box_matrix: box_arr,
-        fused_cache: Mutex::new(None),
+        fused_cache: Box::into_raw(Box::new(Mutex::new(None::<FusedEvaluation>))) as *mut c_void,
     });
     let ptr = Box::into_raw(pot);
     // Self-referential: the eindir base's user_data points to the owning struct
@@ -353,6 +358,9 @@ pub unsafe extern "C" fn rgpot_potential_free_eindir(pot: *mut rgpot_potential_t
     // Free molecular arrays.
     if !p.atomic_numbers.is_null() {
         unsafe { drop(Vec::from_raw_parts(p.atomic_numbers, p.n_atoms, p.n_atoms)) };
+    }
+    if !p.fused_cache.is_null() {
+        unsafe { drop(Box::from_raw(p.fused_cache as *mut FusedCache)) };
     }
     unsafe { drop(Box::from_raw(pot)) };
 }
