@@ -17,10 +17,24 @@
 #include <stdlib.h>
 #include <dlpack/dlpack.h>
 
-#define RGPOT_VERSION "2.0.0"
-#define RGPOT_VERSION_MAJOR 2
+#define RGPOT_VERSION "3.0.2"
+#define RGPOT_VERSION_MAJOR 3
 #define RGPOT_VERSION_MINOR 0
-#define RGPOT_VERSION_PATCH 0
+#define RGPOT_VERSION_PATCH 2
+
+#if defined(RGPOT_HAS_RPC)
+/**
+ * Wire-incompatible protocol revision.
+ */
+#define PROTOCOL_MAJOR 1
+#endif
+
+#if defined(RGPOT_HAS_RPC)
+/**
+ * Additive wire-compatible protocol revision.
+ */
+#define PROTOCOL_MINOR 0
+#endif
 
 /**
  * Status codes returned by all C API functions.
@@ -47,6 +61,8 @@ typedef enum rgpot_status_t {
    */
   RGPOT_BUFFER_SIZE_ERROR = 4,
 } rgpot_status_t;
+
+typedef struct FusedEvaluation FusedEvaluation;
 
 #if defined(RGPOT_HAS_RPC)
 /**
@@ -167,6 +183,10 @@ typedef struct rgpot_potential_t {
    * Box matrix (column-major, 3x3), copied at construction.
    */
   double box_matrix[9];
+  /**
+   * Energy/gradient result shared by a matching eval-then-grad request.
+   */
+  Mutex<Option<FusedEvaluation>> fused_cache;
 } rgpot_potential_t;
 
 #if (defined(RGPOT_HAS_RPC) && defined(RGPOT_HAS_RPC))
