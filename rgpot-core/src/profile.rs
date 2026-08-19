@@ -18,7 +18,7 @@ use capnp::message::{Builder, ReaderOptions};
 use capnp::serialize;
 use libloading::Library;
 
-use crate::Potentials_capnp::{force_input, potential_result};
+use crate::Potentials_capnp::{capabilities, force_input, potential_result};
 
 /// One atomistic evaluation sent through a profile session.
 #[derive(Debug, Clone, Copy)]
@@ -70,6 +70,137 @@ impl From<capnp::Error> for ProfileError {
 
 /// Result type for profile loading and evaluation.
 pub type ProfileResult<T> = Result<T, ProfileError>;
+
+/// Compatibility values required from a backend capability descriptor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CapabilityRequirements {
+    /// Required Cap'n Proto protocol family.
+    pub protocol_family: &'static str,
+    /// Maximum wire-compatible protocol major/minor understood by this loader.
+    pub protocol_major: u16,
+    /// Maximum additive protocol revision understood by this loader.
+    pub protocol_minor: u16,
+    /// Required schema identity.
+    pub schema_id: &'static str,
+    /// Required eindir ABI major/minor.
+    pub bridge_abi_major: u16,
+    /// Maximum eindir ABI minor understood by this loader.
+    pub bridge_abi_minor: u16,
+    /// Required embedded-objective layout revision.
+    pub bridge_layout: u32,
+    /// Required DLPack major/minor.
+    pub dlpack_major: u16,
+    /// Maximum DLPack minor understood by this loader.
+    pub dlpack_minor: u16,
+    /// Required bridge capability bits.
+    pub bridge_features: u64,
+}
+
+impl Default for CapabilityRequirements {
+    fn default() -> Self {
+        Self {
+            protocol_family: "rgpot.potentials",
+            protocol_major: 1,
+            protocol_minor: 0,
+            schema_id: "bd1f89fa17369103",
+            bridge_abi_major: 1,
+            bridge_abi_minor: 0,
+            bridge_layout: 1,
+            dlpack_major: 1,
+            dlpack_minor: 0,
+            bridge_features: 0,
+        }
+    }
+}
+
+/// Validate a serialized backend capability descriptor before dispatch.
+pub fn validate_capabilities(
+    encoded: &[u8],
+    requirements: &CapabilityRequirements,
+) -> ProfileResult<()> {
+    let mut bytes = encoded;
+    let message = serialize::read_message_from_flat_slice(&mut bytes, ReaderOptions::new())?;
+    let value = message.get_root::<capabilities::Reader>()?;
+    let family = value
+        .get_protocol_family()?
+        .to_str()
+        .map_err(|error| ProfileError::new(format!("invalid protocol family text: {error}")))?
+        .to_owned();
+    if family != requirements.protocol_family {
+        return Err(ProfileError::new(format!(
+            "protocol family mismatch: expected {}, received {family}",
+            requirements.protocol_family
+        )));
+    }
+    let major = value.get_protocol_major();
+    if major != requirements.protocol_major {
+        return Err(ProfileError::new(format!(
+            "protocol major mismatch: expected {}, received {major}",
+            requirements.protocol_major
+        )));
+    }
+    let minor = value.get_protocol_minor();
+    if minor > requirements.protocol_minor {
+        return Err(ProfileError::new(format!(
+            "protocol minor too new: maximum {}, received {minor}",
+            requirements.protocol_minor
+        )));
+    }
+    let schema_id = value
+        .get_schema_id()?
+        .to_str()
+        .map_err(|error| ProfileError::new(format!("invalid schema identity text: {error}")))?
+        .to_owned();
+    if schema_id != requirements.schema_id {
+        return Err(ProfileError::new(format!(
+            "schema identity mismatch: expected {}, received {schema_id}",
+            requirements.schema_id
+        )));
+    }
+    let bridge_major = value.get_bridge_abi_major();
+    if bridge_major != requirements.bridge_abi_major {
+        return Err(ProfileError::new(format!(
+            "bridge ABI major mismatch: expected {}, received {bridge_major}",
+            requirements.bridge_abi_major
+        )));
+    }
+    let bridge_minor = value.get_bridge_abi_minor();
+    if bridge_minor > requirements.bridge_abi_minor {
+        return Err(ProfileError::new(format!(
+            "bridge ABI minor too new: maximum {}, received {bridge_minor}",
+            requirements.bridge_abi_minor
+        )));
+    }
+    let layout = value.get_bridge_layout();
+    if layout != requirements.bridge_layout {
+        return Err(ProfileError::new(format!(
+            "bridge layout mismatch: expected {}, received {layout}",
+            requirements.bridge_layout
+        )));
+    }
+    let dlpack_major = value.get_dlpack_major();
+    if dlpack_major != requirements.dlpack_major {
+        return Err(ProfileError::new(format!(
+            "DLPack major mismatch: expected {}, received {dlpack_major}",
+            requirements.dlpack_major
+        )));
+    }
+    let dlpack_minor = value.get_dlpack_minor();
+    if dlpack_minor > requirements.dlpack_minor {
+        return Err(ProfileError::new(format!(
+            "DLPack minor too new: maximum {}, received {dlpack_minor}",
+            requirements.dlpack_minor
+        )));
+    }
+    let features = value.get_bridge_features();
+    let missing = requirements.bridge_features & !features;
+    if missing != 0 {
+        return Err(ProfileError::new(format!(
+            "bridge features missing: required 0x{missing:016x}, received 0x{features:016x}"
+        )));
+    }
+    Ok(())
+}
 
 /// Ordered shared-library candidates for a backend prefix.
 pub fn library_candidates(prefix: &str, explicit_path: Option<&str>) -> Vec<String> {
@@ -207,6 +338,26 @@ type CalculateResultFromConfigFn = unsafe extern "C" fn(
 type PotentialResultSizeFn = unsafe extern "C" fn(*const c_void, usize) -> usize;
 type CapabilitiesResultFn = unsafe extern "C" fn(*mut c_void, usize, *mut usize) -> c_int;
 
+fn read_capabilities(function: CapabilitiesResultFn) -> ProfileResult<Vec<u8>> {
+    let mut required = 0usize;
+    unsafe { function(std::ptr::null_mut(), 0, &mut required) };
+    if required == 0 {
+        return Err(ProfileError::new(
+            "capabilities_result returned an empty capability message",
+        ));
+    }
+    let mut encoded = vec![0u8; required];
+    let mut written = 0usize;
+    let status = unsafe { function(encoded.as_mut_ptr().cast(), encoded.len(), &mut written) };
+    if status != 0 || written == 0 || written > encoded.len() {
+        return Err(ProfileError::new(format!(
+            "capabilities_result failed: status {status}, required {required}, written {written}"
+        )));
+    }
+    encoded.truncate(written);
+    Ok(encoded)
+}
+
 struct ProcessLifetime<T>(ManuallyDrop<T>);
 
 impl<T> ProcessLifetime<T> {
@@ -242,6 +393,7 @@ pub struct ProfileSession {
     last_error: LastErrorFn,
     calculate: SessionCalculateResultFn,
     result_size: PotentialResultSizeFn,
+    capabilities: Vec<u8>,
 }
 
 impl ProfileSession {
@@ -301,7 +453,7 @@ impl ProfileSession {
                 "potential_result_size_for_force_input",
             )?
         };
-        let _capabilities =
+        let capabilities_result =
             unsafe { resolve::<CapabilitiesResultFn>(&library, prefix, "capabilities_result")? };
 
         if unsafe { available() } == 0 {
@@ -309,6 +461,8 @@ impl ProfileSession {
                 "potential profile {prefix} is not available"
             )));
         }
+        let capabilities = read_capabilities(capabilities_result)?;
+        validate_capabilities(&capabilities, &CapabilityRequirements::default())?;
         let version = c_string(unsafe { version_fn() });
         let session = unsafe { session_create(config.as_ptr().cast(), config.len()) };
         if session.is_null() {
@@ -333,6 +487,7 @@ impl ProfileSession {
             last_error,
             calculate,
             result_size,
+            capabilities,
         })
     }
 
@@ -354,6 +509,11 @@ impl ProfileSession {
     /// Numeric ABI generation reported by the backend.
     pub fn abi_version(&self) -> i32 {
         self.abi_version
+    }
+
+    /// Serialized Cap'n Proto capability descriptor used during loading.
+    pub fn capabilities(&self) -> &[u8] {
+        &self.capabilities
     }
 
     /// Evaluate one geometry through the persistent session.

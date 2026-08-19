@@ -1,9 +1,10 @@
 use capnp::message::Builder;
 use capnp::serialize;
 use rgpot_core::profile::{
-    decode_potential_result, encode_force_input, library_candidates, ProfileRequest,
+    decode_potential_result, encode_force_input, library_candidates, validate_capabilities,
+    CapabilityRequirements, ProfileRequest,
 };
-use rgpot_core::Potentials_capnp::potential_result;
+use rgpot_core::Potentials_capnp::{capabilities, potential_result};
 
 #[test]
 fn candidates_are_prefix_parameterized() {
@@ -106,4 +107,40 @@ fn potential_result_codec_preserves_one_fused_evaluation() {
 
     assert_eq!(evaluation.energy, -12.75);
     assert_eq!(evaluation.forces, [1.0, 2.0, 3.0, -1.0, -2.0, -3.0]);
+}
+
+#[test]
+fn capabilities_accept_matching_additive_metadata() {
+    let mut message = Builder::new_default();
+    {
+        let mut value = message.init_root::<capabilities::Builder>();
+        value.set_protocol_family("rgpot.potentials");
+        value.set_protocol_major(1);
+        value.set_protocol_minor(0);
+        value.set_schema_id("bd1f89fa17369103");
+        value.set_bridge_abi_major(1);
+        value.set_bridge_abi_minor(0);
+        value.set_bridge_layout(1);
+        value.set_dlpack_major(1);
+        value.set_dlpack_minor(0);
+        value.set_bridge_features(0b11);
+    }
+    let encoded = serialize::write_message_to_words(&message);
+    validate_capabilities(&encoded, &CapabilityRequirements::default()).expect("compatible");
+}
+
+#[test]
+fn capabilities_reject_incompatible_major_and_schema() {
+    let mut message = Builder::new_default();
+    {
+        let mut value = message.init_root::<capabilities::Builder>();
+        value.set_protocol_family("rgpot.potentials");
+        value.set_protocol_major(2);
+        value.set_protocol_minor(0);
+        value.set_schema_id("wrong");
+    }
+    let encoded = serialize::write_message_to_words(&message);
+    let error = validate_capabilities(&encoded, &CapabilityRequirements::default())
+        .expect_err("incompatible capability metadata must fail");
+    assert!(error.to_string().contains("protocol major"));
 }
