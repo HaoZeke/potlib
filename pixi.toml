@@ -96,8 +96,8 @@ pip = "*"
 [feature.eonviz.pypi-dependencies]
 # Pinned revisions carry the embedded-metadata minimization-trajectory parser and
 # the (s, d) optimization-landscape plotter (plt-min) absent from releases.
-chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", rev = "f71d79b9b9f913c717e4d97dd3ec9fd496f2c208" }
-rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", rev = "a652605a61991d2fea86a9f63bfabfc926f6f03c" }
+chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", rev = "3d9ee78e9926df085d90b2d395c51b7bfc359133" }
+rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", rev = "9be1973bd8ddd48eb92e8d1abc047d55bceace44" }
 readcon = ">=0.14.7"
 jax = "*"
 
