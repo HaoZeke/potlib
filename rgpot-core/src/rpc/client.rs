@@ -19,7 +19,7 @@ use dlpk::sys::DLDeviceType;
 use futures::AsyncReadExt;
 use tokio::runtime::Runtime;
 
-use crate::rpc::schema::potential;
+use crate::rpc::schema::{capabilities, potential};
 use crate::tensor::create_owned_f64_tensor;
 use crate::types::{rgpot_force_input_t, rgpot_force_out_t};
 
@@ -90,6 +90,19 @@ impl RpcClient {
 
         tokio::task::spawn_local(rpc_system);
 
+        let response = potential_client
+            .get_capabilities_request()
+            .send()
+            .promise
+            .await
+            .map_err(|e: CapnpError| format!("capability handshake failed: {e}"))?;
+        let caps = response
+            .get()
+            .map_err(|e| format!("failed to read capabilities: {e}"))?
+            .get_capabilities()
+            .map_err(|e| format!("failed to get capabilities: {e}"))?;
+        validate_capabilities(caps)?;
+
         // --- Build capnp request ---
         let mut request = potential_client.calculate_request();
         {
@@ -144,6 +157,48 @@ impl RpcClient {
 
         Ok(())
     }
+}
+
+fn validate_capabilities(caps: capabilities::Reader<'_>) -> Result<(), String> {
+    let family = caps
+        .get_protocol_family()
+        .map_err(|e| format!("invalid capability protocol family: {e}"))?
+        .to_str()
+        .map_err(|e| format!("invalid capability protocol family text: {e}"))?;
+    if family != "rgpot.potentials"
+        || caps.get_protocol_major() != 1
+        || caps.get_protocol_minor() > 0
+        || caps
+            .get_schema_id()
+            .map_err(|e| format!("invalid capability schema id: {e}"))?
+            .to_str()
+            .map_err(|e| format!("invalid capability schema id text: {e}"))?
+            != "bd1f89fa17369103"
+        || caps.get_bridge_abi_major() != 1
+        || caps.get_bridge_abi_minor() > 1
+        || caps.get_bridge_layout() != 3
+        || caps.get_dlpack_major() != 1
+        || caps.get_dlpack_minor() > 0
+        || !caps.get_available()
+        || caps.get_bridge_features() & 0b11 != 0b11
+    {
+        return Err("RPC capability descriptor is incompatible".to_owned());
+    }
+
+    let mut operations = 0u64;
+    for operation in caps
+        .get_operations()
+        .map_err(|e| format!("invalid capability operations: {e}"))?
+        .iter()
+    {
+        let operation = operation
+            .map_err(|e| format!("invalid capability operation: {e}"))?;
+        operations |= 1u64 << u16::from(operation);
+    }
+    if operations & 0b11 != 0b11 {
+        return Err("RPC capability descriptor lacks energy/forces operations".to_owned());
+    }
+    Ok(())
 }
 
 /// Extract CPU data slices from DLPack input tensors.

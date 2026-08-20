@@ -18,7 +18,7 @@ use std::os::raw::c_void;
 use tokio::runtime::Runtime;
 
 use crate::potential::{PotentialCallback, rgpot_potential_t};
-use crate::rpc::schema::potential;
+use crate::rpc::schema::{capabilities, potential};
 use crate::status::rgpot_status_t;
 use crate::tensor::{
     rgpot_tensor_cpu_f64_2d, rgpot_tensor_cpu_f64_matrix3, rgpot_tensor_cpu_i32_1d,
@@ -38,6 +38,36 @@ unsafe impl Send for PotentialServer {}
 unsafe impl Sync for PotentialServer {}
 
 impl potential::Server for PotentialServer {
+    fn get_capabilities(
+        &mut self,
+        _params: potential::GetCapabilitiesParams,
+        mut results: potential::GetCapabilitiesResults,
+    ) -> capnp::capability::Promise<(), CapnpError> {
+        let mut caps = results.get().init_capabilities();
+        caps.set_backend_name("rgpot-rpc");
+        caps.set_backend_version("");
+        caps.set_abi_version(1);
+        caps.set_available(true);
+        let mut operations = caps.reborrow().init_operations(2);
+        operations.set(0, capabilities::Operation::Energy);
+        operations.set(1, capabilities::Operation::Forces);
+        caps.reborrow().init_lowered_common_fields(0);
+        caps.reborrow().init_config_kinds(0);
+        caps.set_schema_version("1");
+        caps.set_protocol_family("rgpot.potentials");
+        caps.set_protocol_major(1);
+        caps.set_protocol_minor(0);
+        caps.set_schema_id("bd1f89fa17369103");
+        caps.set_bridge_abi_major(1);
+        caps.set_bridge_abi_minor(1);
+        caps.set_bridge_layout(3);
+        caps.set_dlpack_major(1);
+        caps.set_dlpack_minor(0);
+        caps.set_bridge_features(0b11);
+        caps.set_build_identity("");
+        capnp::capability::Promise::ok(())
+    }
+
     fn calculate(
         &mut self,
         params: potential::CalculateParams,
