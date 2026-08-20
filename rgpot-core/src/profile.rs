@@ -9,7 +9,7 @@
 //! Results return as `PotentialResult` bytes in the units requested by the
 //! input message.
 
-use std::ffi::{CStr, c_char, c_int, c_void};
+use std::ffi::{c_char, c_int, c_void, CStr};
 use std::fmt;
 use std::mem::ManuallyDrop;
 use std::path::Path;
@@ -94,6 +94,8 @@ pub struct CapabilityRequirements {
     pub dlpack_minor: u16,
     /// Required bridge capability bits.
     pub bridge_features: u64,
+    /// Required backend operations, encoded by `Capabilities.Operation` ordinal.
+    pub required_operations: u64,
 }
 
 impl Default for CapabilityRequirements {
@@ -109,6 +111,7 @@ impl Default for CapabilityRequirements {
             dlpack_major: 1,
             dlpack_minor: 0,
             bridge_features: 0,
+            required_operations: (1 << 0) | (1 << 1),
         }
     }
 }
@@ -197,6 +200,18 @@ pub fn validate_capabilities(
     if missing != 0 {
         return Err(ProfileError::new(format!(
             "bridge features missing: required 0x{missing:016x}, received 0x{features:016x}"
+        )));
+    }
+    let mut operations = 0u64;
+    for operation in value.get_operations()?.iter() {
+        let operation = operation
+            .map_err(|error| ProfileError::new(format!("invalid capability operation: {error}")))?;
+        operations |= 1u64 << u16::from(operation);
+    }
+    let missing_operations = requirements.required_operations & !operations;
+    if missing_operations != 0 {
+        return Err(ProfileError::new(format!(
+            "required operations missing: 0x{missing_operations:016x}, received 0x{operations:016x}"
         )));
     }
     Ok(())
@@ -649,8 +664,8 @@ fn abi_message(result: &ProfileAbiResult) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     struct DropProbe(Arc<AtomicBool>);
 
