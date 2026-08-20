@@ -327,7 +327,7 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
 #define RGPOT_FAKE_ONLY
 #endif
 
-RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
+RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return RGPOT_CPMDC_ABI_VERSION; }
 
 RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
 

@@ -34,6 +34,7 @@ using PotentialResultSizeFn = size_t (*)(const void *, size_t);
 using SessionCalculateResultFn = CPMDCResult (*)(
     CPMDCSession *, const void *, size_t, void *, size_t, size_t *);
 using VersionFn = const char *(*)(void);
+using AbiVersionFn = int (*)(void);
 using AvailableFn = int (*)(void);
 using FeatureCountFn = size_t (*)(void);
 using FeatureTableFn = const CPMDCFeatureEntry *(*)(void);
@@ -79,6 +80,7 @@ struct EngineBundle {
   PotentialResultSizeFn potential_result_size_for_force_input = nullptr;
   SessionCalculateResultFn session_calculate_result = nullptr;
   VersionFn version = nullptr;
+  AbiVersionFn abi_version = nullptr;
   AvailableFn available = nullptr;
   FeatureCountFn feature_count = nullptr;
   FeatureTableFn feature_table = nullptr;
@@ -97,6 +99,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.potential_result_size_for_force_input = nullptr;
   b.session_calculate_result = nullptr;
   b.version = nullptr;
+  b.abi_version = nullptr;
   b.available = nullptr;
   b.feature_count = nullptr;
   b.feature_table = nullptr;
@@ -132,6 +135,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
       b.engine_lib.sym_optional<SessionCalculateResultFn>(
           "cpmdc_session_calculate_result");
   b.version = b.engine_lib.sym_optional<VersionFn>("cpmdc_version");
+  b.abi_version = b.engine_lib.sym_optional<AbiVersionFn>("cpmdc_abi_version");
   b.available = b.engine_lib.sym_optional<AvailableFn>("cpmdc_available");
   b.feature_count =
       b.engine_lib.sym_optional<FeatureCountFn>("cpmdc_feature_count");
@@ -153,6 +157,10 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   if (!has_one_shot && !has_session_result) {
     b.load_error =
         "engine missing cpmdc session result ABI or one-shot gradient ABI";
+    return false;
+  }
+  if (!b.abi_version || b.abi_version() != RGPOT_CPMDC_ABI_VERSION) {
+    b.load_error = "engine has incompatible cpmdc ABI version";
     return false;
   }
   b.loaded = true;

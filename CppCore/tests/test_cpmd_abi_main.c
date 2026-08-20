@@ -8,6 +8,10 @@
 #include <string.h>
 
 int main(void) {
+  if (cpmdc_abi_version() != RGPOT_CPMDC_ABI_VERSION) {
+    fprintf(stderr, "cpmdc stub ABI version mismatch\n");
+    return 1;
+  }
   if (cpmdc_available() != 0) {
     fprintf(stderr, "cpmdc stub should report unavailable\n");
     return 1;

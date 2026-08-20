@@ -13,6 +13,9 @@
 
 #include <stddef.h>
 
+/** Numeric ABI revision for the nwchemc engine boundary. */
+#define RGPOT_NWCHEMC_ABI_VERSION 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,6 +58,9 @@ RGPOT_NWCHEMC_API NWChemCResult nwchemc_energy_gradient(
 
 /** Engine version string (static buffer). */
 RGPOT_NWCHEMC_API const char *nwchemc_version(void);
+
+/** Numeric ABI revision for fail-closed frontend validation. */
+RGPOT_NWCHEMC_API int nwchemc_abi_version(void);
 
 /** 1 if real embed (RGPOT_HAS_NWCHEM), 0 if stub. */
 RGPOT_NWCHEMC_API int nwchemc_available(void);

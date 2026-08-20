@@ -29,6 +29,7 @@ using EnergyGradientFn = NWChemCResult (*)(int, const double *, const int *,
                                            const void *, size_t, double *);
 using SetParamsFn = int (*)(const void *, size_t);
 using VersionFn = const char *(*)(void);
+using AbiVersionFn = int (*)(void);
 using AvailableFn = int (*)(void);
 
 struct ParamsView {
@@ -73,6 +74,7 @@ struct EngineBundle {
   EnergyGradientFn energy_gradient = nullptr;
   SetParamsFn set_params = nullptr;
   VersionFn version = nullptr;
+  AbiVersionFn abi_version = nullptr;
   AvailableFn available = nullptr;
   std::string load_error;
   bool loaded = false;
@@ -84,6 +86,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.energy_gradient = nullptr;
   b.set_params = nullptr;
   b.version = nullptr;
+  b.abi_version = nullptr;
   b.available = nullptr;
 
   bool eng_ok = false;
@@ -106,6 +109,8 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
       b.engine_lib.sym_optional<EnergyGradientFn>("nwchemc_energy_gradient");
   b.set_params = b.engine_lib.sym_optional<SetParamsFn>("nwchemc_set_params");
   b.version = b.engine_lib.sym_optional<VersionFn>("nwchemc_version");
+  b.abi_version =
+      b.engine_lib.sym_optional<AbiVersionFn>("nwchemc_abi_version");
   b.available = b.engine_lib.sym_optional<AvailableFn>("nwchemc_available");
 
   if (!b.energy_gradient) {
@@ -114,6 +119,10 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   }
   if (!b.set_params) {
     b.load_error = "engine missing nwchemc_set_params";
+    return false;
+  }
+  if (!b.abi_version || b.abi_version() != RGPOT_NWCHEMC_ABI_VERSION) {
+    b.load_error = "engine has incompatible nwchemc ABI version";
     return false;
   }
   b.loaded = true;

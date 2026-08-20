@@ -44,4 +44,6 @@ NWChemCResult nwchemc_energy_gradient(
 
 const char *nwchemc_version(void) { return "nwchemc-fake/0.1"; }
 
+int nwchemc_abi_version(void) { return RGPOT_NWCHEMC_ABI_VERSION; }
+
 int nwchemc_available(void) { return 1; }

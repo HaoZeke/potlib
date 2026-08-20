@@ -8,6 +8,10 @@
 #include <string.h>
 
 int main(void) {
+  if (nwchemc_abi_version() != RGPOT_NWCHEMC_ABI_VERSION) {
+    fprintf(stderr, "FAIL: unexpected nwchemc ABI version\n");
+    return 1;
+  }
   if (nwchemc_available() != 0) {
     fprintf(stderr, "FAIL: stub should report available=0\n");
     return 1;
