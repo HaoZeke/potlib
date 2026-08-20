@@ -98,7 +98,7 @@ pip = "*"
 # the (s, d) optimization-landscape plotter (plt-min) absent from releases.
 chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", rev = "f71d79b9b9f913c717e4d97dd3ec9fd496f2c208" }
 rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", rev = "a652605a61991d2fea86a9f63bfabfc926f6f03c" }
-readcon = ">=0.14.5"
+readcon = ">=0.14.7"
 jax = "*"
 
 [feature.docs]
