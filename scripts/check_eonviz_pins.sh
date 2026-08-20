@@ -17,8 +17,8 @@ if printf '%s\n' "$section" | grep -Eq '^[[:space:]]*(branch|tag)[[:space:]]*=';
 fi
 
 for revision in \
-  f71d79b9b9f913c717e4d97dd3ec9fd496f2c208 \
-  a652605a61991d2fea86a9f63bfabfc926f6f03c; do
+  3d9ee78e9926df085d90b2d395c51b7bfc359133 \
+  9be1973bd8ddd48eb92e8d1abc047d55bceace44; do
   printf '%s\n' "$section" | grep -Fq "$revision"
   grep -Fq "$revision" "$LOCK"
 done
