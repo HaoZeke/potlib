@@ -3,7 +3,7 @@ use capnp::serialize;
 use rgpot_core::Potentials_capnp::{capabilities, potential_result};
 use rgpot_core::profile::{
     CapabilityRequirements, ProfileRequest, ProfileSession, decode_potential_result,
-    encode_force_input, library_candidates, validate_capabilities,
+    capability_build_identity, encode_force_input, library_candidates, validate_capabilities,
 };
 use std::path::Path;
 
@@ -140,6 +140,10 @@ fn capabilities_accept_matching_additive_metadata() {
         .get_root::<rgpot_core::Potentials_capnp::capabilities::Reader>()
         .expect("capabilities root");
     assert_eq!(value.get_build_identity().unwrap().to_str().unwrap(), "rgpot-test@source-revision");
+    assert_eq!(
+        capability_build_identity(&encoded).unwrap().as_deref(),
+        Some("rgpot-test@source-revision")
+    );
 }
 
 #[test]

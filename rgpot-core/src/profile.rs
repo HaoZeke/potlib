@@ -202,6 +202,22 @@ pub fn validate_capabilities(
     Ok(())
 }
 
+/// Read the optional producer build identity from a capability descriptor.
+pub fn capability_build_identity(encoded: &[u8]) -> ProfileResult<Option<String>> {
+    let mut bytes = encoded;
+    let message = serialize::read_message_from_flat_slice(&mut bytes, ReaderOptions::new())?;
+    let value = message.get_root::<capabilities::Reader>()?;
+    if !value.has_build_identity() {
+        return Ok(None);
+    }
+    let identity = value
+        .get_build_identity()?
+        .to_str()
+        .map_err(|error| ProfileError::new(format!("invalid build identity text: {error}")))?
+        .to_owned();
+    Ok((!identity.is_empty()).then_some(identity))
+}
+
 /// Ordered shared-library candidates for a backend prefix.
 pub fn library_candidates(prefix: &str, explicit_path: Option<&str>) -> Vec<String> {
     let mut candidates = Vec::new();
