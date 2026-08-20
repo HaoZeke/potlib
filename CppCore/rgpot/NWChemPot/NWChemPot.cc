@@ -110,7 +110,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.set_params = b.engine_lib.sym_optional<SetParamsFn>("nwchemc_set_params");
   b.version = b.engine_lib.sym_optional<VersionFn>("nwchemc_version");
   b.abi_version =
-      b.engine_lib.sym_optional<AbiVersionFn>("nwchemc_abi_version");
+      b.engine_lib.sym_optional<AbiVersionFn>("nwchemc_c_abi_version");
   b.available = b.engine_lib.sym_optional<AvailableFn>("nwchemc_available");
 
   if (!b.energy_gradient) {
@@ -121,7 +121,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
     b.load_error = "engine missing nwchemc_set_params";
     return false;
   }
-  if (!b.abi_version || b.abi_version() != RGPOT_NWCHEMC_ABI_VERSION) {
+  if (!b.abi_version || b.abi_version() != RGPOT_NWCHEMC_C_ABI_VERSION) {
     b.load_error = "engine has incompatible nwchemc ABI version";
     return false;
   }

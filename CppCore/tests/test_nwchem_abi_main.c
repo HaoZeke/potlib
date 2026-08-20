@@ -8,7 +8,7 @@
 #include <string.h>
 
 int main(void) {
-  if (nwchemc_abi_version() != RGPOT_NWCHEMC_ABI_VERSION) {
+  if (nwchemc_c_abi_version() != RGPOT_NWCHEMC_C_ABI_VERSION) {
     fprintf(stderr, "FAIL: unexpected nwchemc ABI version\n");
     return 1;
   }

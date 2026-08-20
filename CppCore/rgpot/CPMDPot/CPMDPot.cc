@@ -135,7 +135,8 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
       b.engine_lib.sym_optional<SessionCalculateResultFn>(
           "cpmdc_session_calculate_result");
   b.version = b.engine_lib.sym_optional<VersionFn>("cpmdc_version");
-  b.abi_version = b.engine_lib.sym_optional<AbiVersionFn>("cpmdc_abi_version");
+  b.abi_version =
+      b.engine_lib.sym_optional<AbiVersionFn>("cpmdc_c_abi_version");
   b.available = b.engine_lib.sym_optional<AvailableFn>("cpmdc_available");
   b.feature_count =
       b.engine_lib.sym_optional<FeatureCountFn>("cpmdc_feature_count");
@@ -159,7 +160,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
         "engine missing cpmdc session result ABI or one-shot gradient ABI";
     return false;
   }
-  if (!b.abi_version || b.abi_version() != RGPOT_CPMDC_ABI_VERSION) {
+  if (!b.abi_version || b.abi_version() != RGPOT_CPMDC_C_ABI_VERSION) {
     b.load_error = "engine has incompatible cpmdc ABI version";
     return false;
   }

@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 /** Numeric ABI revision for the cpmdc engine boundary. */
-#define RGPOT_CPMDC_ABI_VERSION 1
+#define RGPOT_CPMDC_C_ABI_VERSION 1
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,7 +180,7 @@ RGPOT_CPMDC_API size_t cpmdc_potential_result_size_for_force_input(
 RGPOT_CPMDC_API const char *cpmdc_version(void);
 
 /** Numeric ABI revision for fail-closed frontend validation. */
-RGPOT_CPMDC_API int cpmdc_abi_version(void);
+RGPOT_CPMDC_API int cpmdc_c_abi_version(void);
 
 /** @brief 1 when the embedded OpenCPMD runtime is available. */
 RGPOT_CPMDC_API int cpmdc_available(void);

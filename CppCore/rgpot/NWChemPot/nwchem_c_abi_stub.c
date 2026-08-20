@@ -37,6 +37,6 @@ NWChemCResult nwchemc_energy_gradient(
 
 const char *nwchemc_version(void) { return STUB_VERSION; }
 
-int nwchemc_abi_version(void) { return RGPOT_NWCHEMC_ABI_VERSION; }
+int nwchemc_c_abi_version(void) { return RGPOT_NWCHEMC_C_ABI_VERSION; }
 
 int nwchemc_available(void) { return 0; }

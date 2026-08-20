@@ -8,7 +8,7 @@
 #include <string.h>
 
 int main(void) {
-  if (cpmdc_abi_version() != RGPOT_CPMDC_ABI_VERSION) {
+  if (cpmdc_c_abi_version() != RGPOT_CPMDC_C_ABI_VERSION) {
     fprintf(stderr, "cpmdc stub ABI version mismatch\n");
     return 1;
   }
