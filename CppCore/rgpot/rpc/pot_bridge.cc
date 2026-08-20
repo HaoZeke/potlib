@@ -31,6 +31,7 @@ struct PotClient {
   Potential::Client capability; //!< The RPC capability for potential calls.
   kj::WaitScope *wait_scope;    //!< Reference to the client wait scope.
   std::string last_error;       //!< Buffer for the most recent error message.
+  bool capabilities_valid = false; //!< Handshake succeeded before calculation.
 
   /**
    * @brief Constructor for PotClient.
@@ -75,7 +76,26 @@ PotClient *pot_client_init(const char *host, int32_t port) {
     auto rpc_client = std::make_unique<capnp::EzRpcClient>(address);
     auto cap = rpc_client->getMain().castAs<Potential>();
 
-    return new PotClient(std::move(rpc_client), std::move(cap));
+    auto client = std::make_unique<PotClient>(std::move(rpc_client), std::move(cap));
+    auto handshake = client->capability.getCapabilitiesRequest();
+    auto response = handshake.send().wait(*client->wait_scope);
+    auto caps = response.getCapabilities();
+    uint32_t operations = 0;
+    for (auto operation : caps.getOperations()) {
+      operations |= 1u << static_cast<uint16_t>(operation);
+    }
+    if (caps.getProtocolFamily() != "rgpot.potentials" ||
+        caps.getProtocolMajor() != 1 || caps.getProtocolMinor() > 0 ||
+        caps.getSchemaId() != "bd1f89fa17369103" ||
+        caps.getBridgeAbiMajor() != 1 || caps.getBridgeAbiMinor() > 1 ||
+        caps.getBridgeLayout() != 3 || caps.getDlpackMajor() != 1 ||
+        caps.getDlpackMinor() > 0 || (caps.getBridgeFeatures() & 0b11) != 0b11 ||
+        !caps.getAvailable() || (operations & 0b11) != 0b11) {
+      client->last_error = "RPC capability descriptor is incompatible";
+      return client.release();
+    }
+    client->capabilities_valid = true;
+    return client.release();
   } catch (...) {
     // In init, we return nullptr. The caller must assume initialization failed.
     // TODO(rg): Advanced logging could go to a thread-local static
@@ -117,6 +137,10 @@ int32_t pot_calculate(PotClient *client, int32_t natoms, const double *pos,
   if (!client)
     return -1;
   client->last_error.clear();
+  if (!client->capabilities_valid) {
+    client->last_error = "RPC capability handshake failed";
+    return -3;
+  }
 
   try {
     auto &waitScope = *client->wait_scope;

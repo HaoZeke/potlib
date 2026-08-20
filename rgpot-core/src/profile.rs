@@ -146,11 +146,11 @@ impl Default for CapabilityRequirements {
             protocol_minor: 0,
             schema_id: "bd1f89fa17369103",
             bridge_abi_major: 1,
-            bridge_abi_minor: 0,
-            bridge_layout: 1,
+            bridge_abi_minor: 1,
+            bridge_layout: 3,
             dlpack_major: 1,
             dlpack_minor: 0,
-            bridge_features: 0,
+            bridge_features: (1 << 0) | (1 << 1),
             required_operations: (1 << 0) | (1 << 1),
         }
     }

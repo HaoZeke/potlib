@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include <capnp/ez-rpc.h>
@@ -60,6 +61,33 @@ private:
   rgpot::CPMDPot *m_cpmd = nullptr;
 
 public:
+  static const char *backend_name(rgpot::PotType type) {
+    switch (type) {
+    case rgpot::PotType::CuH2:
+      return "CuH2";
+    case rgpot::PotType::LJ:
+      return "LJ";
+    case rgpot::PotType::XTB:
+      return "XTB";
+    case rgpot::PotType::TBLite:
+      return "TBLite";
+    case rgpot::PotType::Metatomic:
+      return "Metatomic";
+    case rgpot::PotType::NWChem:
+      return "NWChem";
+    case rgpot::PotType::CPMD:
+      return "CPMD";
+    case rgpot::PotType::Morse:
+      return "Morse";
+    case rgpot::PotType::LJCluster:
+      return "LJCluster";
+    case rgpot::PotType::ZBL:
+      return "ZBL";
+    default:
+      return "unknown";
+    }
+  }
+
   /**
    * @brief Constructor for GenericPotImpl.
    * @param pot Ownership of a PotentialBase derived object.
@@ -162,6 +190,33 @@ public:
                        : m_cpmd->setPotentialConfig(cfg, &msg);
     results.setOk(ok);
     results.setMessage(msg);
+    return kj::READY_NOW;
+  }
+
+  kj::Promise<void> getCapabilities(GetCapabilitiesContext context) override {
+    auto caps = context.getResults().initCapabilities();
+    caps.setBackendName(backend_name(m_potential->get_type()));
+    caps.setBackendVersion("");
+    caps.setAbiVersion(1);
+    caps.setAvailable(true);
+    auto operations = caps.initOperations(2);
+    operations.set(0, Capabilities::Operation::ENERGY);
+    operations.set(1, Capabilities::Operation::FORCES);
+    caps.initLoweredCommonFields(0);
+    auto config_kinds = caps.initConfigKinds(0);
+    (void)config_kinds;
+    caps.setSchemaVersion("1");
+    caps.setProtocolFamily("rgpot.potentials");
+    caps.setProtocolMajor(1);
+    caps.setProtocolMinor(0);
+    caps.setSchemaId("bd1f89fa17369103");
+    caps.setBridgeAbiMajor(1);
+    caps.setBridgeAbiMinor(1);
+    caps.setBridgeLayout(3);
+    caps.setDlpackMajor(1);
+    caps.setDlpackMinor(0);
+    caps.setBridgeFeatures(0b11);
+    caps.setBuildIdentity("");
     return kj::READY_NOW;
   }
 };

@@ -15,7 +15,7 @@
 //!
 //! - `ForceInput` — positions, atomic numbers, simulation cell.
 //! - `PotentialResult` — energy and forces.
-//! - `Potential` interface — a single `calculate` RPC method.
+//! - `Potential` interface — capability negotiation followed by calculation.
 //!
 //! ## Client
 //!

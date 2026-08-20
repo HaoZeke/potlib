@@ -2477,4 +2477,8 @@ interface Potential {
   # @brief Compute potential energy and nuclear gradient for this geometry.
   # @return PotentialResult.energy and PotentialResult.gradient.
   calculateGradient @11 (fip :ForceInput) -> (result :PotentialResult);
+
+  # @brief Return the server's protocol, ABI, and operation capabilities.
+  # Clients must validate this descriptor before dispatching calculations.
+  getCapabilities @12 () -> (capabilities :Capabilities);
 }

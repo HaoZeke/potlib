@@ -120,8 +120,8 @@ fn capabilities_accept_matching_additive_metadata() {
         value.set_protocol_minor(0);
         value.set_schema_id("bd1f89fa17369103");
         value.set_bridge_abi_major(1);
-        value.set_bridge_abi_minor(0);
-        value.set_bridge_layout(1);
+        value.set_bridge_abi_minor(1);
+        value.set_bridge_layout(3);
         value.set_dlpack_major(1);
         value.set_dlpack_minor(0);
         value.set_bridge_features(0b11);
@@ -160,7 +160,9 @@ fn capabilities_reject_missing_required_operation() {
         value.set_protocol_minor(0);
         value.set_schema_id("bd1f89fa17369103");
         value.set_bridge_abi_major(1);
-        value.set_bridge_layout(1);
+        value.set_bridge_abi_minor(1);
+        value.set_bridge_layout(3);
+        value.set_bridge_features(0b11);
         value.set_dlpack_major(1);
         let mut operations = value.reborrow().init_operations(1);
         operations.set(0, capabilities::Operation::Energy);
