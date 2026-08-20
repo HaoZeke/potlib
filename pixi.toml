@@ -14,6 +14,7 @@ nickel-fmt = { cmd = "bash ci/gha/format.sh" }
 # Fail if .github/workflows drifted from ci/gha (regen + git diff --exit-code).
 gha-drift = { cmd = "bash ci/gha/check-drift.sh" }
 export-plan = { cmd = "bash ci/gha/export-plan.sh" }
+check-eonviz-pins = { cmd = "bash scripts/check_eonviz_pins.sh" }
 
 [environments]
 rpctest = {features = ["rpc", "itests"]}
@@ -95,9 +96,9 @@ pip = "*"
 [feature.eonviz.pypi-dependencies]
 # Dev branches carry the embedded-metadata minimization-trajectory parser and the
 # (s, d) optimization-landscape plotter (plt-min) the published releases lack.
-chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", branch = "fix/ira-kmax-default-14" }
-rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", branch = "fix/landscape-defaults-and-sp-marker" }
-readcon = ">=0.7"
+chemparseplot = { git = "https://github.com/HaoZeke/chemparseplot.git", rev = "f71d79b9b9f913c717e4d97dd3ec9fd496f2c208" }
+rgpycrumbs = { git = "https://github.com/HaoZeke/rgpycrumbs.git", rev = "a652605a61991d2fea86a9f63bfabfc926f6f03c" }
+readcon = ">=0.14.5"
 jax = "*"
 
 [feature.docs]

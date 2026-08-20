@@ -1441,13 +1441,13 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/wheel-0.47.0-pyhd8ed1ab_0.conda
       - conda: https://repo.prefix.dev/rg-forge/linux-64/ira-2.2.0-fc313f34_0.conda
-      - pypi: git+https://github.com/HaoZeke/chemparseplot.git?branch=fix%2Fira-kmax-default-14#f71d79b9b9f913c717e4d97dd3ec9fd496f2c208
-      - pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a652605a61991d2fea86a9f63bfabfc926f6f03c
+      - pypi: git+https://github.com/HaoZeke/chemparseplot.git?rev=f71d79b9b9f913c717e4d97dd3ec9fd496f2c208#f71d79b9b9f913c717e4d97dd3ec9fd496f2c208
+      - pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?rev=a652605a61991d2fea86a9f63bfabfc926f6f03c#a652605a61991d2fea86a9f63bfabfc926f6f03c
+      - pypi: https://files.pythonhosted.org/packages/08/2c/c37ab38cd92b862ebddcc8748ae47eeb16a0bc28ab2e9b79a152f1a47e45/readcon-0.14.7-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3a/cb/28ce52eb94390dda42599c98ea0204d74799e4d8047a0eb559b6fd648056/ml_dtypes-0.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/48/17/38b718af2353dba7753300871e83fbb64a88a772e12727ae27373ab675ce/jaxlib-0.10.2-cp312-cp312-manylinux_2_27_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/89/82/5ab5211079a151b6f661529369c0c8e98ec64cabf5c0cf22a0a05af124d8/jax-0.10.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/a3/41/50fc8c0af8a4767698a371bcad1455be3a165d9fbb3c65c32abe83522eee/readcon-0.12.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   metatomicbld:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
@@ -8451,8 +8451,7 @@ packages:
   - tornado >=5
   license: PSF-2.0
   license_family: PSF
-  purls:
-  - pkg:pypi/matplotlib?source=compressed-mapping
+  purls: []
   run_exports: {}
   size: 14872
   timestamp: 1781626897041
@@ -8513,7 +8512,7 @@ packages:
   license: PSF-2.0
   license_family: PSF
   purls:
-  - pkg:pypi/matplotlib?source=compressed-mapping
+  - pkg:pypi/matplotlib?source=hash-mapping
   run_exports: {}
   size: 9022139
   timestamp: 1781626880429
@@ -8792,7 +8791,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numpy?source=compressed-mapping
+  - pkg:pypi/numpy?source=hash-mapping
   run_exports:
     weak:
     - numpy >=1.25,<3
@@ -9132,7 +9131,7 @@ packages:
   - __glibc >=2.17
   license: MIT
   purls:
-  - pkg:pypi/polars-runtime-32?source=compressed-mapping
+  - pkg:pypi/polars-runtime-32?source=hash-mapping
   run_exports: {}
   size: 41917352
   timestamp: 1782310371941
@@ -9857,7 +9856,7 @@ packages:
   license: Apache-2.0
   license_family: Apache
   purls:
-  - pkg:pypi/tornado?source=compressed-mapping
+  - pkg:pypi/tornado?source=hash-mapping
   run_exports: {}
   size: 864705
   timestamp: 1781006801632
@@ -10774,7 +10773,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/click?source=compressed-mapping
+  - pkg:pypi/click?source=hash-mapping
   run_exports: {}
   size: 104999
   timestamp: 1779900548735
@@ -11446,7 +11445,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/pip?source=compressed-mapping
+  - pkg:pypi/pip?source=hash-mapping
   run_exports: {}
   size: 1203173
   timestamp: 1780262795392
@@ -11484,7 +11483,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/platformdirs?source=compressed-mapping
+  - pkg:pypi/platformdirs?source=hash-mapping
   run_exports: {}
   size: 26308
   timestamp: 1779972894916
@@ -11511,7 +11510,7 @@ packages:
   - polars-runtime-compat ==1.42.0
   license: MIT
   purls:
-  - pkg:pypi/polars?source=compressed-mapping
+  - pkg:pypi/polars?source=hash-mapping
   run_exports: {}
   size: 541978
   timestamp: 1782310371941
@@ -19839,9 +19838,9 @@ packages:
   run_exports: {}
   size: 222934
   timestamp: 1761607871513
-- pypi: git+https://github.com/HaoZeke/chemparseplot.git?branch=fix%2Fira-kmax-default-14#f71d79b9b9f913c717e4d97dd3ec9fd496f2c208
+- pypi: git+https://github.com/HaoZeke/chemparseplot.git?rev=f71d79b9b9f913c717e4d97dd3ec9fd496f2c208#f71d79b9b9f913c717e4d97dd3ec9fd496f2c208
   name: chemparseplot
-  version: 1.7.0
+  version: 1.7.1.dev59+gf71d79b9b
   requires_dist:
   - numpy>=1.26.2
   - pint>=0.22
@@ -19885,7 +19884,7 @@ packages:
   - scipy>=1.11 ; extra == 'test'
   - xyzrender>=0.1.2 ; extra == 'xyzrender'
   requires_python: '>=3.10'
-- pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?branch=fix%2Flandscape-defaults-and-sp-marker#a652605a61991d2fea86a9f63bfabfc926f6f03c
+- pypi: git+https://github.com/HaoZeke/rgpycrumbs.git?rev=a652605a61991d2fea86a9f63bfabfc926f6f03c#a652605a61991d2fea86a9f63bfabfc926f6f03c
   name: rgpycrumbs
   version: 1.7.1.dev53+ga652605a6
   requires_dist:
@@ -19916,6 +19915,13 @@ packages:
   version: 12.8.93
   sha256: a7756528852ef889772a84c6cd89d41dfa74667e24cca16bb31f8f061e3e9994
   requires_python: '>=3'
+- pypi: https://files.pythonhosted.org/packages/08/2c/c37ab38cd92b862ebddcc8748ae47eeb16a0bc28ab2e9b79a152f1a47e45/readcon-0.14.7-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  name: readcon
+  version: 0.14.7
+  sha256: d87cf5a1ca33b34927346a27eb9e8beaf0f6e2dfa68fd7066cec6a9b013a4e74
+  requires_dist:
+  - readcon-chemfiles==0.14.7 ; extra == 'chemfiles'
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/0d/9b/a997b638fcd068ad6e4d53b8551a7d30fe8b404d6f1804abf1df69838932/nvidia_cuda_runtime_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
   name: nvidia-cuda-runtime-cu12
   version: 12.8.90
@@ -20355,11 +20361,6 @@ packages:
   version: 12.8.90
   sha256: 5b17e2001cc0d751a5bc2c6ec6d26ad95913324a4adb86788c944f8ce9ba441f
   requires_python: '>=3'
-- pypi: https://files.pythonhosted.org/packages/a3/41/50fc8c0af8a4767698a371bcad1455be3a165d9fbb3c65c32abe83522eee/readcon-0.12.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  name: readcon
-  version: 0.12.0
-  sha256: 83523a823edfabdb8270c091a0755613551a869c47fe91f3eda51103518c35e5
-  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/a4/a5/842ae8f0c08b61d6484b52f99a03510a3a72d23141942d216ebe81fefbce/filelock-3.25.2-py3-none-any.whl
   name: filelock
   version: 3.25.2
