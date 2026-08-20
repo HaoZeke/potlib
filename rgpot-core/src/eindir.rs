@@ -72,7 +72,7 @@ mod compatibility_tests {
     fn reports_the_shared_eindir_abi_stamp() {
         let stamp = rgpot_eindir_abi_stamp();
         assert_eq!(stamp.abi_major, 1);
-        assert_eq!(stamp.objective_layout, 2);
+        assert_eq!(stamp.objective_layout, 3);
         assert_eq!(unsafe { rgpot_eindir_abi_compatible(&stamp) }, 1);
     }
 }
@@ -318,6 +318,12 @@ pub unsafe extern "C" fn rgpot_potential_new_eindir(
         gradient_sign: 1,
         operations: EINDIR_OBJECTIVE_OPERATION_ENERGY
             | EINDIR_OBJECTIVE_OPERATION_FORCES,
+        tensor_device_type: eindir_core::ffi::EINDIR_TENSOR_DEVICE_CPU,
+        tensor_dtype_code: eindir_core::ffi::EINDIR_TENSOR_DTYPE_FLOAT,
+        tensor_dtype_bits: 64,
+        tensor_dtype_lanes: 1,
+        tensor_layout: eindir_core::ffi::EINDIR_TENSOR_LAYOUT_CONTIGUOUS,
+        callback_lifetime: eindir_core::ffi::EINDIR_CALLBACK_LIFETIME_BORROWED_SYNC,
     }));
 
     let pot = Box::new(rgpot_potential_t {
