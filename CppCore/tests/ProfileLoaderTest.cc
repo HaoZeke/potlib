@@ -99,6 +99,8 @@ TEST_CASE("ProfileLoader capabilities round-trips a Capabilities message",
   auto kinds = caps.getConfigKinds();
   REQUIRE(kinds.size() == 1);
   REQUIRE(std::string(kinds[0].cStr()) == "cpmd");
+  REQUIRE(std::string(caps.getBuildIdentity().cStr()) ==
+          "cpmdc-fake@source-revision");
 }
 
 TEST_CASE("ProfileLoader drives a config -> session -> step evaluation",

@@ -125,9 +125,21 @@ fn capabilities_accept_matching_additive_metadata() {
         value.set_dlpack_major(1);
         value.set_dlpack_minor(0);
         value.set_bridge_features(0b11);
+        value.set_build_identity("rgpot-test@source-revision");
     }
     let encoded = serialize::write_message_to_words(&message);
     validate_capabilities(&encoded, &CapabilityRequirements::default()).expect("compatible");
+
+    let mut bytes = encoded.as_slice();
+    let message = serialize::read_message_from_flat_slice(
+        &mut bytes,
+        capnp::message::ReaderOptions::new(),
+    )
+    .expect("read capabilities");
+    let value = message
+        .get_root::<rgpot_core::Potentials_capnp::capabilities::Reader>()
+        .expect("capabilities root");
+    assert_eq!(value.get_build_identity().unwrap().to_str().unwrap(), "rgpot-test@source-revision");
 }
 
 #[test]

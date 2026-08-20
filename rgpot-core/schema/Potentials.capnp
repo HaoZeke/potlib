@@ -88,6 +88,7 @@ struct Capabilities {
   dlpackMajor    @15 :UInt16; # DLPack callback major revision.
   dlpackMinor    @16 :UInt16; # DLPack callback minor revision.
   bridgeFeatures @17 :UInt64; # eindir bridge feature bitset.
+  buildIdentity  @18 :Text;   # Optional source/build identity for provenance.
 
   enum Operation {
     energy         @0;

@@ -397,6 +397,7 @@ RGPOT_FAKE_ONLY int cpmdc_capabilities_result(void *capabilities_capnp,
     auto kinds = caps.initConfigKinds(1);
     kinds.set(0, "cpmd");
     caps.setSchemaVersion("fake");
+    caps.setBuildIdentity("cpmdc-fake@source-revision");
     auto words = ::capnp::messageToFlatArray(msg);
     const auto bytes = words.asBytes();
     *capabilities_capnp_size_bytes = bytes.size();
