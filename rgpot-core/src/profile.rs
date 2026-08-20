@@ -46,17 +46,46 @@ pub struct ProfileEvaluation {
 
 /// Error raised while loading or driving a potential profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProfileError(String);
+pub struct ProfileError {
+    message: String,
+    capability: Option<CapabilityMismatch>,
+}
 
 impl ProfileError {
     fn new(message: impl Into<String>) -> Self {
-        Self(message.into())
+        Self {
+            message: message.into(),
+            capability: None,
+        }
+    }
+
+    fn capability(
+        field: &'static str,
+        expected: impl Into<String>,
+        received: impl Into<String>,
+    ) -> Self {
+        let expected = expected.into();
+        let received = received.into();
+        let label = field.replace('_', " ");
+        Self {
+            message: format!("{label} mismatch: expected {expected}, received {received}"),
+            capability: Some(CapabilityMismatch {
+                field,
+                expected,
+                received,
+            }),
+        }
+    }
+
+    /// Return structured compatibility details when this is a capability error.
+    pub fn capability_mismatch(&self) -> Option<&CapabilityMismatch> {
+        self.capability.as_ref()
     }
 }
 
 impl fmt::Display for ProfileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(&self.message)
     }
 }
 
@@ -70,6 +99,17 @@ impl From<capnp::Error> for ProfileError {
 
 /// Result type for profile loading and evaluation.
 pub type ProfileResult<T> = Result<T, ProfileError>;
+
+/// Structured expected/received values for a capability negotiation failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapabilityMismatch {
+    /// Stable capability field name.
+    pub field: &'static str,
+    /// Consumer requirement or accepted range.
+    pub expected: String,
+    /// Producer value received from the descriptor.
+    pub received: String,
+}
 
 /// Compatibility values required from a backend capability descriptor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,24 +170,27 @@ pub fn validate_capabilities(
         .map_err(|error| ProfileError::new(format!("invalid protocol family text: {error}")))?
         .to_owned();
     if family != requirements.protocol_family {
-        return Err(ProfileError::new(format!(
-            "protocol family mismatch: expected {}, received {family}",
-            requirements.protocol_family
-        )));
+        return Err(ProfileError::capability(
+            "protocol_family",
+            requirements.protocol_family,
+            family,
+        ));
     }
     let major = value.get_protocol_major();
     if major != requirements.protocol_major {
-        return Err(ProfileError::new(format!(
-            "protocol major mismatch: expected {}, received {major}",
-            requirements.protocol_major
-        )));
+        return Err(ProfileError::capability(
+            "protocol_major",
+            requirements.protocol_major.to_string(),
+            major.to_string(),
+        ));
     }
     let minor = value.get_protocol_minor();
     if minor > requirements.protocol_minor {
-        return Err(ProfileError::new(format!(
-            "protocol minor too new: maximum {}, received {minor}",
-            requirements.protocol_minor
-        )));
+        return Err(ProfileError::capability(
+            "protocol_minor",
+            format!("<= {}", requirements.protocol_minor),
+            minor.to_string(),
+        ));
     }
     let schema_id = value
         .get_schema_id()?
@@ -155,52 +198,60 @@ pub fn validate_capabilities(
         .map_err(|error| ProfileError::new(format!("invalid schema identity text: {error}")))?
         .to_owned();
     if schema_id != requirements.schema_id {
-        return Err(ProfileError::new(format!(
-            "schema identity mismatch: expected {}, received {schema_id}",
-            requirements.schema_id
-        )));
+        return Err(ProfileError::capability(
+            "schema_id",
+            requirements.schema_id,
+            schema_id,
+        ));
     }
     let bridge_major = value.get_bridge_abi_major();
     if bridge_major != requirements.bridge_abi_major {
-        return Err(ProfileError::new(format!(
-            "bridge ABI major mismatch: expected {}, received {bridge_major}",
-            requirements.bridge_abi_major
-        )));
+        return Err(ProfileError::capability(
+            "bridge_abi_major",
+            requirements.bridge_abi_major.to_string(),
+            bridge_major.to_string(),
+        ));
     }
     let bridge_minor = value.get_bridge_abi_minor();
     if bridge_minor > requirements.bridge_abi_minor {
-        return Err(ProfileError::new(format!(
-            "bridge ABI minor too new: maximum {}, received {bridge_minor}",
-            requirements.bridge_abi_minor
-        )));
+        return Err(ProfileError::capability(
+            "bridge_abi_minor",
+            format!("<= {}", requirements.bridge_abi_minor),
+            bridge_minor.to_string(),
+        ));
     }
     let layout = value.get_bridge_layout();
     if layout != requirements.bridge_layout {
-        return Err(ProfileError::new(format!(
-            "bridge layout mismatch: expected {}, received {layout}",
-            requirements.bridge_layout
-        )));
+        return Err(ProfileError::capability(
+            "bridge_layout",
+            requirements.bridge_layout.to_string(),
+            layout.to_string(),
+        ));
     }
     let dlpack_major = value.get_dlpack_major();
     if dlpack_major != requirements.dlpack_major {
-        return Err(ProfileError::new(format!(
-            "DLPack major mismatch: expected {}, received {dlpack_major}",
-            requirements.dlpack_major
-        )));
+        return Err(ProfileError::capability(
+            "dlpack_major",
+            requirements.dlpack_major.to_string(),
+            dlpack_major.to_string(),
+        ));
     }
     let dlpack_minor = value.get_dlpack_minor();
     if dlpack_minor > requirements.dlpack_minor {
-        return Err(ProfileError::new(format!(
-            "DLPack minor too new: maximum {}, received {dlpack_minor}",
-            requirements.dlpack_minor
-        )));
+        return Err(ProfileError::capability(
+            "dlpack_minor",
+            format!("<= {}", requirements.dlpack_minor),
+            dlpack_minor.to_string(),
+        ));
     }
     let features = value.get_bridge_features();
     let missing = requirements.bridge_features & !features;
     if missing != 0 {
-        return Err(ProfileError::new(format!(
-            "bridge features missing: required 0x{missing:016x}, received 0x{features:016x}"
-        )));
+        return Err(ProfileError::capability(
+            "bridge_features",
+            format!("contains 0x{missing:016x}"),
+            format!("0x{features:016x}"),
+        ));
     }
     let mut operations = 0u64;
     for operation in value.get_operations()?.iter() {
@@ -210,9 +261,11 @@ pub fn validate_capabilities(
     }
     let missing_operations = requirements.required_operations & !operations;
     if missing_operations != 0 {
-        return Err(ProfileError::new(format!(
-            "required operations missing: 0x{missing_operations:016x}, received 0x{operations:016x}"
-        )));
+        return Err(ProfileError::capability(
+            "operations",
+            format!("contains 0x{missing_operations:016x}"),
+            format!("0x{operations:016x}"),
+        ));
     }
     Ok(())
 }
