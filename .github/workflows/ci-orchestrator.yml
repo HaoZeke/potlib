@@ -111,6 +111,8 @@ jobs:
             ln -sf "$(command -v snapper-fmt)" "$HOME/.cargo/bin/snapper"
             echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           fi
+      - name: Check immutable eonviz pins
+        run: bash scripts/check_eonviz_pins.sh
       - name: Run prek on all files
         shell: pixi run bash -e {0}
         run: |
