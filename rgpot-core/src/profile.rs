@@ -9,7 +9,7 @@
 //! Results return as `PotentialResult` bytes in the units requested by the
 //! input message.
 
-use std::ffi::{c_char, c_int, c_void, CStr};
+use std::ffi::{CStr, c_char, c_int, c_void};
 use std::fmt;
 use std::mem::ManuallyDrop;
 use std::path::Path;
@@ -408,6 +408,26 @@ impl ProfileSession {
         explicit_path: Option<&Path>,
         config: &[u8],
     ) -> ProfileResult<Self> {
+        unsafe {
+            Self::load_with_requirements(
+                prefix,
+                explicit_path,
+                config,
+                &CapabilityRequirements::default(),
+            )
+        }
+    }
+
+    /// Load a conforming backend with caller-selected capability requirements.
+    ///
+    /// Capability validation completes before the backend session is created,
+    /// so operation-specific bridge bits are part of the loader handshake.
+    pub unsafe fn load_with_requirements(
+        prefix: &str,
+        explicit_path: Option<&Path>,
+        config: &[u8],
+        requirements: &CapabilityRequirements,
+    ) -> ProfileResult<Self> {
         if prefix.is_empty()
             || !prefix
                 .bytes()
@@ -462,7 +482,7 @@ impl ProfileSession {
             )));
         }
         let capabilities = read_capabilities(capabilities_result)?;
-        validate_capabilities(&capabilities, &CapabilityRequirements::default())?;
+        validate_capabilities(&capabilities, requirements)?;
         let version = c_string(unsafe { version_fn() });
         let session = unsafe { session_create(config.as_ptr().cast(), config.len()) };
         if session.is_null() {
@@ -613,8 +633,8 @@ fn abi_message(result: &ProfileAbiResult) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct DropProbe(Arc<AtomicBool>);
 

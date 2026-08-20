@@ -1,10 +1,11 @@
 use capnp::message::Builder;
 use capnp::serialize;
-use rgpot_core::profile::{
-    decode_potential_result, encode_force_input, library_candidates, validate_capabilities,
-    CapabilityRequirements, ProfileRequest,
-};
 use rgpot_core::Potentials_capnp::{capabilities, potential_result};
+use rgpot_core::profile::{
+    CapabilityRequirements, ProfileRequest, ProfileSession, decode_potential_result,
+    encode_force_input, library_candidates, validate_capabilities,
+};
+use std::path::Path;
 
 #[test]
 fn candidates_are_prefix_parameterized() {
@@ -143,4 +144,16 @@ fn capabilities_reject_incompatible_major_and_schema() {
     let error = validate_capabilities(&encoded, &CapabilityRequirements::default())
         .expect_err("incompatible capability metadata must fail");
     assert!(error.to_string().contains("protocol major"));
+}
+
+#[test]
+fn profile_loader_exposes_requested_capability_requirements() {
+    let loader: unsafe fn(
+        &str,
+        Option<&Path>,
+        &[u8],
+        &CapabilityRequirements,
+    ) -> rgpot_core::profile::ProfileResult<ProfileSession> =
+        ProfileSession::load_with_requirements;
+    let _ = loader;
 }
