@@ -23,6 +23,16 @@ def main() -> int:
         if schema_id not in lines:
             rel = schema_path.relative_to(root)
             raise AssertionError(f"{rel} has the wrong Cap'n Proto schema identity")
+        required_contract = (
+            "protocolFamily",
+            "bridgeAbiMajor",
+            "bridgeLayout",
+            "getCapabilities @12",
+        )
+        for field in required_contract:
+            if not any(field in line for line in lines):
+                rel = schema_path.relative_to(root)
+                raise AssertionError(f"{rel} is missing RPC capability field {field}")
 
     if cpp_lines == rust_lines:
         return 0
