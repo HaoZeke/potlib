@@ -331,6 +331,8 @@ RGPOT_FAKE_ONLY int cpmdc_c_abi_version(void) {
   return RGPOT_CPMDC_C_ABI_VERSION;
 }
 
+RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
+
 RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
 
 RGPOT_FAKE_ONLY int cpmdc_configure(const void *config_capnp,
