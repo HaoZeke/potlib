@@ -169,6 +169,7 @@ fn capabilities_reject_missing_required_operation() {
     let error = validate_capabilities(&encoded, &CapabilityRequirements::default())
         .expect_err("missing forces operation must fail");
     assert!(error.to_string().contains("operations"));
+    assert_eq!(error.capability_mismatch().unwrap().field, "operations");
 }
 
 #[test]
@@ -185,6 +186,12 @@ fn capabilities_reject_incompatible_major_and_schema() {
     let error = validate_capabilities(&encoded, &CapabilityRequirements::default())
         .expect_err("incompatible capability metadata must fail");
     assert!(error.to_string().contains("protocol major"));
+    let mismatch = error
+        .capability_mismatch()
+        .expect("capability rejection should expose structured details");
+    assert_eq!(mismatch.field, "protocol_major");
+    assert_eq!(mismatch.expected, "1");
+    assert_eq!(mismatch.received, "2");
 }
 
 #[test]
