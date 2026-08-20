@@ -17,7 +17,7 @@
 //! rgpot callback, so evaluation logic lives once -- there is no duplicate
 //! eval path and no conversion method.
 
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 use std::sync::Mutex;
 
 use dlpk::sys::DLManagedTensorVersioned;
@@ -44,7 +44,10 @@ use crate::types::{rgpot_force_input_t, rgpot_force_out_t};
 pub use eindir_core::ffi::eindir_status_t;
 pub use eindir_core::ffi::{
     eindir_objective_eval, eindir_objective_grad, eindir_objective_has_grad,
-    eindir_objective_t, eindir_abi_stamp_t, EindirEvalFn, EindirFreeFn, EindirGradFn,
+    eindir_objective_descriptor,
+    eindir_objective_descriptor_t, eindir_objective_t, eindir_abi_stamp_t, EindirEvalFn,
+    EindirFreeFn, EindirGradFn, EINDIR_OBJECTIVE_OPERATION_ENERGY,
+    EINDIR_OBJECTIVE_OPERATION_FORCES,
 };
 
 /// Return the eindir ABI stamp used by the embedded objective base.
@@ -69,7 +72,7 @@ mod compatibility_tests {
     fn reports_the_shared_eindir_abi_stamp() {
         let stamp = rgpot_eindir_abi_stamp();
         assert_eq!(stamp.abi_major, 1);
-        assert_eq!(stamp.objective_layout, 1);
+        assert_eq!(stamp.objective_layout, 2);
         assert_eq!(unsafe { rgpot_eindir_abi_compatible(&stamp) }, 1);
     }
 }
@@ -94,6 +97,8 @@ pub struct rgpot_potential_t {
     pub pot_user_data: *mut c_void,
     /// Optional destructor for `pot_user_data`.
     pub pot_free_fn: Option<unsafe extern "C" fn(*mut c_void)>,
+    /// Owned semantic descriptor attached to the embedded eindir objective.
+    pub descriptor_owned: *mut eindir_objective_descriptor_t,
     /// Atom count; set by `rgpot_potential_new_eindir`.
     pub n_atoms: usize,
     /// Atomic numbers, heap-allocated (len = n_atoms), owned by this struct.
@@ -304,6 +309,17 @@ pub unsafe extern "C" fn rgpot_potential_new_eindir(
         unsafe { std::ptr::copy_nonoverlapping(box_matrix, box_arr.as_mut_ptr(), 9) };
     }
 
+    let descriptor = Box::into_raw(Box::new(eindir_objective_descriptor_t {
+        schema_id: b"eindir.objective-descriptor.v1\0".as_ptr().cast::<c_char>(),
+        producer_id: b"rgpot\0".as_ptr().cast::<c_char>(),
+        length_unit: b"angstrom\0".as_ptr().cast::<c_char>(),
+        energy_unit: b"eV\0".as_ptr().cast::<c_char>(),
+        energy_sign: 1,
+        gradient_sign: 1,
+        operations: EINDIR_OBJECTIVE_OPERATION_ENERGY
+            | EINDIR_OBJECTIVE_OPERATION_FORCES,
+    }));
+
     let pot = Box::new(rgpot_potential_t {
         base: eindir_objective_t {
             dim,
@@ -315,10 +331,12 @@ pub unsafe extern "C" fn rgpot_potential_new_eindir(
             user_data: std::ptr::null_mut(),
             // No free_fn in the embedded base: rgpot_potential_free handles all cleanup.
             free_fn: None,
+            descriptor,
         },
         callback,
         pot_user_data: user_data,
         pot_free_fn: free_fn,
+        descriptor_owned: descriptor,
         n_atoms,
         atomic_numbers: atmnrs,
         box_matrix: box_arr,
@@ -362,6 +380,9 @@ pub unsafe extern "C" fn rgpot_potential_free_eindir(pot: *mut rgpot_potential_t
     if !p.fused_cache.is_null() {
         unsafe { drop(Box::from_raw(p.fused_cache as *mut FusedCache)) };
     }
+    if !p.descriptor_owned.is_null() {
+        unsafe { drop(Box::from_raw(p.descriptor_owned)) };
+    }
     unsafe { drop(Box::from_raw(pot)) };
 }
 
@@ -371,6 +392,8 @@ pub unsafe extern "C" fn rgpot_potential_free_eindir(pot: *mut rgpot_potential_t
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::CStr;
+
     use super::*;
     use crate::tensor::create_owned_f64_tensor;
     use eindir_core::ffi::EindirObjectiveWrapper;
@@ -509,6 +532,19 @@ mod tests {
             )
         };
         assert!(!pot.is_null());
+        let descriptor = unsafe { eindir_objective_descriptor(&(*pot).base) };
+        assert!(!descriptor.is_null());
+        let descriptor = unsafe { &*descriptor };
+        assert_eq!(
+            unsafe { CStr::from_ptr(descriptor.producer_id).to_bytes() },
+            b"rgpot"
+        );
+        assert_eq!(descriptor.energy_sign, 1);
+        assert_eq!(descriptor.gradient_sign, 1);
+        assert_eq!(
+            descriptor.operations,
+            EINDIR_OBJECTIVE_OPERATION_ENERGY | EINDIR_OBJECTIVE_OPERATION_FORCES
+        );
 
         // THE IS-A CAST: zero cost, no conversion method.
         let obj = pot as *mut eindir_objective_t;
