@@ -86,3 +86,22 @@ rgpot-core and anneal-core never depend on each other; eindir-core is the only
 shared vocabulary.
 Pin all three to the same eindir-core (and =dlpk=) revision so the one shared
 compilation lines up.
+
+** Compatibility validation at the bridge boundary
+
+The bridge validates the producer before the first objective evaluation. The
+native =eindir_core_abi_stamp_t= must match ABI major, objective layout, object
+size, and alignment exactly; additive ABI and DLPack minor revisions may not
+exceed the consumer. Required feature bits must be advertised by the producer.
+
+The semantic =eindir_objective_descriptor_t= additionally carries schema and
+producer identity, length and energy units, energy/gradient signs, operations,
+DLPack device and dtype, tensor layout, and callback lifetime. Consumers use
+=eindir_objective_descriptor_compatible= with required operation bits as a
+subset. Empty strings and zero scalar requirements are wildcards. A mismatch
+is rejected before evaluation and the bridge exposes the diagnostic through
+=eindir_last_error=.
+
+The contract is versioned as =eindir.objective= and the current descriptor
+requires contiguous CPU floating-point tensors, synchronous borrowed callback
+storage, energy and force operations, and the published tensor-aware layout.
