@@ -136,6 +136,12 @@ RPC client types:
 </tr>
 
 <tr>
+<td class="org-left"><code>UmaPot</code></td>
+<td class="org-left"><code>Uma</code>, <code>Uma:uma-s-1p1</code>, <code>Uma:uma-s-1p1:omol</code></td>
+<td class="org-left">Always built. Runtime needs <code>fairchem-core</code> and a HuggingFace token for live UMA; tests use <code>RGPOT_UMA_FAKE=1</code></td>
+</tr>
+
+<tr>
 <td class="org-left"><code>NWChemPot</code></td>
 <td class="org-left"><code>NWChem</code></td>
 <td class="org-left">Frontend always builds; load <code>libnwchemc</code> from the split <code>nwchemc</code> project at runtime</td>

@@ -1,0 +1,1 @@
+UmaPot evaluates Meta FAIR UMA checkpoints (``uma-s-1p1`` + ``task_name=omol``) through a persistent fairchem helper. No torch C++ link; set ``RGPOT_UMA_HELPER`` or use the shipped ``uma_helper.py``. potserv accepts ``Uma``, ``Uma:<model>``, and ``Uma:<model>:<task>``.

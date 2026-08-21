@@ -149,7 +149,11 @@ else
 endif
 
 py.install_sources(
-    files('rgpot/__init__.py'),
+    files(
+        'rgpot/__init__.py',
+        'rgpot/uma.py',
+        '../CppCore/rgpot/UmaPot/uma_helper.py',
+    ),
     pure: false,
     subdir: 'rgpot',
 )

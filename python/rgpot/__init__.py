@@ -23,6 +23,7 @@ from rgpot._core import (
     evaluate_metatomic_dlopen,
     has_metatomic_dlopen,
 )
+from rgpot.uma import default_uma_helper_path, evaluate_uma
 
 
 def _torch_major() -> str | None:
@@ -112,6 +113,8 @@ __all__ = [
     "evaluate_lj",
     "evaluate_metatomic",
     "evaluate_metatomic_dlopen",
+    "evaluate_uma",
+    "default_uma_helper_path",
     "default_metatomic_engine_path",
     "available_metatomic_engine_abis",
     "has_metatomic_dlopen",

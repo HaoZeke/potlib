@@ -28,6 +28,10 @@
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #endif // RGPOT_HAS_METATOMIC
 
+#ifdef RGPOT_HAS_UMA
+#include "rgpot/UmaPot/UmaPot.hpp"
+#endif // RGPOT_HAS_UMA
+
 #include "rgpot/CPMDPot/CPMDPot.hpp"
 #include "rgpot/LennardJones/LJClusterPot.hpp"
 #include "rgpot/LennardJones/LJPot.hpp"
@@ -188,6 +192,9 @@ int main(int argc, char *argv[]) {
 #ifdef RGPOT_HAS_METATOMIC
               << ", Metatomic:<model_path>"
 #endif
+#ifdef RGPOT_HAS_UMA
+              << ", Uma, Uma:<model>, Uma:<model>:<task>"
+#endif
               << ", NWChem"
               << ", CPMD"
               << std::endl;
@@ -268,6 +275,23 @@ int main(int argc, char *argv[]) {
               << std::endl;
     potential_to_use = std::make_unique<rgpot::MetatomicPot>(cfg);
 #endif // RGPOT_HAS_METATOMIC
+#ifdef RGPOT_HAS_UMA
+  } else if (pot_type == "Uma" || pot_type.rfind("Uma:", 0) == 0) {
+    rgpot::UmaConfig cfg;
+    if (pot_type.rfind("Uma:", 0) == 0) {
+      const auto rest = pot_type.substr(4);
+      const auto colon = rest.find(':');
+      if (colon == std::string::npos) {
+        cfg.model = rest;
+      } else {
+        cfg.model = rest.substr(0, colon);
+        cfg.task_name = rest.substr(colon + 1);
+      }
+    }
+    std::cout << "Loading UMA potential model='" << cfg.model << "' task='"
+              << cfg.task_name << "'..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::UmaPot>(cfg);
+#endif // RGPOT_HAS_UMA
   } else if (pot_type == "NWChem") {
     std::cout << "Loading NWChem potential (dlopen libnwchemc)..."
               << std::endl;

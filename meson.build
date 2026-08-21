@@ -251,6 +251,11 @@ endif
 # NWChemPot frontend always builds and dlopens the split nwchemc engine
 # (libnwchemc.so) at runtime. rgpot carries no in-process NWChem embed.
 _args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
+# UmaPot is a POSIX helper frontend (no torch C++ link). Compiled into
+# the umbrella when the full library is built, not into client-only.
+if not get_option('with_rpc_client_only')
+    _args += ['-DRGPOT_HAS_UMA=TRUE']
+endif
 
 has_tblite = false
 if get_option('with_tblite')
