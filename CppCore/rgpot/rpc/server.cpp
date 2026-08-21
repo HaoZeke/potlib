@@ -30,6 +30,9 @@
 
 #ifdef RGPOT_HAS_UMA
 #include "rgpot/UmaPot/UmaPot.hpp"
+#endif
+#ifdef RGPOT_HAS_SKALA
+#include "rgpot/SkalaPot/SkalaPot.hpp"
 #endif // RGPOT_HAS_UMA
 
 #include "rgpot/CPMDPot/CPMDPot.hpp"
@@ -195,6 +198,9 @@ int main(int argc, char *argv[]) {
 #ifdef RGPOT_HAS_UMA
               << ", Uma:<model_path>, Uma:<model_path>:<task>"
 #endif
+#ifdef RGPOT_HAS_SKALA
+              << ", Skala, Skala:<basis>"
+#endif
               << ", NWChem"
               << ", CPMD"
               << std::endl;
@@ -294,6 +300,15 @@ int main(int argc, char *argv[]) {
               << "' task='" << cfg.task_name << "'..." << std::endl;
     potential_to_use = std::make_unique<rgpot::UmaPot>(cfg);
 #endif // RGPOT_HAS_UMA
+#ifdef RGPOT_HAS_SKALA
+  } else if (pot_type == "Skala" || pot_type.rfind("Skala:", 0) == 0) {
+    rgpot::SkalaConfig cfg;
+    if (pot_type.rfind("Skala:", 0) == 0)
+      cfg.basis = pot_type.substr(6);
+    std::cout << "Loading Skala XC via NWChem DFT (xc=" << cfg.xc
+              << " basis=" << cfg.basis << ")..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::SkalaPot>(cfg);
+#endif // RGPOT_HAS_SKALA
   } else if (pot_type == "NWChem") {
     std::cout << "Loading NWChem potential (dlopen libnwchemc)..."
               << std::endl;

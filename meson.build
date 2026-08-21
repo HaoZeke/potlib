@@ -253,6 +253,14 @@ endif
 _args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
 
 
+has_skala = get_option('with_skala')
+if has_skala
+    if not get_option('with_rpc') and not get_option('with_rpc_client_only')
+        error('with_skala=true needs with_rpc=true (NWChemPot / Cap\'n Proto)')
+    endif
+    _args += ['-DRGPOT_HAS_SKALA=TRUE']
+endif
+
 has_tblite = false
 if get_option('with_tblite')
     tblite_dep = dependency('tblite', required: true)
