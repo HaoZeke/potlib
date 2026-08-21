@@ -1,1 +1,1 @@
-UmaPot evaluates Meta FAIR UMA checkpoints (``uma-s-1p1`` + ``task_name=omol``) through a persistent fairchem helper. No torch C++ link; set ``RGPOT_UMA_HELPER`` or use the shipped ``uma_helper.py``. potserv accepts ``Uma``, ``Uma:<model>``, and ``Uma:<model>:<task>``.
+UmaPot loads UMA / OMol metatomic TorchScript checkpoints on the same C++ stack as MetatomicPot (``load_atomistic_model``, vesin neighbors, autograd forces). Charge and spin attach as System extra data for the omol head. potserv accepts ``Uma:<model_path>`` and ``Uma:<model_path>:<task>``.

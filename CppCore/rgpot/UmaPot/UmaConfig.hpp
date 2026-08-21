@@ -1,23 +1,44 @@
 #pragma once
-// MIT License — config POD for the fairchem UMA / OMol helper frontend
+// MIT License — config POD for the linked UMA / OMol metatomic frontend
+
+#include "rgpot/MetatomicPot/MetatomicConfig.hpp"
 
 #include <string>
 
 namespace rgpot {
 
+/**
+ * UMA / OMol calculator configuration.
+ *
+ * The checkpoint is a metatomic TorchScript model (same load path as
+ * MetatomicPot). Charge and spin ride as System extra data for the omol
+ * head. task_name is recorded on the config and hashed into paramsKey.
+ */
 struct UmaConfig {
-  /** HuggingFace / fairchem checkpoint name, e.g. uma-s-1p1. */
-  std::string model = "uma-s-1p1";
-  /** UMA task head. Baker-Chan is molecular: omol. */
+  std::string model_path;
   std::string task_name = "omol";
-  std::string device = "cpu";
-  /** Optional explicit path to uma_helper.py. */
-  std::string helper_path;
-  /** Optional Python interpreter. Empty uses python3 / RGPOT_UMA_PYTHON. */
-  std::string python;
+  std::string device;
+  std::string length_unit = "angstrom";
+  std::string extensions_directory;
   int charge = 0;
-  /** Spin multiplicity (1 = singlet), matches fairchem atoms.info["spin"]. */
   int spin = 1;
+  TorchDeterminismPolicy torch_determinism = TorchDeterminismPolicy::Fast;
+  std::string engine_path;
+
+  [[nodiscard]] MetatomicConfig to_metatomic() const {
+    MetatomicConfig m;
+    m.model_path = model_path;
+    m.device = device;
+    m.length_unit = length_unit;
+    m.extensions_directory = extensions_directory;
+    m.torch_determinism = torch_determinism;
+    m.engine_path = engine_path;
+    m.task_name = task_name;
+    m.charge = charge;
+    m.spin = spin;
+    m.attach_system_extras = true;
+    return m;
+  }
 };
 
 } // namespace rgpot

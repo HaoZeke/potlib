@@ -1,30 +1,29 @@
 #pragma once
-// MIT License — fairchem UMA / OMol frontend (no torch C++ link)
+// MIT License — linked UMA / OMol metatomic frontend (same stack as MetatomicPot)
 
+#include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #include "rgpot/ParamHash.hpp"
 #include "rgpot/Potential.hpp"
 #include "rgpot/UmaPot/UmaConfig.hpp"
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
-#include <string>
 
 namespace rgpot {
 
 /**
- * @brief UMA / OMol calculator via a persistent fairchem Python helper.
+ * @brief UMA / OMol calculator on the metatomic C++ stack.
  *
- * UMA lives in fairchem-core, not as a metatomic TorchScript .pt. This
- * frontend forks ``uma_helper.py`` once, keeps the predictor loaded, and
- * evaluates energy/forces over a line-JSON pipe. Tests inject a fake helper
- * through ``RGPOT_UMA_HELPER`` / ``UmaConfig::helper_path``.
+ * Loads a metatomic TorchScript checkpoint with
+ * ``metatomic_torch::load_atomistic_model``, builds vesin neighbor lists,
+ * and takes autograd forces. Charge and spin are attached as System extra
+ * data on every call (omol). This is the same in-process path as
+ * MetatomicPot; it is not a Python helper.
  */
 class UmaPot : public Potential<UmaPot> {
 public:
-  UmaPot() : UmaPot(UmaConfig{}) {}
   explicit UmaPot(const UmaConfig &config);
-  ~UmaPot() override;
+  ~UmaPot() override = default;
 
   UmaPot(const UmaPot &) = delete;
   UmaPot &operator=(const UmaPot &) = delete;
@@ -32,7 +31,8 @@ public:
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   [[nodiscard]] PotCaps caps() const noexcept override {
-    return {.reentrancy = Reentrancy::ProcessSerial, .periodic = true};
+    return {.reentrancy = Reentrancy::SharedInstance,
+            .perImageInstances = true};
   }
 
   [[nodiscard]] const UmaConfig &config() const noexcept { return m_config; }
@@ -43,22 +43,14 @@ public:
     return m_paramsKey;
   }
 
-  [[nodiscard]] const std::string &backend() const noexcept {
-    return m_backend;
-  }
-
 private:
   static constexpr uint64_t kKernelVersion = 1;
 
-  struct Helper;
   UmaConfig m_config;
   uint64_t m_paramsKey{0};
-  mutable std::string m_backend;
-  mutable std::unique_ptr<Helper> m_helper;
-  mutable std::mutex m_mutex;
+  std::unique_ptr<MetatomicPot> m_inner;
 
   void recomputeParamsKey();
-  void ensureHelper() const;
 };
 
 } // namespace rgpot

@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
               << ", Metatomic:<model_path>"
 #endif
 #ifdef RGPOT_HAS_UMA
-              << ", Uma, Uma:<model>, Uma:<model>:<task>"
+              << ", Uma:<model_path>, Uma:<model_path>:<task>"
 #endif
               << ", NWChem"
               << ", CPMD"
@@ -276,20 +276,22 @@ int main(int argc, char *argv[]) {
     potential_to_use = std::make_unique<rgpot::MetatomicPot>(cfg);
 #endif // RGPOT_HAS_METATOMIC
 #ifdef RGPOT_HAS_UMA
-  } else if (pot_type == "Uma" || pot_type.rfind("Uma:", 0) == 0) {
+  } else if (pot_type.rfind("Uma:", 0) == 0) {
     rgpot::UmaConfig cfg;
-    if (pot_type.rfind("Uma:", 0) == 0) {
-      const auto rest = pot_type.substr(4);
-      const auto colon = rest.find(':');
-      if (colon == std::string::npos) {
-        cfg.model = rest;
-      } else {
-        cfg.model = rest.substr(0, colon);
-        cfg.task_name = rest.substr(colon + 1);
+    auto rest = pot_type.substr(4);
+    const auto colon = rest.rfind(':');
+    if (colon != std::string::npos) {
+      const auto tail = rest.substr(colon + 1);
+      if (tail == "omol" || tail == "omat" || tail == "oc20" ||
+          tail == "oc22" || tail == "oc25" || tail == "odac" ||
+          tail == "omc") {
+        cfg.task_name = tail;
+        rest = rest.substr(0, colon);
       }
     }
-    std::cout << "Loading UMA potential model='" << cfg.model << "' task='"
-              << cfg.task_name << "'..." << std::endl;
+    cfg.model_path = rest;
+    std::cout << "Loading UMA metatomic model '" << cfg.model_path
+              << "' task='" << cfg.task_name << "'..." << std::endl;
     potential_to_use = std::make_unique<rgpot::UmaPot>(cfg);
 #endif // RGPOT_HAS_UMA
   } else if (pot_type == "NWChem") {

@@ -44,9 +44,6 @@ if not get_option('with_rpc_client_only')
     subdir('rgpot/Morse')  # 'morse'
     rgpotentials += [morse]
 
-    subdir('rgpot/UmaPot')  # 'uma': fairchem UMA / OMol helper
-    rgpotentials += [uma]
-
     subdir('rgpot/ZBL')  # 'zbl'
     rgpotentials += [zbl]
 
@@ -89,6 +86,8 @@ if not get_option('with_rpc_client_only')
     # engine plugin (has_metatomic); it is dlopen'd, not linked.
     if has_metatomic and not get_option('with_python')
         rgpotentials += [metatomicpot]
+        subdir('rgpot/UmaPot')
+        rgpotentials += [uma]
     endif
 
     if _rpc_stack
@@ -230,11 +229,6 @@ if get_option('with_tests')
     )
     test_args = _args
     test_args += ['-DRGPOTTEST']
-    test_args += [
-        '-DRGPOT_UMA_HELPER_SOURCE="@0@"'.format(
-            meson.current_source_dir() / 'rgpot/UmaPot/uma_helper.py',
-        ),
-    ]
     # Client-only builds skip rgpot_core; UnitsTest still needs units.cc.
     if get_option('with_rpc_client_only')
         units_for_tests = static_library(
@@ -266,7 +260,6 @@ if get_option('with_tests')
                 '',
             ],
             ['ZBLPotTest', 'zbl_pot_test', 'ZBLPotTest.cc', ''],
-            ['UmaPotTest', 'uma_pot_test', 'UmaPotTest.cc', ''],
         ]
     endif
     if has_fortran
@@ -298,6 +291,12 @@ if get_option('with_tests')
                 'MetatomicTest',
                 'metatomic_test',
                 'MetatomicPotTest.cc',
+                '/CppCore/tests',
+            ],
+            [
+                'UmaPotTest',
+                'uma_pot_test',
+                'UmaPotTest.cc',
                 '/CppCore/tests',
             ],
         ]
@@ -575,15 +574,13 @@ if not meson.is_subproject()
         endif
         if has_metatomic
             _pc_cflags += ['-DRGPOT_HAS_METATOMIC_POT=TRUE']
+            _pc_cflags += ['-DRGPOT_HAS_UMA=TRUE']
         endif
         if has_xtb
             _pc_cflags += ['-DRGPOT_HAS_XTB_POT=TRUE']
         endif
         if has_tblite
             _pc_cflags += ['-DRGPOT_HAS_TBLITE_POT=TRUE']
-        endif
-        if not get_option('with_rpc_client_only')
-            _pc_cflags += ['-DRGPOT_HAS_UMA=TRUE']
         endif
     endif
     if _rpc_stack
