@@ -300,6 +300,15 @@ if get_option('with_tests')
                 '/CppCore/tests',
             ],
         ]
+        executable(
+            'uma_ase_parity',
+            sources: ['tests/uma_ase_parity.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+        )
     endif
     # NWChem/CPMD frontend tests (need ptlrpc + frontends from _rpc_stack)
     if _rpc_stack and not get_option('with_rpc_client_only')
