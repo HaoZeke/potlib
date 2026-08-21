@@ -3,10 +3,11 @@
 
 Neighbor lists stay outside the graph (vesin). The exported module consumes
 precomputed edge_index / cell_offsets, matching eSCNMDBackbone with
-otf_graph=False.
+otf_graph=False. merge_mole stays on, so one .pt2 covers one composition
+(z_set, charge, spin).
 
 Stages:
-  1. ASE FAIRChemCalculator reference on Baker HCN
+  1. ASE FAIRChemCalculator reference on the chosen atoms
   2. Eager tensor wrapper + vesin vs that reference
   3. torch.export
   4. AOTInductor .pt2
@@ -39,6 +40,95 @@ HCN = Atoms(
     pbc=True,
 )
 HCN.info.update({"charge": 0, "spin": 1})
+
+
+def z_set_of(atoms: Atoms) -> list[int]:
+    return sorted({int(z) for z in atoms.get_atomic_numbers()})
+
+
+def default_label(atoms_path: str | None) -> str:
+    if not atoms_path:
+        return "hcn"
+    path = Path(atoms_path)
+    if path.name.lower() in {
+        "reactant.con",
+        "product.con",
+        "reactant.xyz",
+        "product.xyz",
+    }:
+        return path.parent.name
+    return path.stem
+
+
+def _cellpar_to_cell(lengths, angles):
+    from ase.geometry import cellpar_to_cell
+
+    return cellpar_to_cell(list(lengths) + list(angles))
+
+
+def _read_eon_con(path: Path) -> Atoms:
+    """Read an eOn .con (ASE has no built-in eOn reader)."""
+    lines = Path(path).read_text().splitlines()
+    if len(lines) < 9:
+        raise ValueError(f"{path}: too short for eOn .con")
+    lengths = [float(x) for x in lines[2].split()[:3]]
+    angles = [float(x) for x in lines[3].split()[:3]]
+    ntypes = int(lines[6].split()[0])
+    counts = [int(x) for x in lines[7].split()[:ntypes]]
+    if len(counts) < ntypes:
+        raise ValueError(f"{path}: expected {ntypes} type counts")
+    symbols: list[str] = []
+    positions: list[list[float]] = []
+    i = 9
+    for n_at in counts:
+        if i >= len(lines):
+            raise ValueError(f"{path}: truncated type header")
+        sym = lines[i].strip().split()[0]
+        i += 1
+        if i < len(lines) and lines[i].lower().startswith("coordinates"):
+            i += 1
+        for _ in range(n_at):
+            if i >= len(lines):
+                raise ValueError(f"{path}: truncated coordinates")
+            parts = lines[i].split()
+            positions.append([float(parts[0]), float(parts[1]), float(parts[2])])
+            symbols.append(sym)
+            i += 1
+    return Atoms(
+        symbols=symbols,
+        positions=positions,
+        cell=_cellpar_to_cell(lengths, angles),
+        pbc=True,
+    )
+
+
+def _ensure_box(atoms: Atoms) -> Atoms:
+    cell = atoms.get_cell()
+    if cell is None or float(cell.volume) < 1e-8:
+        atoms.set_cell([[25.0, 0.0, 0.0], [0.0, 25.0, 0.0], [0.0, 0.0, 25.0]])
+        atoms.set_pbc(True)
+    elif not bool(atoms.pbc.any()):
+        atoms.set_pbc(True)
+    return atoms
+
+
+def load_atoms(path: str | os.PathLike | None) -> Atoms:
+    """Load .xyz/.con via ASE, then an eOn .con fallback. Default is Baker HCN."""
+    if path is None:
+        return HCN.copy()
+    path = Path(path)
+    if not path.is_file():
+        raise SystemExit(f"--atoms not found: {path}")
+    if path.suffix.lower() == ".con":
+        try:
+            return _ensure_box(_read_eon_con(path))
+        except Exception:
+            from ase.io import read
+
+            return _ensure_box(read(str(path)))
+    from ase.io import read
+
+    return _ensure_box(read(str(path)))
 
 
 def _vesin_edges(
@@ -77,7 +167,16 @@ def _vesin_edges(
     return edge_index, shifts
 
 
-def vesin_atomic_data(atoms: Atoms, cutoff: float, dtype, device, max_neighbors: int | None):
+def vesin_atomic_data(
+    atoms: Atoms,
+    cutoff: float,
+    dtype,
+    device,
+    max_neighbors: int | None,
+    *,
+    task_name: str = "omol",
+    sid: str = "hcn",
+):
     """Official AtomicData carrying vesin edges (otf_graph=False path)."""
     from fairchem.core.datasets.atomic_data import AtomicData
 
@@ -98,8 +197,8 @@ def vesin_atomic_data(atoms: Atoms, cutoff: float, dtype, device, max_neighbors:
         spin=torch.tensor([int(atoms.info.get("spin", 1))], dtype=torch.long),
         fixed=torch.zeros(pos.shape[0], dtype=torch.long),
         tags=torch.zeros(pos.shape[0], dtype=torch.long),
-        dataset=["omol"],
-        sid=["hcn"],
+        dataset=[task_name],
+        sid=[sid],
     )
     return data.to(device)
 
@@ -308,7 +407,7 @@ def load_predictor(name: str, device: str):
     )
 
 
-def ase_reference(atoms: Atoms, model: str, device: str):
+def ase_reference(atoms: Atoms, model: str, device: str, task_name: str = "omol"):
     """Official ASE path: internal graph gen, no pymatgen."""
     from fairchem.core import FAIRChemCalculator, pretrained_mlip
     from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
@@ -325,7 +424,7 @@ def ase_reference(atoms: Atoms, model: str, device: str):
         model, device=device, inference_settings=settings
     )
     a = atoms.copy()
-    a.calc = FAIRChemCalculator(pred, task_name="omol")
+    a.calc = FAIRChemCalculator(pred, task_name=task_name)
     e = float(a.get_potential_energy())
     f = np.asarray(a.get_forces(), dtype=np.float64)
     return e, f, pred
@@ -380,41 +479,46 @@ def patch_export_ops():
     print("patched Safeacos/Safeatan2/compute_energy for export", flush=True)
 
 
-def write_sidecar(path: Path, cutoff: float, max_neighbors: int, example, dtype):
+def write_sidecar(
+    path: Path,
+    cutoff: float,
+    max_neighbors: int,
+    example,
+    dtype,
+    *,
+    task_name: str = "omol",
+    charge: int = 0,
+    spin: int = 1,
+    z_set: list[int] | None = None,
+    label: str = "hcn",
+):
+    input_names = [
+        "pos",
+        "atomic_numbers",
+        "cell",
+        "pbc",
+        "edge_index",
+        "cell_offsets",
+        "charge",
+        "spin",
+        "batch",
+        "natoms",
+    ]
     meta = {
         "cutoff": float(cutoff),
         "max_neighbors": int(max_neighbors),
-        "task_name": "omol",
-        "inputs": [
-            "pos",
-            "atomic_numbers",
-            "cell",
-            "pbc",
-            "edge_index",
-            "cell_offsets",
-            "charge",
-            "spin",
-            "batch",
-            "natoms",
-        ],
-        "outputs": ["energy", "forces"],
+        "task_name": str(task_name),
+        "charge": int(charge),
+        "spin": int(spin),
+        "z_set": [int(z) for z in (z_set or [])],
+        "label": str(label),
         "edge_convention": "fairchem_neighbor_center",
+        "inputs": input_names,
+        "outputs": ["energy", "forces"],
         "pos_dtype": str(dtype).replace("torch.", ""),
-        "shapes": {name: list(t.shape) for name, t in zip(
-            [
-                "pos",
-                "atomic_numbers",
-                "cell",
-                "pbc",
-                "edge_index",
-                "cell_offsets",
-                "charge",
-                "spin",
-                "batch",
-                "natoms",
-            ],
-            example,
-        )},
+        "shapes": {
+            name: list(t.shape) for name, t in zip(input_names, example)
+        },
     }
     side = Path(path).with_suffix(".json")
     side.write_text(json.dumps(meta, indent=2) + "\n")
@@ -474,13 +578,40 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="uma-s-1p1")
     p.add_argument("--device", default="cpu")
-    p.add_argument("--out", default="bench_data/uma/uma-s-1p1-omol-hcn.pt2")
+    p.add_argument("--atoms", default=None, help="Structure (.xyz/.con). Default: Baker HCN.")
+    p.add_argument("--charge", type=int, default=None, help="Total charge (default: atoms.info or 0)")
+    p.add_argument("--spin", type=int, default=None, help="Spin multiplicity (default: atoms.info or 1)")
+    p.add_argument("--label", default=None, help="Sidecar / filename label (default: hcn or atoms path)")
+    p.add_argument("--task", default="omol", help="FAIRChem task_name (default: omol)")
+    p.add_argument("--out", default=None, help="Output .pt2 path")
     p.add_argument("--skip-aoti", action="store_true")
     p.add_argument("--eager-only", action="store_true")
+    p.add_argument(
+        "--compare-only",
+        action="store_true",
+        help="Load an existing .pt2 and compare to ASE; do not export.",
+    )
     args = p.parse_args()
 
+    atoms = load_atoms(args.atoms)
+    label = args.label or default_label(args.atoms)
+    charge = args.charge if args.charge is not None else int(atoms.info.get("charge", 0))
+    spin = args.spin if args.spin is not None else int(atoms.info.get("spin", 1))
+    atoms.info["charge"] = int(charge)
+    atoms.info["spin"] = int(spin)
+    task_name = str(args.task)
+    z_set = z_set_of(atoms)
+    if args.out is None:
+        args.out = f"bench_data/uma/{args.model}-{task_name}-{label}.pt2"
+    out = Path(args.out)
+
+    print(
+        f"label={label} task={task_name} charge={charge} spin={spin} "
+        f"z_set={z_set} natoms={len(atoms)}",
+        flush=True,
+    )
     print("ASE FAIRChemCalculator reference", args.model, flush=True)
-    e_ref, f_ref, pred = ase_reference(HCN, args.model, args.device)
+    e_ref, f_ref, pred = ase_reference(atoms, args.model, args.device, task_name)
     print(f"ASE FAIRChemCalculator E={e_ref:.17g}", flush=True)
     for i, row in enumerate(f_ref):
         print(f"  F[{i}] {row[0]:.17g} {row[1]:.17g} {row[2]:.17g}")
@@ -492,7 +623,8 @@ def main() -> int:
     cutoff = float(backbone.cutoff)
     max_n = int(getattr(backbone, "max_neighbors", 300) or 300)
     print(f"cutoff={cutoff} max_neighbors={max_n}", flush=True)
-    for task in pred.dataset_to_tasks["omol"]:
+    tasks = pred.dataset_to_tasks.get(task_name, [])
+    for task in tasks:
         mean = float(task.normalizer.mean)
         rmsd = float(task.normalizer.rmsd)
         refs = task.element_references is not None
@@ -504,7 +636,36 @@ def main() -> int:
     device = torch.device(args.device)
     dtype = next(hydra.parameters()).dtype
 
-    data_v = vesin_atomic_data(HCN, cutoff, dtype, device, max_n)
+    if args.compare_only:
+        if not out.is_file():
+            print(f"FAIL: --compare-only needs an existing .pt2: {out}", file=sys.stderr)
+            return 4
+        example = pack_example(atoms, cutoff, device, dtype, max_n)
+        write_sidecar(
+            out,
+            cutoff,
+            max_n,
+            example,
+            dtype,
+            task_name=task_name,
+            charge=charge,
+            spin=spin,
+            z_set=z_set,
+            label=label,
+        )
+        pkg = load_aoti(out)
+        e_a, f_a = run_aoti(pkg, example)
+        e_a = torch.as_tensor(e_a).detach().cpu()
+        f_a = torch.as_tensor(f_a).detach().cpu().numpy()
+        if not compare("aoti", e_a, f_a, e_ref, f_ref):
+            print("FAIL: AOTI package does not match ASE", file=sys.stderr)
+            return 4
+        print("OK existing", out.resolve())
+        return 0
+
+    data_v = vesin_atomic_data(
+        atoms, cutoff, dtype, device, max_n, task_name=task_name, sid=label
+    )
     print(f"vesin AtomicData edges={int(data_v.nedges.item())}", flush=True)
     pred_v = pred.predict(data_v)
     e_ad = pred_v["energy"].detach().cpu()
@@ -514,17 +675,28 @@ def main() -> int:
         print("FAIL: vesin AtomicData via MLIPPredictUnit does not match ASE", file=sys.stderr)
         return 2
 
-    example = pack_example(HCN, cutoff, device, dtype, max_n)
+    example = pack_example(atoms, cutoff, device, dtype, max_n)
     print(f"vesin edges={example[4].shape[1]}", flush=True)
 
-    wrap = TensorUma(hydra, pred_unit=pred, task_name="omol").to(device).eval()
+    wrap = TensorUma(hydra, pred_unit=pred, task_name=task_name).to(device).eval()
     with torch.enable_grad():
         e_e, f_e = wrap(*example)
     ok_eager = compare("eager+vesin", e_e.detach().cpu(), f_e.detach().cpu().numpy(), e_ref, f_ref)
     if not ok_eager:
         print("FAIL: eager tensor wrapper does not match ASE", file=sys.stderr)
         return 2
-    write_sidecar(Path(args.out), cutoff, max_n, example, dtype)
+    write_sidecar(
+        out,
+        cutoff,
+        max_n,
+        example,
+        dtype,
+        task_name=task_name,
+        charge=charge,
+        spin=spin,
+        z_set=z_set,
+        label=label,
+    )
     if args.eager_only:
         return 0
 
@@ -551,15 +723,15 @@ def main() -> int:
         ("static-strict", dict(strict=True)),
     ]
     last = None
-    for label, kwargs in attempts:
+    for attempt, kwargs in attempts:
         try:
-            print("try export", label, flush=True)
+            print("try export", attempt, flush=True)
             exported = torch.export.export(wrap, example, **kwargs)
-            print("export ok", label, type(exported), flush=True)
+            print("export ok", attempt, type(exported), flush=True)
             break
         except Exception as exc:
             last = exc
-            print(f"{label} failed: {type(exc).__name__}: {exc}", flush=True)
+            print(f"{attempt} failed: {type(exc).__name__}: {exc}", flush=True)
     if exported is None:
         print("try make_fx(tracing_mode=real)", flush=True)
         from torch.fx.experimental.proxy_tensor import make_fx
