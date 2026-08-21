@@ -42,7 +42,7 @@ enum class PotType {
   EAMAl,       //!<  Double-exponential EAM aluminium.
   FeHe,        //!<  Fe-He embedded atom with species-dependent terms.
   WaterH,      //!<  TIP4P water with an interacting hydrogen atom.
-  Uma          //!<  UMA / OMol via the metatomic C++ stack.
+  Uma          //!<  UMA / OMol via vesin + AOTInductor .pt2.
 };
 
 } // namespace rgpot

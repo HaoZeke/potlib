@@ -1,9 +1,9 @@
-# Linked UMA / OMol frontend. Same torch/metatomic link as MetatomicPot.
+# UMA / OMol: vesin neighbor list + AOTInductor .pt2 (needs torch from _deps).
 uma = static_library(
     'uma',
     'UmaPot.cc',
-    dependencies: _deps,
-    cpp_args: _args + ['-DRGPOT_METATOMIC_LINKED=1'],
+    dependencies: _deps + [vesin_dep],
+    cpp_args: _args,
     include_directories: ['../../'],
     pic: true,
     install: false,

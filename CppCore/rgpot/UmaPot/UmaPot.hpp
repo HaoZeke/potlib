@@ -1,7 +1,6 @@
 #pragma once
-// MIT License — linked UMA / OMol metatomic frontend (same stack as MetatomicPot)
+// MIT License — UMA / OMol via vesin neighbors + AOTInductor .pt2
 
-#include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #include "rgpot/ParamHash.hpp"
 #include "rgpot/Potential.hpp"
 #include "rgpot/UmaPot/UmaConfig.hpp"
@@ -12,18 +11,16 @@
 namespace rgpot {
 
 /**
- * @brief UMA / OMol calculator on the metatomic C++ stack.
+ * @brief UMA / OMol calculator: vesin neighbor list + AOTI package.
  *
- * Loads a metatomic TorchScript checkpoint with
- * ``metatomic_torch::load_atomistic_model``, builds vesin neighbor lists,
- * and takes autograd forces. Charge and spin are attached as System extra
- * data on every call (omol). This is the same in-process path as
- * MetatomicPot; it is not a Python helper.
+ * Loads an AOTInductor ``.pt2`` exported by ``scripts/export_uma_aoti.py``.
+ * Each force call builds a fairchem-convention edge list with vesin and
+ * runs the compiled graph. Charge and spin are per-call tensor inputs.
  */
 class UmaPot : public Potential<UmaPot> {
 public:
   explicit UmaPot(const UmaConfig &config);
-  ~UmaPot() override = default;
+  ~UmaPot() override;
 
   UmaPot(const UmaPot &) = delete;
   UmaPot &operator=(const UmaPot &) = delete;
@@ -44,13 +41,17 @@ public:
   }
 
 private:
-  static constexpr uint64_t kKernelVersion = 1;
+  static constexpr uint64_t kKernelVersion = 2;
+
+  struct Impl;
 
   UmaConfig m_config;
   uint64_t m_paramsKey{0};
-  std::unique_ptr<MetatomicPot> m_inner;
+  std::unique_ptr<Impl> m_impl;
 
   void recomputeParamsKey();
+  void applySidecar();
+  void ensureLoaded() const;
 };
 
 } // namespace rgpot

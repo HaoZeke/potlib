@@ -138,7 +138,7 @@ RPC client types:
 <tr>
 <td class="org-left"><code>UmaPot</code></td>
 <td class="org-left"><code>Uma:&lt;model_path&gt;</code>, <code>Uma:&lt;model_path&gt;:omol</code></td>
-<td class="org-left">Enable with <code>-Dwith_metatomic=true</code>. Same linked torch/metatomic path as MetatomicPot; charge/spin extras for the omol head</td>
+<td class="org-left">Enable with <code>-Dwith_metatomic=true</code>. AOTInductor <code>.pt2</code> plus vesin neighbor lists; charge/spin are per-call tensor inputs</td>
 </tr>
 
 <tr>

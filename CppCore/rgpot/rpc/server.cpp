@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
       }
     }
     cfg.model_path = rest;
-    std::cout << "Loading UMA metatomic model '" << cfg.model_path
+    std::cout << "Loading UMA AOTI package '" << cfg.model_path
               << "' task='" << cfg.task_name << "'..." << std::endl;
     potential_to_use = std::make_unique<rgpot::UmaPot>(cfg);
 #endif // RGPOT_HAS_UMA

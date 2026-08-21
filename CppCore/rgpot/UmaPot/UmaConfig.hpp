@@ -1,7 +1,5 @@
 #pragma once
-// MIT License — config POD for the linked UMA / OMol metatomic frontend
-
-#include "rgpot/MetatomicPot/MetatomicConfig.hpp"
+// MIT License — config POD for UmaPot (vesin neighbor list + AOTI .pt2)
 
 #include <string>
 
@@ -10,35 +8,19 @@ namespace rgpot {
 /**
  * UMA / OMol calculator configuration.
  *
- * The checkpoint is a metatomic TorchScript model (same load path as
- * MetatomicPot). Charge and spin ride as System extra data for the omol
- * head. task_name is recorded on the config and hashed into paramsKey.
+ * model_path is an AOTInductor package (.pt2) produced by
+ * scripts/export_uma_aoti.py. Neighbor lists are built with vesin and
+ * passed as tensors; the compiled graph does not call fairchem.
  */
 struct UmaConfig {
   std::string model_path;
   std::string task_name = "omol";
-  std::string device;
-  std::string length_unit = "angstrom";
-  std::string extensions_directory;
+  std::string device = "cpu";
   int charge = 0;
   int spin = 1;
-  TorchDeterminismPolicy torch_determinism = TorchDeterminismPolicy::Fast;
-  std::string engine_path;
-
-  [[nodiscard]] MetatomicConfig to_metatomic() const {
-    MetatomicConfig m;
-    m.model_path = model_path;
-    m.device = device;
-    m.length_unit = length_unit;
-    m.extensions_directory = extensions_directory;
-    m.torch_determinism = torch_determinism;
-    m.engine_path = engine_path;
-    m.task_name = task_name;
-    m.charge = charge;
-    m.spin = spin;
-    m.attach_system_extras = true;
-    return m;
-  }
+  /// Cutoff in angstrom. Overridden by the sidecar JSON next to .pt2 when present.
+  double cutoff = 6.0;
+  int max_neighbors = 300;
 };
 
 } // namespace rgpot

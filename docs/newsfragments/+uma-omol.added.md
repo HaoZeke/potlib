@@ -1,1 +1,1 @@
-UmaPot loads UMA / OMol metatomic TorchScript checkpoints on the same C++ stack as MetatomicPot (``load_atomistic_model``, vesin neighbors, autograd forces). Charge and spin attach as System extra data for the omol head. potserv accepts ``Uma:<model_path>`` and ``Uma:<model_path>:<task>``.
+UmaPot evaluates UMA / OMol from an AOTInductor ``.pt2`` (``scripts/export_uma_aoti.py``): vesin builds the neighbor list, the compiled graph returns energy and forces. Charge and spin are per-call tensor inputs. potserv accepts ``Uma:<model.pt2>`` and ``Uma:<model.pt2>:<task>``.
