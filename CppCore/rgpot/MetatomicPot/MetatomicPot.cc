@@ -405,19 +405,19 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         atomic_types, torch_positions, torch_cell, torch_pbc);
 
     if (m_config.attach_system_extras) {
-      system->add_data("charge",
+      // add_data rejects bare names that are not known outputs; extras
+      // must be <domain>::<name>. Keep both the metatomic multiplicity
+      // name and the UMA/fairchem "spin" alias.
+      system->add_data("rgpot::charge",
                        scalar_system_data("charge",
                                           static_cast<double>(m_config.charge),
                                           m_device, m_dtype));
-      // Official metatomic per-system quantity (ASE: spin_multiplicity,
-      // falling back to atoms.info["spin"]). Also attach "spin" so a
-      // UMA/OMol export that follows the fairchem name still sees it.
       system->add_data(
-          "spin_multiplicity",
+          "rgpot::spin_multiplicity",
           scalar_system_data("spin_multiplicity",
                              static_cast<double>(m_config.spin), m_device,
                              m_dtype));
-      system->add_data("spin",
+      system->add_data("rgpot::spin",
                        scalar_system_data("spin",
                                           static_cast<double>(m_config.spin),
                                           m_device, m_dtype));
