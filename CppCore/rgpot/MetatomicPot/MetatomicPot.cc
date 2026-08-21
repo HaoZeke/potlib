@@ -409,6 +409,14 @@ void MetatomicPot::forceImpl(const ForceInput &in, ForceOut *out) const {
                        scalar_system_data("charge",
                                           static_cast<double>(m_config.charge),
                                           m_device, m_dtype));
+      // Official metatomic per-system quantity (ASE: spin_multiplicity,
+      // falling back to atoms.info["spin"]). Also attach "spin" so a
+      // UMA/OMol export that follows the fairchem name still sees it.
+      system->add_data(
+          "spin_multiplicity",
+          scalar_system_data("spin_multiplicity",
+                             static_cast<double>(m_config.spin), m_device,
+                             m_dtype));
       system->add_data("spin",
                        scalar_system_data("spin",
                                           static_cast<double>(m_config.spin),
