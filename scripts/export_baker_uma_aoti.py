@@ -107,6 +107,10 @@ def main() -> int:
     p.add_argument("--skip-existing", action="store_true")
     p.add_argument("--eager-only", action="store_true")
     p.add_argument("--skip-aoti", action="store_true")
+    # A static-shape package freezes the traced edge count, so a band
+    # that stretches past it aborts. The sidecar makes the intramolecular
+    # graph complete and the edge count constant at n(n-1).
+    p.add_argument("--molecular-box", type=float, default=0.0)
     args = p.parse_args()
 
     baker_dir = discover_baker_dir(args.baker_dir)
@@ -159,6 +163,8 @@ def main() -> int:
             cmd.append("--eager-only")
         if args.skip_aoti:
             cmd.append("--skip-aoti")
+        if args.molecular_box and args.molecular_box > 0.0:
+            cmd += ["--molecular-box", str(args.molecular_box)]
         print("RUN", " ".join(cmd), flush=True)
         proc = subprocess.run(cmd, check=False)
         if proc.returncode != 0:
