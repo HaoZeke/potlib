@@ -491,6 +491,7 @@ def write_sidecar(
     spin: int = 1,
     z_set: list[int] | None = None,
     label: str = "hcn",
+    molecular_box: float = 0.0,
 ):
     input_names = [
         "pos",
@@ -506,6 +507,7 @@ def write_sidecar(
     ]
     meta = {
         "cutoff": float(cutoff),
+        "molecular_box": float(molecular_box),
         "max_neighbors": int(max_neighbors),
         "task_name": str(task_name),
         "charge": int(charge),
@@ -520,6 +522,10 @@ def write_sidecar(
             name: list(t.shape) for name, t in zip(input_names, example)
         },
     }
+    return meta
+
+
+def write_sidecar_file(path: Path, meta: dict):
     side = Path(path).with_suffix(".json")
     side.write_text(json.dumps(meta, indent=2) + "\n")
     print("WROTE", side.resolve(), flush=True)
@@ -538,7 +544,7 @@ def _first_import(candidates):
     raise RuntimeError(f"none of {candidates} imported") from last
 
 
-def aoti_package(exported, path: Path):
+def aoti_package(exported, path: Path, metadata=None):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fn = _first_import(
@@ -548,7 +554,17 @@ def aoti_package(exported, path: Path):
             "torch._inductor.package.aoti_compile_and_package",
         ]
     )
-    fn(exported, package_path=str(path))
+    kwargs = {"package_path": str(path)}
+    if metadata:
+        # Bake the runtime contract into the package itself: the C++
+        # loader reads it via AOTIModelPackageLoader::get_metadata(),
+        # so the .pt2 is self-describing and needs no sidecar.
+        kwargs["inductor_configs"] = {
+            "aot_inductor.metadata": {
+                str(k): str(v) for k, v in metadata.items()
+            }
+        }
+    fn(exported, **kwargs)
     return path
 
 
@@ -584,6 +600,27 @@ def main() -> int:
     p.add_argument("--label", default=None, help="Sidecar / filename label (default: hcn or atoms path)")
     p.add_argument("--task", default="omol", help="FAIRChem task_name (default: omol)")
     p.add_argument("--out", default=None, help="Output .pt2 path")
+    p.add_argument(
+        "--molecular-box",
+        type=float,
+        default=0.0,
+        help=(
+            "Trace with the molecule re-centered in this synthetic cube and "
+            "a cutoff of 0.4*L: every intramolecular pair is an edge, no "
+            "periodic image ever is, so the vesin edge count is n(n-1) at "
+            "every geometry (what a static-shape AOTI graph requires). "
+            "The runtime reads molecular_box back from the package metadata."
+        ),
+    )
+    p.add_argument(
+        "--sidecar",
+        action="store_true",
+        help=(
+            "Also write the legacy .json sidecar. The contract is embedded "
+            "in the .pt2 metadata; the sidecar only serves consumers of "
+            "packages minted without it."
+        ),
+    )
     p.add_argument("--skip-aoti", action="store_true")
     p.add_argument("--eager-only", action="store_true")
     p.add_argument(
@@ -599,6 +636,12 @@ def main() -> int:
     spin = args.spin if args.spin is not None else int(atoms.info.get("spin", 1))
     atoms.info["charge"] = int(charge)
     atoms.info["spin"] = int(spin)
+    if args.molecular_box and args.molecular_box > 0.0:
+        L = float(args.molecular_box)
+        pos = atoms.get_positions()
+        atoms.set_positions(pos - pos.mean(axis=0) + [L / 2.0] * 3)
+        atoms.set_cell([[L, 0.0, 0.0], [0.0, L, 0.0], [0.0, 0.0, L]])
+        atoms.set_pbc(True)
     task_name = str(args.task)
     z_set = z_set_of(atoms)
     if args.out is None:
@@ -622,6 +665,13 @@ def main() -> int:
     backbone.otf_graph = False
     cutoff = float(backbone.cutoff)
     max_n = int(getattr(backbone, "max_neighbors", 300) or 300)
+    if args.molecular_box and args.molecular_box > 0.0:
+        # Complete-graph tracing: the model envelope zeroes pairs beyond
+        # its own cutoff, so widening the graph cutoff only fixes the
+        # edge count (validated on claisen reactant + 1.35x stretch:
+        # dE <= 3.0e-4 eV, dF <= 8.7e-4 eV/A vs the internal graph).
+        cutoff = 0.4 * float(args.molecular_box)
+        max_n = 100000
     print(f"cutoff={cutoff} max_neighbors={max_n}", flush=True)
     tasks = pred.dataset_to_tasks.get(task_name, [])
     for task in tasks:
@@ -641,7 +691,7 @@ def main() -> int:
             print(f"FAIL: --compare-only needs an existing .pt2: {out}", file=sys.stderr)
             return 4
         example = pack_example(atoms, cutoff, device, dtype, max_n)
-        write_sidecar(
+        meta = write_sidecar(
             out,
             cutoff,
             max_n,
@@ -652,7 +702,10 @@ def main() -> int:
             spin=spin,
             z_set=z_set,
             label=label,
+            molecular_box=float(args.molecular_box or 0.0),
         )
+        if args.sidecar:
+            write_sidecar_file(out, meta)
         pkg = load_aoti(out)
         e_a, f_a = run_aoti(pkg, example)
         e_a = torch.as_tensor(e_a).detach().cpu()
@@ -685,7 +738,7 @@ def main() -> int:
     if not ok_eager:
         print("FAIL: eager tensor wrapper does not match ASE", file=sys.stderr)
         return 2
-    write_sidecar(
+    meta = write_sidecar(
         out,
         cutoff,
         max_n,
@@ -696,7 +749,10 @@ def main() -> int:
         spin=spin,
         z_set=z_set,
         label=label,
+        molecular_box=float(args.molecular_box or 0.0),
     )
+    if args.sidecar:
+        write_sidecar_file(out, meta)
     if args.eager_only:
         return 0
 
@@ -758,7 +814,7 @@ def main() -> int:
 
     out = Path(args.out)
     print("AOTI package", out, flush=True)
-    aoti_package(exported, out)
+    aoti_package(exported, out, metadata=meta)
     pkg = load_aoti(out)
     e_a, f_a = run_aoti(pkg, example)
     e_a = torch.as_tensor(e_a).detach().cpu()

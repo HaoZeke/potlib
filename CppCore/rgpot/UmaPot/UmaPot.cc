@@ -213,6 +213,27 @@ void UmaPot::ensureLoaded() const {
   m_impl->loader =
       std::make_unique<torch::inductor::AOTIModelPackageLoader>(
           m_config.model_path);
+  // The package's own embedded metadata is authoritative; the JSON
+  // sidecar covers packages exported without it. One convention, one
+  // producer (scripts/export_uma_aoti.py), the .pt2 self-describing.
+  const auto meta = m_impl->loader->get_metadata();
+  auto num = [&](const char *key, double fallback) {
+    const auto it = meta.find(key);
+    if (it == meta.end() || it->second.empty())
+      return fallback;
+    try {
+      return std::stod(it->second);
+    } catch (...) {
+      return fallback;
+    }
+  };
+  m_impl->cutoff = num("cutoff", m_impl->cutoff);
+  m_impl->molecular_box = num("molecular_box", m_impl->molecular_box);
+  m_impl->max_neighbors = static_cast<int>(
+      num("max_neighbors", static_cast<double>(m_impl->max_neighbors)));
+  const auto dt = meta.find("pos_dtype");
+  if (dt != meta.end() && dt->second == "float64")
+    m_impl->dtype = torch::kFloat64;
 }
 
 UmaPot::UmaPot(const UmaConfig &config)
