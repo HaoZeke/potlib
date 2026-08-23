@@ -27,6 +27,11 @@ public:
 
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
+  /// One AOTI call per chunk of up to the package's batch_max
+  /// same-composition systems (a NEB band). Band packages carry only
+  /// the batched graph, so a lone system is padded to two.
+  void forceBatchImpl(const ForceBatch &batch) const override;
+
   [[nodiscard]] PotCaps caps() const noexcept override {
     return {.reentrancy = Reentrancy::SharedInstance,
             .perImageInstances = true};

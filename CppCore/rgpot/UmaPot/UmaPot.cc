@@ -149,6 +149,7 @@ struct UmaPot::Impl {
   double cutoff{6.0};
   double molecular_box{0.0};
   int max_neighbors{300};
+  int64_t batch_max{0};
   std::unique_ptr<torch::inductor::AOTIModelPackageLoader> loader;
   mutable std::mutex mutex;
 };
@@ -188,6 +189,7 @@ void UmaPot::ensureLoaded() const {
   m_impl->molecular_box = num("molecular_box", m_impl->molecular_box);
   m_impl->max_neighbors = static_cast<int>(
       num("max_neighbors", static_cast<double>(m_impl->max_neighbors)));
+  m_impl->batch_max = static_cast<int64_t>(num("batch_max", 0.0));
   const auto dt = meta.find("pos_dtype");
   if (dt != meta.end() && dt->second == "float64")
     m_impl->dtype = torch::kFloat64;
@@ -224,6 +226,17 @@ void UmaPot::setChargeSpin(int charge, int spin) {
 void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (in.nAtoms == 0)
     throw std::runtime_error("UmaPot: nAtoms == 0");
+  {
+    std::lock_guard<std::mutex> lock(m_impl->mutex);
+    ensureLoaded();
+  }
+  if (m_impl->batch_max > 1) {
+    // A band package carries only the batched (B >= 2) graph; a lone
+    // system rides the batch path, which pads it to two.
+    ForceBatch one{.nSystems = 1, .in = &in, .out = out};
+    forceBatchImpl(one);
+    return;
+  }
 
   // Under the molecular-box convention the caller's cell is replaced by
   // the sidecar's cube and positions re-center into it. Energies and
@@ -333,6 +346,194 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     out->F[i] = fp[i];
   out->energy = energy;
   out->variance = 0.0;
+}
+
+void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
+  // A band evaluation: every system shares this pot's composition, so
+  // one AOTI call covers a chunk of up to batch_max geometries. The
+  // per-system fallback covers everything else (no band contract in
+  // the package, mixed compositions, single systems).
+  auto fallback = [&](size_t from, size_t to) {
+    for (size_t i = from; i < to; ++i)
+      forceImpl(batch.in[i], &batch.out[i]);
+  };
+  if (batch.nSystems == 0)
+    return;
+  {
+    std::lock_guard<std::mutex> lock(m_impl->mutex);
+    ensureLoaded();
+  }
+  const int64_t bmax = m_impl->batch_max;
+  if (bmax <= 1) {
+    // Single-system package: the plain graph is the only one there is.
+    fallback(0, batch.nSystems);
+    return;
+  }
+  const size_t n0 = batch.in[0].nAtoms;
+  bool uniform = true;
+  for (size_t i = 0; uniform && i < batch.nSystems; ++i) {
+    uniform = batch.in[i].nAtoms == n0;
+    for (size_t a = 0; uniform && a < n0; ++a)
+      uniform = batch.in[i].atmnrs[a] == batch.in[0].atmnrs[a];
+  }
+  if (!uniform) {
+    throw std::runtime_error(
+        "UmaPot: band package requires one composition per batch");
+  }
+
+  const auto n = static_cast<int64_t>(n0);
+  const bool molecular = m_impl->molecular_box > 0.0;
+  const double L = m_impl->molecular_box;
+
+  for (size_t start = 0; start < batch.nSystems;
+       start += static_cast<size_t>(bmax)) {
+    const size_t stop =
+        std::min(batch.nSystems, start + static_cast<size_t>(bmax));
+    const auto B_real = static_cast<int64_t>(stop - start);
+    // The band graph's nsystems dim starts at two: a lone system is
+    // evaluated twice and the duplicate result discarded.
+    const bool padded = B_real == 1;
+    const int64_t B = padded ? 2 : B_real;
+    auto in_at = [&](int64_t b) -> const ForceInput & {
+      return batch.in[start + static_cast<size_t>(padded ? 0 : b)];
+    };
+
+    // Per-system recenter + edges; edge indices offset into the
+    // concatenated atom range.
+    std::vector<std::vector<double>> sys_pos(static_cast<size_t>(B));
+    std::vector<std::array<double, 9>> sys_box(static_cast<size_t>(B));
+    std::vector<EdgeList> sys_edges(static_cast<size_t>(B));
+    int64_t nedges_total = 0;
+    for (int64_t b = 0; b < B; ++b) {
+      const ForceInput &in = in_at(b);
+      auto &pos_b = sys_pos[static_cast<size_t>(b)];
+      auto &box_b = sys_box[static_cast<size_t>(b)];
+      pos_b.assign(in.pos, in.pos + 3 * n);
+      if (molecular) {
+        double c[3] = {0.0, 0.0, 0.0};
+        for (int64_t i = 0; i < n; ++i)
+          for (int d = 0; d < 3; ++d)
+            c[d] += pos_b[static_cast<size_t>(3 * i + d)];
+        for (int d = 0; d < 3; ++d)
+          c[d] /= static_cast<double>(n);
+        for (int64_t i = 0; i < n; ++i)
+          for (int d = 0; d < 3; ++d)
+            pos_b[static_cast<size_t>(3 * i + d)] += 0.5 * L - c[d];
+        box_b = {L, 0.0, 0.0, 0.0, L, 0.0, 0.0, 0.0, L};
+      } else {
+        std::copy(in.box, in.box + 9, box_b.begin());
+      }
+      const ForceInput local{static_cast<size_t>(n), pos_b.data(), in.atmnrs,
+                             box_b.data()};
+      sys_edges[static_cast<size_t>(b)] = vesin_fairchem_edges(
+          local, m_impl->cutoff, m_impl->max_neighbors);
+      nedges_total += static_cast<int64_t>(
+          sys_edges[static_cast<size_t>(b)].neighbor.size());
+    }
+    if (nedges_total == 0)
+      throw std::runtime_error("UmaPot: vesin produced no edges (batch)");
+
+    auto opts_f =
+        torch::TensorOptions().dtype(m_impl->dtype).device(torch::kCPU);
+    auto opts_l =
+        torch::TensorOptions().dtype(torch::kLong).device(torch::kCPU);
+
+    auto pos = torch::empty({B * n, 3}, torch::dtype(torch::kFloat64));
+    auto atomic_numbers = torch::empty({B * n}, opts_l);
+    auto cell = torch::empty({B, 3, 3}, torch::dtype(torch::kFloat64));
+    auto pbc = torch::ones({B, 3}, torch::TensorOptions().dtype(torch::kBool));
+    auto edge_index = torch::empty({2, nedges_total}, opts_l);
+    auto cell_offsets =
+        torch::empty({nedges_total, 3}, torch::dtype(torch::kFloat32));
+    auto charge = torch::full({B}, static_cast<int64_t>(m_config.charge),
+                              opts_l);
+    auto spin =
+        torch::full({B}, static_cast<int64_t>(m_config.spin), opts_l);
+    auto batch_vec = torch::empty({B * n}, opts_l);
+    auto natoms = torch::full({B}, n, opts_l);
+    auto nedges_t = torch::empty({B}, opts_l);
+    {
+      auto ne_a = nedges_t.accessor<int64_t, 1>();
+      for (int64_t b = 0; b < B; ++b)
+        ne_a[b] = static_cast<int64_t>(
+            sys_edges[static_cast<size_t>(b)].neighbor.size());
+    }
+
+    {
+      auto pos_a = pos.accessor<double, 2>();
+      auto z_a = atomic_numbers.accessor<int64_t, 1>();
+      auto cell_a = cell.accessor<double, 3>();
+      auto ei = edge_index.accessor<int64_t, 2>();
+      auto off = cell_offsets.accessor<float, 2>();
+      auto bv = batch_vec.accessor<int64_t, 1>();
+      int64_t e_at = 0;
+      for (int64_t b = 0; b < B; ++b) {
+        const ForceInput &in = in_at(b);
+        const auto &pos_b = sys_pos[static_cast<size_t>(b)];
+        for (int64_t i = 0; i < n; ++i) {
+          pos_a[b * n + i][0] = pos_b[static_cast<size_t>(3 * i)];
+          pos_a[b * n + i][1] = pos_b[static_cast<size_t>(3 * i + 1)];
+          pos_a[b * n + i][2] = pos_b[static_cast<size_t>(3 * i + 2)];
+          z_a[b * n + i] = in.atmnrs[i];
+          bv[b * n + i] = b;
+        }
+        for (int r = 0; r < 3; ++r)
+          for (int c = 0; c < 3; ++c)
+            cell_a[b][r][c] = sys_box[static_cast<size_t>(b)]
+                                     [static_cast<size_t>(3 * r + c)];
+        const auto &edges = sys_edges[static_cast<size_t>(b)];
+        const auto ne = static_cast<int64_t>(edges.neighbor.size());
+        for (int64_t e = 0; e < ne; ++e) {
+          ei[0][e_at + e] = edges.neighbor[static_cast<size_t>(e)] + b * n;
+          ei[1][e_at + e] = edges.center[static_cast<size_t>(e)] + b * n;
+          off[e_at + e][0] = edges.offsets[static_cast<size_t>(3 * e)];
+          off[e_at + e][1] = edges.offsets[static_cast<size_t>(3 * e + 1)];
+          off[e_at + e][2] = edges.offsets[static_cast<size_t>(3 * e + 2)];
+        }
+        e_at += ne;
+      }
+    }
+    pos = pos.to(opts_f);
+    cell = cell.to(opts_f);
+    auto cell_offsets_f = cell_offsets.to(opts_f);
+
+    if (m_impl->device != torch::kCPU) {
+      pos = pos.to(m_impl->device);
+      atomic_numbers = atomic_numbers.to(m_impl->device);
+      cell = cell.to(m_impl->device);
+      pbc = pbc.to(m_impl->device);
+      edge_index = edge_index.to(m_impl->device);
+      cell_offsets_f = cell_offsets_f.to(m_impl->device);
+      charge = charge.to(m_impl->device);
+      spin = spin.to(m_impl->device);
+      batch_vec = batch_vec.to(m_impl->device);
+      natoms = natoms.to(m_impl->device);
+      nedges_t = nedges_t.to(m_impl->device);
+    }
+
+    std::vector<torch::Tensor> inputs = {
+        pos,    atomic_numbers, cell,      pbc,    edge_index,
+        cell_offsets_f, charge, spin, batch_vec, natoms, nedges_t};
+
+    std::lock_guard<std::mutex> lock(m_impl->mutex);
+    c10::InferenceMode guard;
+    auto outputs = m_impl->loader->run(inputs);
+    if (outputs.size() < 2)
+      throw std::runtime_error("UmaPot: AOTI package returned <2 tensors");
+    auto energies = outputs[0].to(torch::kFloat64).cpu().contiguous();
+    auto forces = outputs[1].to(torch::kFloat64).cpu().contiguous();
+    if (energies.numel() != B || forces.numel() != B * n * 3)
+      throw std::runtime_error("UmaPot: batch output shape mismatch");
+    const double *ep = energies.data_ptr<double>();
+    const double *fp = forces.data_ptr<double>();
+    for (int64_t b = 0; b < B_real; ++b) {
+      ForceOut &o = batch.out[start + static_cast<size_t>(b)];
+      o.energy = ep[b];
+      o.variance = 0.0;
+      for (int64_t i = 0; i < n * 3; ++i)
+        o.F[i] = fp[b * n * 3 + i];
+    }
+  }
 }
 
 } // namespace rgpot
