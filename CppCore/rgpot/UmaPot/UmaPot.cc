@@ -390,12 +390,14 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
     const size_t stop =
         std::min(batch.nSystems, start + static_cast<size_t>(bmax));
     const auto B_real = static_cast<int64_t>(stop - start);
-    // The band graph's nsystems dim starts at two: a lone system is
-    // evaluated twice and the duplicate result discarded.
-    const bool padded = B_real == 1;
-    const int64_t B = padded ? 2 : B_real;
+    // The band graph is traced at exactly batch_max systems (static
+    // shapes; merge_mole freezes per-atom buffers at the traced
+    // total), so every chunk pads to that size by repeating the last
+    // system and the padded results are discarded.
+    const int64_t B = bmax;
     auto in_at = [&](int64_t b) -> const ForceInput & {
-      return batch.in[start + static_cast<size_t>(padded ? 0 : b)];
+      const int64_t src = b < B_real ? b : B_real - 1;
+      return batch.in[start + static_cast<size_t>(src)];
     };
 
     // Per-system recenter + edges; edge indices offset into the
