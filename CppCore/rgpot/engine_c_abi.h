@@ -5,9 +5,10 @@
  * One symbol set for every heavy backend: an engine shared library
  * (libuma_engine.so, libmetatomic_engine.so, ...) exports these
  * functions, backend selection is which library the host dlopens, and
- * configuration travels as one flat JSON object instead of a
- * per-backend struct. Adding a backend therefore needs no new host
- * code and no new ABI header.
+ * configuration travels as a Cap'n Proto flat-array message on the
+ * shared Potentials.capnp wire (the engine names its root params
+ * struct, e.g. UmaParams). Adding a backend therefore needs no new
+ * host code and no new ABI header.
  *
  * Units: positions Angstrom, energy eV, forces eV/Angstrom.
  *
@@ -54,11 +55,14 @@ RGPOT_ENGINE_API int rgpot_engine_abi_version(void);
 RGPOT_ENGINE_API int rgpot_engine_available(void);
 
 /**
- * Create a potential from a flat JSON object of engine-specific keys
- * (e.g. {"model_path":"...","task_name":"omol","charge":0,"spin":2}).
- * Returns NULL on failure with a message in errbuf.
+ * Create a potential from a Cap'n Proto flat-array message whose root
+ * struct is the engine's params arm in Potentials.capnp (UmaParams for
+ * the UMA engine). config points at config_len bytes (word-aligned
+ * capnp framing as produced by capnp::messageToFlatArray). Returns
+ * NULL on failure with a message in errbuf.
  */
-RGPOT_ENGINE_API RgpotEnginePot *rgpot_engine_create(const char *config_json,
+RGPOT_ENGINE_API RgpotEnginePot *rgpot_engine_create(const void *config,
+                                                     size_t config_len,
                                                      char *errbuf,
                                                      size_t errlen);
 

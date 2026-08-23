@@ -78,6 +78,16 @@ struct Capabilities {
   loweredCommonFields @5 :List(Text); # CommonMethodSpec field names the overlay lowers.
   configKinds    @6 :List(Text); # PotentialConfig arms accepted, e.g. "nwchem".
   schemaVersion  @7 :Text;  # Potentials.capnp release the backend compiled against.
+  protocolFamily @8 :Text;  # Stable RPC family, e.g. "rgpot.potentials".
+  protocolMajor  @9 :UInt16; # Wire-incompatible changes increment this value.
+  protocolMinor  @10 :UInt16; # Additive wire-compatible changes increment this value.
+  schemaId       @11 :Text; # Stable Cap'n Proto schema identity.
+  bridgeAbiMajor @12 :UInt16; # eindir objective ABI major revision.
+  bridgeAbiMinor @13 :UInt16; # eindir objective ABI minor revision.
+  bridgeLayout   @14 :UInt32; # eindir objective layout revision.
+  dlpackMajor    @15 :UInt16; # DLPack callback major revision.
+  dlpackMinor    @16 :UInt16; # DLPack callback minor revision.
+  bridgeFeatures @17 :UInt64; # eindir bridge feature bitset.
 
   enum Operation {
     energy         @0;
@@ -1952,6 +1962,42 @@ struct MetatomicParams {
   }
 }
 
+# @struct UmaParams
+# @brief UMA / OMol AOTInductor backend arm, mirroring rgpot's UmaConfig so
+# model selection travels on the shared wire. The package is a per-composition
+# .pt2 export; the sidecar JSON beside it (molecular_box / cutoff / z_set)
+# stays authoritative for values it carries.
+struct UmaParams {
+  modelPath    @0 :Text;          # AOTInductor .pt2 package path.
+  taskName     @1 :Text = "omol"; # UMA task head.
+  device       @2 :Text = "cpu";  # torch device string.
+  charge       @3 :Int32 = 0;     # Total charge.
+  spin         @4 :Int32 = 1;     # Spin multiplicity.
+  cutoff       @5 :Float64 = 0.0; # Angstrom; <=0 keeps UmaConfig/sidecar value.
+  maxNeighbors @6 :Int32 = 0;     # <=0 keeps UmaConfig/sidecar value.
+}
+
+# @struct LammpsParams
+# @brief LAMMPS backend arm driving the lammpc dynlib shim.
+#
+# lammpc calls the actual liblammps functions directly, in process: instance
+# creation, pair setup and pair compute, position/force array access. No
+# command-string parsing, no input scripts, no file traffic anywhere in the
+# force loop. Geometry arrives per step via ForceInput; these fields fix the
+# interaction model once per session.
+struct LammpsParams {
+  unitsStyle @0 :Text = "metal";  # LAMMPS units; metal => eV / Angstrom.
+  atomStyle  @1 :Text = "atomic";
+  pairStyle  @2 :Text = "";       # pair_style args, e.g. "eam/alloy" or "lj/cut 10.0".
+  pairCoeffs @3 :List(Text);      # pair_coeff argument lines, one entry per line.
+  typeToAtomicNumber @4 :List(Int32); # LAMMPS type i+1 -> Z; maps ForceInput.atmnrs.
+  masses     @5 :List(Float64);   # Per-type mass (amu); empty => standard weight per Z.
+  newtonPair @6 :Bool = true;
+  boundary   @7 :Text = "p p p";  # boundary keyword args.
+  extraSetup @8 :List(Text);      # Escape hatch: raw commands after the pair block.
+  suffix     @9 :Text = "";       # Accelerator suffix (omp/gpu/kk) when compiled in.
+}
+
 # @struct NWChemDplotStanza
 # @brief "dplot" block: density/orbital cube output.
 struct NWChemDplotStanza {
@@ -2386,8 +2432,9 @@ struct PotentialConfig {
     nwchem    @1 :NWChemParams; # NWChemPot / potserv ... NWChem
     cpmd      @2 :CPMDParams;   # CPMDPot / potserv ... OpenCPMD
     metatomic @4 :MetatomicParams; # MetatomicPot (torch ML models)
-    # xtb       @5 :XTBParams;
-    # tblite    @6 :TBLiteParams;
+    lammps    @5 :LammpsParams;    # lammpc dynlib shim (LAMMPS library API)
+    # xtb       @6 :XTBParams;
+    # tblite    @7 :TBLiteParams;
   }
   # Normalized overlay applied BEFORE the native arm; native settings win.
   common @3 :CommonMethodSpec;

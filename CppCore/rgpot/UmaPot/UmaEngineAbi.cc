@@ -14,6 +14,12 @@
 #include <string>
 #include <vector>
 
+#include <capnp/message.h>
+#include <capnp/serialize.h>
+#include <kj/io.h>
+
+#include "rgpot/rpc/Potentials.capnp.h"
+
 // When this engine is called from a Python host (pyeonclient / nanobind) the
 // GIL is often still held. Torch autograd refuses that. Soft-resolve CPython
 // thread APIs so pure C++ hosts (eonclient binary) need no libpython link.
@@ -47,40 +53,6 @@ struct SoftGilRelease {
   SoftGilRelease &operator=(const SoftGilRelease &) = delete;
 };
 
-// Flat-JSON key lookups, matching the sidecar reader's tolerance: a
-// missing or malformed key keeps the fallback.
-double json_number(const std::string &text, const char *key, double fallback) {
-  const std::string pat = std::string("\"") + key + "\"";
-  const auto pos = text.find(pat);
-  if (pos == std::string::npos)
-    return fallback;
-  const auto colon = text.find(':', pos + pat.size());
-  if (colon == std::string::npos)
-    return fallback;
-  try {
-    return std::stod(text.substr(colon + 1));
-  } catch (...) {
-    return fallback;
-  }
-}
-
-std::string json_string(const std::string &text, const char *key,
-                        const std::string &fallback) {
-  const std::string pat = std::string("\"") + key + "\"";
-  const auto pos = text.find(pat);
-  if (pos == std::string::npos)
-    return fallback;
-  const auto colon = text.find(':', pos + pat.size());
-  if (colon == std::string::npos)
-    return fallback;
-  const auto open = text.find('"', colon + 1);
-  if (open == std::string::npos)
-    return fallback;
-  const auto close = text.find('"', open + 1);
-  if (close == std::string::npos)
-    return fallback;
-  return text.substr(open + 1, close - open - 1);
-}
 } // namespace
 
 struct RgpotEnginePot {
@@ -99,35 +71,36 @@ int rgpot_engine_abi_version(void) { return RGPOT_ENGINE_ABI_VERSION; }
 
 int rgpot_engine_available(void) { return 1; }
 
-RgpotEnginePot *rgpot_engine_create(const char *config_json, char *errbuf,
-                                    size_t errlen) {
-  if (!config_json || config_json[0] == '\0') {
-    set_err(errbuf, errlen, "rgpot_engine_create(uma): config required");
+RgpotEnginePot *rgpot_engine_create(const void *config, size_t config_len,
+                                    char *errbuf, size_t errlen) {
+  if (!config || config_len == 0 || config_len % sizeof(capnp::word) != 0) {
+    set_err(errbuf, errlen,
+            "rgpot_engine_create(uma): capnp UmaParams message required");
     return nullptr;
   }
-  const std::string text(config_json);
   try {
+    const kj::ArrayPtr<const capnp::word> words(
+        reinterpret_cast<const capnp::word *>(config),
+        config_len / sizeof(capnp::word));
+    capnp::FlatArrayMessageReader reader(words);
+    const auto params = reader.getRoot<::UmaParams>();
+
     rgpot::UmaConfig c;
-    c.model_path = json_string(text, "model_path", "");
+    c.model_path = params.getModelPath().cStr();
     if (c.model_path.empty()) {
-      set_err(errbuf, errlen, "rgpot_engine_create(uma): model_path required");
+      set_err(errbuf, errlen, "rgpot_engine_create(uma): modelPath required");
       return nullptr;
     }
-    c.task_name = json_string(text, "task_name", c.task_name);
-    c.device = json_string(text, "device", c.device);
-    c.charge = static_cast<int>(
-        json_number(text, "charge", static_cast<double>(c.charge)));
-    c.spin = static_cast<int>(
-        json_number(text, "spin", static_cast<double>(c.spin)));
-    if (c.spin <= 0)
-      c.spin = 1;
-    const double cutoff = json_number(text, "cutoff", 0.0);
-    if (cutoff > 0.0)
-      c.cutoff = cutoff;
-    const int max_neighbors =
-        static_cast<int>(json_number(text, "max_neighbors", 0.0));
-    if (max_neighbors > 0)
-      c.max_neighbors = max_neighbors;
+    if (params.getTaskName().size() > 0)
+      c.task_name = params.getTaskName().cStr();
+    if (params.getDevice().size() > 0)
+      c.device = params.getDevice().cStr();
+    c.charge = params.getCharge();
+    c.spin = params.getSpin() > 0 ? params.getSpin() : 1;
+    if (params.getCutoff() > 0.0)
+      c.cutoff = params.getCutoff();
+    if (params.getMaxNeighbors() > 0)
+      c.max_neighbors = params.getMaxNeighbors();
     auto pot = std::make_unique<RgpotEnginePot>();
     pot->impl = std::make_unique<rgpot::UmaPot>(c);
     return pot.release();
