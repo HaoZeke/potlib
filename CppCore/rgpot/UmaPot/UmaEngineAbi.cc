@@ -153,4 +153,54 @@ int rgpot_engine_force(RgpotEnginePot *pot, long nAtoms,
   }
 }
 
+int rgpot_engine_force_batch(RgpotEnginePot *pot, long nSystems, long nAtoms,
+                             const double *positions, const int *atomicNrs,
+                             double *forces, double *energies,
+                             double *variances, const double *boxes,
+                             rgpot_engine_coord_transform transform,
+                             void *transform_user) {
+  if (!pot || !pot->impl || !positions || !atomicNrs || !forces || !energies ||
+      !boxes || nSystems <= 0 || nAtoms <= 0)
+    return 1;
+  try {
+    SoftGilRelease no_gil;
+    const size_t B = static_cast<size_t>(nSystems);
+    const size_t stride = static_cast<size_t>(nAtoms) * 3;
+    // Scratch copies: a host transform must never mutate caller buffers.
+    std::vector<double> R(positions, positions + stride * B);
+    std::vector<double> cells(boxes, boxes + 9 * B);
+    if (transform) {
+      for (size_t i = 0; i < B; ++i) {
+        const int rc = transform(transform_user, nAtoms, R.data() + i * stride,
+                                 cells.data() + i * 9);
+        if (rc != 0)
+          return rc;
+      }
+    }
+    std::vector<rgpot::ForceInput> in;
+    std::vector<rgpot::ForceOut> out(B);
+    in.reserve(B);
+    for (size_t i = 0; i < B; ++i) {
+      in.push_back(rgpot::ForceInput{static_cast<size_t>(nAtoms),
+                                     R.data() + i * stride, atomicNrs,
+                                     cells.data() + i * 9});
+      out[i] = rgpot::ForceOut{forces + i * stride, 0.0, 0.0};
+    }
+    const rgpot::ForceBatch batch{B, in.data(), out.data()};
+    pot->impl->forceBatchImpl(batch);
+    for (size_t i = 0; i < B; ++i) {
+      energies[i] = out[i].energy;
+      if (variances)
+        variances[i] = out[i].variance;
+    }
+    return 0;
+  } catch (const std::exception &e) {
+    std::fprintf(stderr, "rgpot_engine_force_batch(uma): %s\n", e.what());
+    return 2;
+  } catch (...) {
+    std::fprintf(stderr, "rgpot_engine_force_batch(uma): unknown exception\n");
+    return 2;
+  }
+}
+
 } // extern "C"
