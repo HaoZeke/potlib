@@ -5,6 +5,9 @@
 #include "rgpot/MetatomicPot/vesin_compat.hpp"
 #include "vesin.h"
 
+#include <array>
+#include <vector>
+
 #include <torch/csrc/inductor/aoti_package/model_package_loader.h>
 #include <torch/torch.h>
 
@@ -166,6 +169,7 @@ struct UmaPot::Impl {
   torch::Device device{torch::kCPU};
   torch::ScalarType dtype{torch::kFloat32};
   double cutoff{6.0};
+  double molecular_box{0.0};
   int max_neighbors{300};
   std::unique_ptr<torch::inductor::AOTIModelPackageLoader> loader;
   mutable std::mutex mutex;
@@ -190,6 +194,12 @@ void UmaPot::applySidecar() {
   if (meta.empty())
     return;
   m_impl->cutoff = json_number(meta, "cutoff", m_impl->cutoff);
+  // Molecular-box convention: the package was traced with the molecule
+  // re-centered in a synthetic L-cube and a cutoff below L/2, so every
+  // intramolecular pair is an edge and no periodic image ever is. The
+  // vesin edge count is then n(n-1) at every geometry, which is what a
+  // static-shape AOTI graph requires.
+  m_impl->molecular_box = json_number(meta, "molecular_box", 0.0);
   m_impl->max_neighbors = static_cast<int>(json_number(
       meta, "max_neighbors", static_cast<double>(m_impl->max_neighbors)));
   if (meta.find("float64") != std::string::npos)
@@ -238,9 +248,32 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (in.nAtoms == 0)
     throw std::runtime_error("UmaPot: nAtoms == 0");
 
+  // Under the molecular-box convention the caller's cell is replaced by
+  // the sidecar's cube and positions re-center into it. Energies and
+  // forces are translation invariant, so only the graph changes.
+  const bool molecular = m_impl->molecular_box > 0.0;
+  std::vector<double> mol_pos;
+  std::array<double, 9> mol_box{};
+  if (molecular) {
+    const double L = m_impl->molecular_box;
+    mol_pos.assign(in.pos, in.pos + 3 * in.nAtoms);
+    double c[3] = {0.0, 0.0, 0.0};
+    for (size_t i = 0; i < in.nAtoms; ++i)
+      for (int d = 0; d < 3; ++d)
+        c[d] += mol_pos[3 * i + d];
+    for (int d = 0; d < 3; ++d)
+      c[d] /= static_cast<double>(in.nAtoms);
+    for (size_t i = 0; i < in.nAtoms; ++i)
+      for (int d = 0; d < 3; ++d)
+        mol_pos[3 * i + d] += 0.5 * L - c[d];
+    mol_box = {L, 0.0, 0.0, 0.0, L, 0.0, 0.0, 0.0, L};
+  }
+  const ForceInput local{in.nAtoms, molecular ? mol_pos.data() : in.pos,
+                         in.atmnrs, molecular ? mol_box.data() : in.box};
+
   const EdgeList edges =
-      vesin_fairchem_edges(in, m_impl->cutoff, m_impl->max_neighbors);
-  const auto n = static_cast<int64_t>(in.nAtoms);
+      vesin_fairchem_edges(local, m_impl->cutoff, m_impl->max_neighbors);
+  const auto n = static_cast<int64_t>(local.nAtoms);
   const auto nedges = static_cast<int64_t>(edges.neighbor.size());
   if (nedges == 0)
     throw std::runtime_error("UmaPot: vesin produced no edges");
@@ -253,22 +286,22 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   auto pos = torch::empty({n, 3}, torch::dtype(torch::kFloat64));
   auto pos_a = pos.accessor<double, 2>();
   for (int64_t i = 0; i < n; ++i) {
-    pos_a[i][0] = in.pos[3 * i];
-    pos_a[i][1] = in.pos[3 * i + 1];
-    pos_a[i][2] = in.pos[3 * i + 2];
+    pos_a[i][0] = local.pos[3 * i];
+    pos_a[i][1] = local.pos[3 * i + 1];
+    pos_a[i][2] = local.pos[3 * i + 2];
   }
   pos = pos.to(opts_f);
 
   auto atomic_numbers = torch::empty({n}, opts_l);
   auto z_a = atomic_numbers.accessor<int64_t, 1>();
   for (int64_t i = 0; i < n; ++i)
-    z_a[i] = in.atmnrs[i];
+    z_a[i] = local.atmnrs[i];
 
   auto cell = torch::empty({1, 3, 3}, torch::dtype(torch::kFloat64));
   auto cell_a = cell.accessor<double, 3>();
   for (int r = 0; r < 3; ++r)
     for (int c = 0; c < 3; ++c)
-      cell_a[0][r][c] = in.box[3 * r + c];
+      cell_a[0][r][c] = local.box[3 * r + c];
   cell = cell.to(opts_f);
 
   auto pbc = torch::tensor({{true, true, true}},
