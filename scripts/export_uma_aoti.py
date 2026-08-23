@@ -840,7 +840,11 @@ def main() -> int:
         return 2
 
     batch_max = max(0, int(args.batch_max))
-    trace_systems = 2 if batch_max > 1 else 1
+    # merge_mole freezes per-atom expert buffers at the traced total, so
+    # a band package is traced at exactly batch_max systems and stays
+    # fully static; the C++ side pads every chunk to that size. A NEB
+    # band has a fixed image count, so nothing is lost.
+    trace_systems = batch_max if batch_max > 1 else 1
     example = pack_example(atoms, cutoff, device, dtype, max_n,
                            n_systems=trace_systems)
     print(f"vesin edges={example[4].shape[1]} systems={trace_systems}",
@@ -888,26 +892,18 @@ def main() -> int:
         "natoms": None,
     }
     if batch_max > 1:
-        # Band batching: the system count is its own dynamic dim, so one
-        # call evaluates a whole same-composition band. fairchem's
-        # batched shift path requires B >= 2 (its B == 1 branch is a
-        # different graph), so the band package serves batches only and
-        # the C++ side pads a lone system to two.
-        nsys_dim = torch.export.Dim("nsystems", min=2, max=max(2, batch_max))
-        dyn.update({
-            "cell": {0: nsys_dim},
-            "pbc": {0: nsys_dim},
-            "charge": {0: nsys_dim},
-            "spin": {0: nsys_dim},
-            "natoms": {0: nsys_dim},
-            "nedges": {0: nsys_dim},
-        })
+        # Fully static band package: fixed composition and fixed system
+        # count leave nothing dynamic, and the molecular-box convention
+        # keeps the edge count at B * n * (n-1) for every geometry.
+        dyn = None
     exported = None
     attempts = [
-        ("dynamic-nonstrict", dict(dynamic_shapes=dyn, strict=False)),
         ("static-nonstrict", dict(strict=False)),
         ("static-strict", dict(strict=True)),
     ]
+    if dyn is not None:
+        attempts.insert(0, ("dynamic-nonstrict",
+                            dict(dynamic_shapes=dyn, strict=False)))
     last = None
     for attempt, kwargs in attempts:
         try:
@@ -952,18 +948,9 @@ def main() -> int:
     if not compare_batched("aoti", e_a, f_a, e_ref, f_ref, len(atoms)):
         print("FAIL: AOTI package does not match ASE", file=sys.stderr)
         return 4
-    if batch_max > 1:
-        # A batch size other than the traced one must also hold.
-        probe_b = min(3, batch_max)
-        multi = pack_example(atoms, cutoff, device, dtype, max_n,
-                             n_systems=probe_b)
-        e_m, f_m = run_aoti(pkg, multi)
-        if not compare_batched(f"aoti[B={probe_b}]",
-                               torch.as_tensor(e_m).cpu(),
-                               torch.as_tensor(f_m).cpu().numpy(),
-                               e_ref, f_ref, len(atoms)):
-            print("FAIL: AOTI at non-traced batch size", file=sys.stderr)
-            return 4
+    # The band contract is exact-B: every call carries batch_max
+    # systems (padded by the caller); the per-subsystem comparison
+    # above already exercised the packaged graph at that size.
     print("WROTE", out.resolve())
     return 0
 
