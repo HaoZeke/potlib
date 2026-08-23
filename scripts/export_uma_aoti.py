@@ -403,6 +403,65 @@ class TensorUma(nn.Module):
         return energy, forces
 
 
+class TensorUmaBatched(TensorUma):
+    """Band-batched forward: per-system nedges input and segment
+    reductions, so one call evaluates B same-composition systems."""
+
+    def forward(  # type: ignore[override]
+        self,
+        pos: torch.Tensor,
+        atomic_numbers: torch.Tensor,
+        cell: torch.Tensor,
+        pbc: torch.Tensor,
+        edge_index: torch.Tensor,
+        cell_offsets: torch.Tensor,
+        charge: torch.Tensor,
+        spin: torch.Tensor,
+        batch: torch.Tensor,
+        natoms: torch.Tensor,
+        nedges: torch.Tensor,
+    ):
+        pos = pos.clone().requires_grad_(True)
+        z = atomic_numbers.long()
+        b = batch.long()
+        data = TensorData(
+            pos=pos,
+            atomic_numbers=z,
+            atomic_numbers_full=z,
+            cell=cell,
+            pbc=pbc,
+            edge_index=edge_index.long(),
+            cell_offsets=cell_offsets,
+            nedges=nedges.long(),
+            charge=charge.long(),
+            spin=spin.long(),
+            batch=b,
+            batch_full=b,
+            natoms=natoms.long(),
+            fixed=torch.zeros_like(z),
+            tags=torch.zeros_like(z),
+            dataset=[self.task_name],
+            sid=[""],
+        )
+        emb = self.backbone(data)
+        node_emb = emb["node_embedding"]
+        scalar = node_emb.narrow(1, 0, 1).squeeze(1)
+        node_e = self.efs.energy_block(scalar).reshape(-1).to(torch.float64)
+        B = natoms.shape[0]
+        energy_raw = torch.zeros(
+            B, dtype=torch.float64, device=node_e.device
+        ).index_add(0, b, node_e)
+        ref_sum = torch.zeros(
+            B, dtype=torch.float64, device=node_e.device
+        ).index_add(0, b, self.elem_refs.to(device=z.device)[z])
+        energy = energy_raw * self.e_rmsd + self.e_mean + ref_sum
+        (g,) = torch.autograd.grad(
+            energy_raw.sum(), pos, create_graph=False
+        )
+        forces = (-g).to(torch.float64) * self.f_rmsd + self.f_mean
+        return energy, forces
+
+
 def _settings():
     from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
 
@@ -481,6 +540,11 @@ def pack_example(atoms: Atoms, cutoff: float, device, dtype, max_neighbors: int 
     batch = torch.arange(B, dtype=torch.long,
                          device=device).repeat_interleave(n)
     natoms = torch.tensor([n] * B, dtype=torch.long, device=device)
+    if B > 1:
+        nedges = torch.tensor([np.asarray(edge_index).shape[1]] * B,
+                              dtype=torch.long, device=device)
+        return (pos, atomic_numbers, cell, pbc, ei, off, charge, spin,
+                batch, natoms, nedges)
     return (pos, atomic_numbers, cell, pbc, ei, off, charge, spin, batch, natoms)
 
 
@@ -556,6 +620,8 @@ def runtime_metadata(
         "batch",
         "natoms",
     ]
+    if len(example) > 10:
+        input_names.append("nedges")
     meta = {
         "cutoff": float(cutoff),
         "molecular_box": float(molecular_box),
@@ -780,7 +846,8 @@ def main() -> int:
     print(f"vesin edges={example[4].shape[1]} systems={trace_systems}",
           flush=True)
 
-    wrap = TensorUma(hydra, pred_unit=pred, task_name=task_name).to(device).eval()
+    wrap_cls = TensorUmaBatched if batch_max > 1 else TensorUma
+    wrap = wrap_cls(hydra, pred_unit=pred, task_name=task_name).to(device).eval()
     with torch.enable_grad():
         e_e, f_e = wrap(*example)
     ok_eager = compare_batched("eager+vesin", e_e.detach().cpu(), f_e.detach().cpu().numpy(), e_ref, f_ref, len(atoms))
@@ -822,15 +889,18 @@ def main() -> int:
     }
     if batch_max > 1:
         # Band batching: the system count is its own dynamic dim, so one
-        # call evaluates a whole same-composition band. Per-atom and
-        # per-edge dims already ride natoms/nedges.
-        nsys_dim = torch.export.Dim("nsystems", min=1, max=batch_max)
+        # call evaluates a whole same-composition band. fairchem's
+        # batched shift path requires B >= 2 (its B == 1 branch is a
+        # different graph), so the band package serves batches only and
+        # the C++ side pads a lone system to two.
+        nsys_dim = torch.export.Dim("nsystems", min=2, max=max(2, batch_max))
         dyn.update({
             "cell": {0: nsys_dim},
             "pbc": {0: nsys_dim},
             "charge": {0: nsys_dim},
             "spin": {0: nsys_dim},
             "natoms": {0: nsys_dim},
+            "nedges": {0: nsys_dim},
         })
     exported = None
     attempts = [
@@ -883,14 +953,16 @@ def main() -> int:
         print("FAIL: AOTI package does not match ASE", file=sys.stderr)
         return 4
     if batch_max > 1:
-        # The band contract: a single-system call through the same
-        # package must also hold (nsystems dim min is 1).
-        single = pack_example(atoms, cutoff, device, dtype, max_n)
-        e_1, f_1 = run_aoti(pkg, single)
-        if not compare_batched("aoti[B=1]", torch.as_tensor(e_1).cpu(),
-                               torch.as_tensor(f_1).cpu().numpy(),
+        # A batch size other than the traced one must also hold.
+        probe_b = min(3, batch_max)
+        multi = pack_example(atoms, cutoff, device, dtype, max_n,
+                             n_systems=probe_b)
+        e_m, f_m = run_aoti(pkg, multi)
+        if not compare_batched(f"aoti[B={probe_b}]",
+                               torch.as_tensor(e_m).cpu(),
+                               torch.as_tensor(f_m).cpu().numpy(),
                                e_ref, f_ref, len(atoms)):
-            print("FAIL: AOTI B=1 through batched package", file=sys.stderr)
+            print("FAIL: AOTI at non-traced batch size", file=sys.stderr)
             return 4
     print("WROTE", out.resolve())
     return 0
