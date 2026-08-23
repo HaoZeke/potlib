@@ -316,6 +316,25 @@ class TensorUma(nn.Module):
             if baked.dim() == 1:
                 baked = baked.unsqueeze(0)
             backbone.dataset_embedding = BakedDatasetEmbedding(baked)
+            # The baked embedding is one row; the charge embedding
+            # carries the (dynamic) system count, so the dataset row
+            # expands to it inside the graph. Overriding csd_embedding
+            # keeps fairchem untouched and the expansion symbolic.
+            import types
+
+            def _csd_batched(bself, charge, spin, dataset):
+                chg_emb = bself.charge_embedding(charge)
+                spin_emb = bself.spin_embedding(spin)
+                d_emb = bself.dataset_embedding.emb.to(chg_emb.dtype).expand(
+                    chg_emb.shape[0], -1
+                )
+                return torch.nn.SiLU()(
+                    bself.mix_csd(
+                        torch.cat((chg_emb, spin_emb, d_emb), dim=1)
+                    )
+                )
+
+            backbone.csd_embedding = types.MethodType(_csd_batched, backbone)
         efs = None
         for _name, head in hydra.output_heads.items():
             inner = getattr(head, "head", head)
