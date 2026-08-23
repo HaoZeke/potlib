@@ -24,29 +24,7 @@
 namespace rgpot {
 namespace {
 
-std::string read_file(const std::string &path) {
-  std::ifstream in(path);
-  if (!in)
-    return {};
-  std::ostringstream ss;
-  ss << in.rdbuf();
-  return ss.str();
-}
 
-double json_number(const std::string &text, const char *key, double fallback) {
-  const std::string pat = std::string("\"") + key + "\"";
-  const auto pos = text.find(pat);
-  if (pos == std::string::npos)
-    return fallback;
-  const auto colon = text.find(':', pos + pat.size());
-  if (colon == std::string::npos)
-    return fallback;
-  try {
-    return std::stod(text.substr(colon + 1));
-  } catch (...) {
-    return fallback;
-  }
-}
 
 bool ends_with(const std::string &s, const std::string &suf) {
   return s.size() >= suf.size() &&
@@ -186,26 +164,6 @@ void UmaPot::recomputeParamsKey() {
   m_paramsKey = fp.h;
 }
 
-void UmaPot::applySidecar() {
-  const std::string side = m_config.model_path.substr(
-                               0, m_config.model_path.size() - 4) +
-                           ".json";
-  const std::string meta = read_file(side);
-  if (meta.empty())
-    return;
-  m_impl->cutoff = json_number(meta, "cutoff", m_impl->cutoff);
-  // Molecular-box convention: the package was traced with the molecule
-  // re-centered in a synthetic L-cube and a cutoff below L/2, so every
-  // intramolecular pair is an edge and no periodic image ever is. The
-  // vesin edge count is then n(n-1) at every geometry, which is what a
-  // static-shape AOTI graph requires.
-  m_impl->molecular_box = json_number(meta, "molecular_box", 0.0);
-  m_impl->max_neighbors = static_cast<int>(json_number(
-      meta, "max_neighbors", static_cast<double>(m_impl->max_neighbors)));
-  if (meta.find("float64") != std::string::npos)
-    m_impl->dtype = torch::kFloat64;
-}
-
 void UmaPot::ensureLoaded() const {
   if (m_impl->loader)
     return;
@@ -213,8 +171,7 @@ void UmaPot::ensureLoaded() const {
   m_impl->loader =
       std::make_unique<torch::inductor::AOTIModelPackageLoader>(
           m_config.model_path);
-  // The package's own embedded metadata is authoritative; the JSON
-  // sidecar covers packages exported without it. One convention, one
+  // The package's embedded metadata is the runtime contract: one
   // producer (scripts/export_uma_aoti.py), the .pt2 self-describing.
   const auto meta = m_impl->loader->get_metadata();
   auto num = [&](const char *key, double fallback) {
@@ -252,7 +209,6 @@ UmaPot::UmaPot(const UmaConfig &config)
   m_impl->device = parse_device(m_config.device);
   m_impl->max_neighbors = m_config.max_neighbors;
   m_impl->cutoff = m_config.cutoff;
-  applySidecar();
   if (!(m_impl->cutoff > 0.0) || !std::isfinite(m_impl->cutoff))
     m_impl->cutoff = 6.0;
 }

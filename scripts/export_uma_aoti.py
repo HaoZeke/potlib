@@ -479,7 +479,7 @@ def patch_export_ops():
     print("patched Safeacos/Safeatan2/compute_energy for export", flush=True)
 
 
-def write_sidecar(
+def runtime_metadata(
     path: Path,
     cutoff: float,
     max_neighbors: int,
@@ -523,13 +523,6 @@ def write_sidecar(
         },
     }
     return meta
-
-
-def write_sidecar_file(path: Path, meta: dict):
-    side = Path(path).with_suffix(".json")
-    side.write_text(json.dumps(meta, indent=2) + "\n")
-    print("WROTE", side.resolve(), flush=True)
-    return side
 
 
 def _first_import(candidates):
@@ -597,7 +590,7 @@ def main() -> int:
     p.add_argument("--atoms", default=None, help="Structure (.xyz/.con). Default: Baker HCN.")
     p.add_argument("--charge", type=int, default=None, help="Total charge (default: atoms.info or 0)")
     p.add_argument("--spin", type=int, default=None, help="Spin multiplicity (default: atoms.info or 1)")
-    p.add_argument("--label", default=None, help="Sidecar / filename label (default: hcn or atoms path)")
+    p.add_argument("--label", default=None, help="Metadata / filename label (default: hcn or atoms path)")
     p.add_argument("--task", default="omol", help="FAIRChem task_name (default: omol)")
     p.add_argument("--out", default=None, help="Output .pt2 path")
     p.add_argument(
@@ -610,15 +603,6 @@ def main() -> int:
             "periodic image ever is, so the vesin edge count is n(n-1) at "
             "every geometry (what a static-shape AOTI graph requires). "
             "The runtime reads molecular_box back from the package metadata."
-        ),
-    )
-    p.add_argument(
-        "--sidecar",
-        action="store_true",
-        help=(
-            "Also write the legacy .json sidecar. The contract is embedded "
-            "in the .pt2 metadata; the sidecar only serves consumers of "
-            "packages minted without it."
         ),
     )
     p.add_argument("--skip-aoti", action="store_true")
@@ -691,7 +675,7 @@ def main() -> int:
             print(f"FAIL: --compare-only needs an existing .pt2: {out}", file=sys.stderr)
             return 4
         example = pack_example(atoms, cutoff, device, dtype, max_n)
-        meta = write_sidecar(
+        meta = runtime_metadata(
             out,
             cutoff,
             max_n,
@@ -704,8 +688,6 @@ def main() -> int:
             label=label,
             molecular_box=float(args.molecular_box or 0.0),
         )
-        if args.sidecar:
-            write_sidecar_file(out, meta)
         pkg = load_aoti(out)
         e_a, f_a = run_aoti(pkg, example)
         e_a = torch.as_tensor(e_a).detach().cpu()
@@ -738,7 +720,7 @@ def main() -> int:
     if not ok_eager:
         print("FAIL: eager tensor wrapper does not match ASE", file=sys.stderr)
         return 2
-    meta = write_sidecar(
+    meta = runtime_metadata(
         out,
         cutoff,
         max_n,
@@ -751,8 +733,6 @@ def main() -> int:
         label=label,
         molecular_box=float(args.molecular_box or 0.0),
     )
-    if args.sidecar:
-        write_sidecar_file(out, meta)
     if args.eager_only:
         return 0
 
