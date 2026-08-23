@@ -430,21 +430,52 @@ def ase_reference(atoms: Atoms, model: str, device: str, task_name: str = "omol"
     return e, f, pred
 
 
-def pack_example(atoms: Atoms, cutoff: float, device, dtype, max_neighbors: int | None = None):
+def pack_example(atoms: Atoms, cutoff: float, device, dtype, max_neighbors: int | None = None,
+                 n_systems: int = 1):
+    """Pack one geometry as a fairchem-convention input tuple.
+
+    n_systems > 1 replicates the geometry into a batch of independent
+    systems (shared composition, per-system cell/charge/spin/natoms and
+    offset edge lists): the tracing example for a band-batched export.
+    """
     pos_np = np.asarray(atoms.get_positions(), dtype=np.float64)
     cell_np = np.asarray(atoms.get_cell(), dtype=np.float64)
     edge_index, shifts = _vesin_edges(pos_np, cell_np, cutoff, max_neighbors=max_neighbors)
-    pos = torch.tensor(pos_np, dtype=dtype, device=device)
-    atomic_numbers = torch.tensor(atoms.get_atomic_numbers(), dtype=torch.long, device=device)
-    cell = torch.tensor(cell_np, dtype=dtype, device=device).unsqueeze(0)
-    pbc = torch.tensor([[True, True, True]], device=device)
-    ei = torch.tensor(edge_index, dtype=torch.long, device=device)
-    off = torch.tensor(shifts, dtype=dtype, device=device)
-    charge = torch.tensor([int(atoms.info.get("charge", 0))], dtype=torch.long, device=device)
-    spin = torch.tensor([int(atoms.info.get("spin", 1))], dtype=torch.long, device=device)
-    batch = torch.zeros(pos.shape[0], dtype=torch.long, device=device)
-    natoms = torch.tensor([pos.shape[0]], dtype=torch.long, device=device)
+    n = pos_np.shape[0]
+    B = max(1, int(n_systems))
+    pos = torch.tensor(np.tile(pos_np, (B, 1)), dtype=dtype, device=device)
+    atomic_numbers = torch.tensor(
+        np.tile(np.asarray(atoms.get_atomic_numbers()), B),
+        dtype=torch.long, device=device)
+    cell = torch.tensor(np.tile(cell_np[None, :, :], (B, 1, 1)),
+                        dtype=dtype, device=device)
+    pbc = torch.tensor([[True, True, True]] * B, device=device)
+    ei_np = np.concatenate(
+        [np.asarray(edge_index) + b * n for b in range(B)], axis=1)
+    ei = torch.tensor(ei_np, dtype=torch.long, device=device)
+    off = torch.tensor(np.tile(np.asarray(shifts), (B, 1)), dtype=dtype,
+                       device=device)
+    charge = torch.tensor([int(atoms.info.get("charge", 0))] * B,
+                          dtype=torch.long, device=device)
+    spin = torch.tensor([int(atoms.info.get("spin", 1))] * B,
+                        dtype=torch.long, device=device)
+    batch = torch.arange(B, dtype=torch.long,
+                         device=device).repeat_interleave(n)
+    natoms = torch.tensor([n] * B, dtype=torch.long, device=device)
     return (pos, atomic_numbers, cell, pbc, ei, off, charge, spin, batch, natoms)
+
+
+def compare_batched(tag: str, e, f, e_ref, f_ref, n: int,
+                    e_tol=1e-4, f_tol=1e-4) -> bool:
+    """Compare a batched output (B replicas of one geometry) against
+    the single-system reference, per subsystem."""
+    e_arr = np.atleast_1d(np.asarray(e, dtype=np.float64))
+    f_arr = np.asarray(f, dtype=np.float64).reshape(-1, 3)
+    ok = True
+    for b in range(e_arr.shape[0]):
+        ok &= compare(f"{tag}[{b}]", e_arr[b], f_arr[b * n:(b + 1) * n],
+                      e_ref, f_ref, e_tol, f_tol)
+    return ok
 
 
 def compare(tag: str, e, f, e_ref, f_ref, e_tol=1e-4, f_tol=1e-4) -> bool:
@@ -492,6 +523,7 @@ def runtime_metadata(
     z_set: list[int] | None = None,
     label: str = "hcn",
     molecular_box: float = 0.0,
+    batch_max: int = 0,
 ):
     input_names = [
         "pos",
@@ -514,6 +546,7 @@ def runtime_metadata(
         "spin": int(spin),
         "z_set": [int(z) for z in (z_set or [])],
         "label": str(label),
+        "batch_max": int(batch_max),
         "edge_convention": "fairchem_neighbor_center",
         "inputs": input_names,
         "outputs": ["energy", "forces"],
@@ -605,6 +638,16 @@ def main() -> int:
             "The runtime reads molecular_box back from the package metadata."
         ),
     )
+    p.add_argument(
+        "--batch-max",
+        type=int,
+        default=0,
+        help=(
+            "Trace with a dynamic system dimension so one AOTI call "
+            "evaluates up to this many same-composition geometries (a NEB "
+            "band in one graph call). 0 keeps the single-system export."
+        ),
+    )
     p.add_argument("--skip-aoti", action="store_true")
     p.add_argument("--eager-only", action="store_true")
     p.add_argument(
@@ -687,6 +730,7 @@ def main() -> int:
             z_set=z_set,
             label=label,
             molecular_box=float(args.molecular_box or 0.0),
+            batch_max=max(0, int(args.batch_max)),
         )
         pkg = load_aoti(out)
         e_a, f_a = run_aoti(pkg, example)
@@ -710,13 +754,17 @@ def main() -> int:
         print("FAIL: vesin AtomicData via MLIPPredictUnit does not match ASE", file=sys.stderr)
         return 2
 
-    example = pack_example(atoms, cutoff, device, dtype, max_n)
-    print(f"vesin edges={example[4].shape[1]}", flush=True)
+    batch_max = max(0, int(args.batch_max))
+    trace_systems = 2 if batch_max > 1 else 1
+    example = pack_example(atoms, cutoff, device, dtype, max_n,
+                           n_systems=trace_systems)
+    print(f"vesin edges={example[4].shape[1]} systems={trace_systems}",
+          flush=True)
 
     wrap = TensorUma(hydra, pred_unit=pred, task_name=task_name).to(device).eval()
     with torch.enable_grad():
         e_e, f_e = wrap(*example)
-    ok_eager = compare("eager+vesin", e_e.detach().cpu(), f_e.detach().cpu().numpy(), e_ref, f_ref)
+    ok_eager = compare_batched("eager+vesin", e_e.detach().cpu(), f_e.detach().cpu().numpy(), e_ref, f_ref, len(atoms))
     if not ok_eager:
         print("FAIL: eager tensor wrapper does not match ASE", file=sys.stderr)
         return 2
@@ -732,6 +780,7 @@ def main() -> int:
         z_set=z_set,
         label=label,
         molecular_box=float(args.molecular_box or 0.0),
+        batch_max=max(0, int(args.batch_max)),
     )
     if args.eager_only:
         return 0
@@ -752,6 +801,18 @@ def main() -> int:
         "batch": {0: natoms_dim},
         "natoms": None,
     }
+    if batch_max > 1:
+        # Band batching: the system count is its own dynamic dim, so one
+        # call evaluates a whole same-composition band. Per-atom and
+        # per-edge dims already ride natoms/nedges.
+        nsys_dim = torch.export.Dim("nsystems", min=1, max=batch_max)
+        dyn.update({
+            "cell": {0: nsys_dim},
+            "pbc": {0: nsys_dim},
+            "charge": {0: nsys_dim},
+            "spin": {0: nsys_dim},
+            "natoms": {0: nsys_dim},
+        })
     exported = None
     attempts = [
         ("dynamic-nonstrict", dict(dynamic_shapes=dyn, strict=False)),
@@ -785,7 +846,7 @@ def main() -> int:
     print("export ok", type(exported), flush=True)
     with torch.enable_grad():
         e_x, f_x = exported.module()(*example)
-    if not compare("exported", e_x.detach().cpu(), f_x.detach().cpu().numpy(), e_ref, f_ref):
+    if not compare_batched("exported", e_x.detach().cpu(), f_x.detach().cpu().numpy(), e_ref, f_ref, len(atoms)):
         print("FAIL: exported module does not match ASE", file=sys.stderr)
         return 3
 
@@ -799,9 +860,19 @@ def main() -> int:
     e_a, f_a = run_aoti(pkg, example)
     e_a = torch.as_tensor(e_a).detach().cpu()
     f_a = torch.as_tensor(f_a).detach().cpu().numpy()
-    if not compare("aoti", e_a, f_a, e_ref, f_ref):
+    if not compare_batched("aoti", e_a, f_a, e_ref, f_ref, len(atoms)):
         print("FAIL: AOTI package does not match ASE", file=sys.stderr)
         return 4
+    if batch_max > 1:
+        # The band contract: a single-system call through the same
+        # package must also hold (nsystems dim min is 1).
+        single = pack_example(atoms, cutoff, device, dtype, max_n)
+        e_1, f_1 = run_aoti(pkg, single)
+        if not compare_batched("aoti[B=1]", torch.as_tensor(e_1).cpu(),
+                               torch.as_tensor(f_1).cpu().numpy(),
+                               e_ref, f_ref, len(atoms)):
+            print("FAIL: AOTI B=1 through batched package", file=sys.stderr)
+            return 4
     print("WROTE", out.resolve())
     return 0
 
