@@ -1965,8 +1965,8 @@ struct MetatomicParams {
 # @struct UmaParams
 # @brief UMA / OMol AOTInductor backend arm, mirroring rgpot's UmaConfig so
 # model selection travels on the shared wire. The package is a per-composition
-# .pt2 export; the sidecar JSON beside it (molecular_box / cutoff / z_set)
-# stays authoritative for values it carries.
+# .pt2 export carrying its runtime contract (molecular_box / cutoff / z_set)
+# as embedded AOTI metadata, which stays authoritative for values it holds.
 struct UmaParams {
   modelPath    @0 :Text;          # AOTInductor .pt2 package path.
   taskName     @1 :Text = "omol"; # UMA task head.
