@@ -118,3 +118,79 @@ TEST_CASE("UmaPot Baker HCN matches ASE FAIRChem omol", "[UmaPot][omol]") {
   REQUIRE_THAT(energy, WithinAbs(kHcnAseOmolEnergy, 1e-4));
   REQUIRE_THAT(max_df, WithinAbs(0.0, 1e-4));
 }
+
+TEST_CASE("UmaPot band batch matches per-system evaluation",
+          "[UmaPot][omol][band]") {
+  // Needs a band package (exported with --batch-max) named beside the
+  // single-system fixture or via RGPOT_UMA_OMOL_BAND_PT2. Skipped when
+  // absent so the plain fixture suite stays runnable.
+  std::string band;
+  if (const char *env = std::getenv("RGPOT_UMA_OMOL_BAND_PT2"); env && *env) {
+    band = env;
+  }
+  if (band.empty() || !fs::exists(band)) {
+    SKIP("set RGPOT_UMA_OMOL_BAND_PT2 to a --batch-max export");
+  }
+
+  rgpot::UmaConfig cfg;
+  cfg.model_path = band;
+  cfg.device = "cpu";
+  cfg.task_name = "omol";
+  cfg.charge = 0;
+  cfg.spin = 1;
+  rgpot::UmaPot pot(cfg);
+
+  // Three HCN geometries: the reference row plus two perturbations.
+  const std::array<std::array<double, 9>, 3> geoms{{
+      {12.49734736216627162, 12.49892801474515913, 12.54059929828148512,
+       12.50115413363106498, 12.50036504272228832, 11.38209979880783251,
+       12.50149850420264563, 12.50069809648255514, 13.61514544631068446},
+      {12.53734736216627162, 12.49892801474515913, 12.54059929828148512,
+       12.50115413363106498, 12.54036504272228832, 11.38209979880783251,
+       12.50149850420264563, 12.50069809648255514, 13.57514544631068446},
+      {12.45734736216627162, 12.52892801474515913, 12.50059929828148512,
+       12.50115413363106498, 12.46036504272228832, 11.42209979880783251,
+       12.54149850420264563, 12.50069809648255514, 13.65514544631068446},
+  }};
+  const std::vector<int> atmtypes{6, 7, 1};
+  const std::array<double, 9> box{25.0, 0.0, 0.0, 0.0, 25.0, 0.0,
+                                  0.0, 0.0, 25.0};
+  const std::array<std::array<double, 3>, 3> box33{
+      {{25.0, 0.0, 0.0}, {0.0, 25.0, 0.0}, {0.0, 0.0, 25.0}}};
+
+  // Per-system reference through the public single-call entry (which
+  // pads through the band graph itself, so this also covers padding).
+  std::array<double, 3> e_single{};
+  std::array<std::array<double, 9>, 3> f_single{};
+  for (size_t s = 0; s < 3; ++s) {
+    AtomMatrix positions(3, 3);
+    for (int i = 0; i < 3; ++i)
+      for (int d = 0; d < 3; ++d)
+        positions(i, d) = geoms[s][static_cast<size_t>(3 * i + d)];
+    auto [energy, forces, variance] = pot(positions, atmtypes, box33);
+    (void)variance;
+    e_single[s] = energy;
+    for (int i = 0; i < 3; ++i)
+      for (int d = 0; d < 3; ++d)
+        f_single[s][static_cast<size_t>(3 * i + d)] = forces(i, d);
+  }
+
+  // One batched call over all three through the public batch entry.
+  std::vector<rgpot::ForceInput> in;
+  std::vector<rgpot::ForceOut> out;
+  std::array<std::array<double, 9>, 3> f_batch{};
+  for (size_t s = 0; s < 3; ++s) {
+    in.push_back(rgpot::ForceInput{3, geoms[s].data(), atmtypes.data(),
+                                   box.data()});
+    out.push_back(rgpot::ForceOut{f_batch[s].data(), 0.0, 0.0});
+  }
+  const rgpot::ForceBatch batch{3, in.data(), out.data()};
+  pot.forceBatch(batch);
+
+  for (size_t s = 0; s < 3; ++s) {
+    REQUIRE_THAT(out[s].energy, WithinAbs(e_single[s], 1e-8));
+    for (size_t k = 0; k < 9; ++k) {
+      REQUIRE_THAT(f_batch[s][k], WithinAbs(f_single[s][k], 1e-7));
+    }
+  }
+}
