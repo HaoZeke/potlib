@@ -85,6 +85,38 @@ RGPOT_ENGINE_API RgpotEnginePot *rgpot_engine_create(const void *config,
                                                      char *errbuf,
                                                      size_t errlen);
 
+/**
+ * Gate settings for a learning engine, passed as the config blob.
+ *
+ * INTERIM. The config arm is specified as a Cap'n Proto message and
+ * becomes GprParams once Potentials.capnp carries a nested
+ * PotentialSpec (rgpot-b7zw). Until then a learning engine has no way
+ * to be configured at all, which leaves certifyBelowForce at zero and
+ * so leaves a driver's convergence claim unbacked by ground truth --
+ * the one guarantee such an engine exists to provide. A fixed-layout
+ * struct with a magic word closes that hole without pretending to be
+ * capnp: an engine dispatches on the magic, so the capnp message can
+ * replace it later without either side guessing which it received.
+ */
+#define RGPOT_ENGINE_GPR_GATE_MAGIC 0x47505247u /* "GRPG" */
+#define RGPOT_ENGINE_GPR_GATE_VERSION 1u
+
+typedef struct {
+  unsigned magic;   /**< RGPOT_ENGINE_GPR_GATE_MAGIC */
+  unsigned version; /**< RGPOT_ENGINE_GPR_GATE_VERSION */
+  /** Answer from the model below this multiple of its likelihood noise. */
+  double sigmaLoFactor;
+  /** Above this multiple the geometry is not learned from. */
+  double sigmaHiFactor;
+  /** Predicted force magnitude under this (eV/Angstrom) forces a
+   *  ground-truth call, so a driver's convergence claim is checked
+   *  rather than trusted. Non-positive disables the certificate. */
+  double certifyBelowForce;
+  /** Refit cadence in training-set appends; zero refits at every
+   *  incorporation boundary. */
+  unsigned long long refitTrainingRevisions;
+} RgpotEngineGprGate;
+
 RGPOT_ENGINE_API void rgpot_engine_destroy(RgpotEnginePot *pot);
 
 /**
