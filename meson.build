@@ -128,9 +128,17 @@ if has_fortran
         dependencies: vesin_hdr_dep,
         pic: true,
     )
+    # vesin_dep, not vesin_hdr_dep: the Fortran wrapper calls vesin_free
+    # and vesin_neighbors_byref, so anything linking the wrapper needs the
+    # vesin objects too. Compile information alone is enough for the
+    # umbrella, which links vesin_dep separately, but not for an executable
+    # that pulls wrapper objects of its own -- a static archive linked into
+    # a shared library does not re-export what it resolved. Meson
+    # deduplicates the static link, so naming it here does not duplicate
+    # objects in the umbrella.
     vesin_f_dep = declare_dependency(
         link_with: vesin_fortran_lib,
-        dependencies: vesin_hdr_dep,
+        dependencies: vesin_dep,
         include_directories: vesin_fortran_lib.private_dir_include(),
     )
 endif
