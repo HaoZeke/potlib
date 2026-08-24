@@ -1977,6 +1977,66 @@ struct UmaParams {
   maxNeighbors @6 :Int32 = 0;     # <=0 keeps UmaConfig/sidecar value.
 }
 
+# @struct PotentialSpec
+# @brief One backend, named and configured, as a value that can be carried
+# inside another backend's configuration.
+#
+# Backend selection is otherwise a property of which engine library a host
+# dlopens, which works while a potential is a leaf. A learning surrogate is
+# not a leaf: it wraps an oracle and has to say which one and how it is
+# configured, so the choice has to travel on the wire rather than in the
+# host's loader. This is that value, one arm per params struct already in
+# this file.
+#
+# Purely additive: no existing field is renumbered, so a reader that does
+# not know this struct is unaffected.
+struct PotentialSpec {
+  union {
+    nwchem     @0 :NWChemParams;
+    cpmd       @1 :CPMDParams;
+    metatomic  @2 :MetatomicParams;
+    uma        @3 :UmaParams;
+    lammps     @4 :LammpsParams;
+    # Backends whose configuration is entirely a library path plus the
+    # geometry on ForceInput carry no params struct of their own.
+    builtin    @5 :BuiltinParams;
+  }
+}
+
+# @struct BuiltinParams
+# @brief Arm for backends configured by name alone (analytic potentials and
+# the dlopen-only engines), so PotentialSpec can name them without inventing
+# a params struct that would hold one field.
+struct BuiltinParams {
+  name @0 :Text;   # e.g. "lj", "cuh2", "xtb", "morse".
+  library @1 :Text = "";  # Optional explicit engine library path.
+}
+
+# @struct GprParams
+# @brief Learning-surrogate arm: a Gaussian process that answers where its
+# posterior is resolved and calls an oracle where it is not.
+#
+# The oracle is a nested PotentialSpec rather than a callback, so a host that
+# selects this backend does not also have to supply ground truth through a
+# side channel. That is the difference between an engine eOn can load and one
+# eOn can use: its GenericEngineLoader resolves create/destroy/force and never
+# calls set_callbacks, so an engine that expects its oracle by callback gets
+# none.
+#
+# The gate is two-sided and stated in multiples of the model's own likelihood
+# noise rather than in absolute energy, so it transfers across systems.
+struct GprParams {
+  oracle @0 :PotentialSpec;        # Ground truth. Required.
+  sigmaLoFactor @1 :Float64 = 1.0;  # Answer from the model below this * sigma.
+  sigmaHiFactor @2 :Float64 = 20.0; # Above this * sigma, do not learn the row.
+  # A predicted force magnitude under this (eV/Angstrom) forces a
+  # ground-truth call, so a driver's convergence claim is checked rather
+  # than trusted. Non-positive disables the certificate, which leaves a
+  # driver free to converge on the surrogate's own minimum.
+  certifyBelowForce @3 :Float64 = 0.0;
+  refitTrainingRevisions @4 :UInt64 = 5;  # Refit cadence in appends.
+}
+
 # @struct LammpsParams
 # @brief LAMMPS backend arm driving the lammpc dynlib shim.
 #
