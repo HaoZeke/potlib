@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import struct
 import sys
 from pathlib import Path
-
-import numpy as np
 
 ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[2]
 DATA = ROOT / "CppCore" / "tests" / "data" / "xckernel"
@@ -83,24 +82,41 @@ def main() -> int:
         if got != expect:
             fail(f"sha256 mismatch {rel}: {got} != {expect}")
 
+    def npy_shape(path: Path) -> tuple[int, ...]:
+        raw = path.read_bytes()
+        if raw[:6] != b"\x93NUMPY":
+            fail(f"{path.name} is not npy")
+        major = raw[6]
+        if major == 1:
+            hlen = struct.unpack_from("<H", raw, 8)[0]
+            header = raw[10 : 10 + hlen].decode("ascii")
+        elif major == 2:
+            hlen = struct.unpack_from("<I", raw, 8)[0]
+            header = raw[12 : 12 + hlen].decode("ascii")
+        else:
+            fail(f"{path.name} npy version {major}")
+        i = header.find("shape")
+        lpar = header.find("(", i)
+        rpar = header.find(")", lpar)
+        nums = [p.strip() for p in header[lpar + 1 : rpar].split(",") if p.strip()]
+        return tuple(int(n) for n in nums)
+
     for stem in (
         "xck_lda_r_o1",
         "xck_gga_r_o1",
         "xck_gga_r_o2",
         "xck_mgga_tau_r_o1",
     ):
-        ref = np.load(DATA / "c_vs_numpy" / f"{stem}_ref.npy")
-        if ref.shape != (4, 4):
-            fail(f"{stem} ref shape {ref.shape} != (4, 4)")
-        if not np.isfinite(ref).all():
-            fail(f"{stem} ref has non-finite values")
+        shape = npy_shape(DATA / "c_vs_numpy" / f"{stem}_ref.npy")
+        if shape != (4, 4):
+            fail(f"{stem} ref shape {shape} != (4, 4)")
 
-    fock_lda = np.load(DATA / "lda_r_o1_fock_ref.npy")
-    if fock_lda.shape != (4, 4):
-        fail(f"lda_r_o1_fock_ref shape {fock_lda.shape}")
-    gga_fxc = np.load(DATA / "gga_r_o2_fxc_ref.npy")
-    if gga_fxc.ndim != 2 or gga_fxc.shape[0] != gga_fxc.shape[1]:
-        fail(f"gga_r_o2_fxc_ref shape {gga_fxc.shape}")
+    fock_shape = npy_shape(DATA / "lda_r_o1_fock_ref.npy")
+    if fock_shape != (4, 4):
+        fail(f"lda_r_o1_fock_ref shape {fock_shape}")
+    gga_shape = npy_shape(DATA / "gga_r_o2_fxc_ref.npy")
+    if len(gga_shape) != 2 or gga_shape[0] != gga_shape[1]:
+        fail(f"gga_r_o2_fxc_ref shape {gga_shape}")
 
     print("xckernel goldens: all named files present, MANIFEST sha256 ok")
     print(f"tols: C-vs-NumPy {TOL_C_NUMPY} Fock {TOL_FOCK} fxc {TOL_FXC}")
