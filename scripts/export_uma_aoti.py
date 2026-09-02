@@ -591,6 +591,36 @@ def patch_export_ops():
     if inner is not None:
         outputs.compute_energy = inner
     print("patched Safeacos/Safeatan2/compute_energy for export", flush=True)
+    # Deterministic edge frames: the model's rotation frame per edge carries
+    # a random roll gamma (torch.rand_like in init_edge_rot_euler_angles).
+    # The network is equivariant in that roll, so any fixed roll is an
+    # equally valid gauge; a random one leaves a random op in the exported
+    # graph and the float32 output differs from run to run at rounding
+    # level. Fix the roll to zero (fixed roll gauge) in every module that
+    # bound the function by name.
+    def _euler_angles_fixed_roll(edge_distance_vec):
+        xyz = torch.nn.functional.normalize(edge_distance_vec).clamp(-1.0, 1.0)
+        x, y, z = torch.split(xyz, 1, dim=1)
+        beta = _acos(y.squeeze(-1))
+        alpha = _atan2(x.squeeze(-1), z.squeeze(-1))
+        gamma = torch.zeros_like(alpha)
+        return -gamma, -beta, -alpha
+    rot.init_edge_rot_euler_angles = _euler_angles_fixed_roll
+    import fairchem.core.models.uma.escn_md as escn_md
+    escn_md.init_edge_rot_euler_angles = _euler_angles_fixed_roll
+    print("patched init_edge_rot_euler_angles: fixed roll gauge", flush=True)
+    # The quaternion Wigner path (use_quaternion_wigner, the default) draws
+    # the same random roll with torch.rand inside axis_angle_wigner_hybrid.
+    # Route that module's torch.rand to zeros; every other torch attribute
+    # is forwarded unchanged.
+    import fairchem.core.models.uma.common.quaternion.wigner_d_hybrid as wdh
+    class _FixedRollTorch:
+        def __getattr__(self, name):
+            return getattr(torch, name)
+        def rand(self, *shape, **kwargs):
+            return torch.zeros(*shape, **kwargs)
+    wdh.torch = _FixedRollTorch()
+    print("patched axis_angle_wigner_hybrid: fixed roll gauge", flush=True)
 
 
 def runtime_metadata(

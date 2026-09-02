@@ -49,6 +49,8 @@ EdgeList vesin_fairchem_edges(const ForceInput &in, double cutoff,
                               int max_neighbors) {
   VesinOptions options{};
   vesin_compat::fill_neighbor_options(options, cutoff, /*full_list=*/true);
+  // One neighbor-list thread: the pair order then depends on the input alone.
+  vesin_compat::set_n_threads(options, 1);
   options.return_distances = true;
 
   VesinNeighborList nl{};
@@ -109,6 +111,19 @@ EdgeList vesin_fairchem_edges(const ForceInput &in, double cutoff,
   }
   vesin_free(&nl);
 
+  // Canonical edge order: the neighbor list may be assembled by several
+  // threads, so its pair order is not a function of the input. The model's
+  // float32 message-passing sums follow the edge order, so a run is
+  // reproducible only if this order is. Total order on (center, distance,
+  // neighbor, shift).
+  std::sort(keep.begin(), keep.end(), [](const Cand &a, const Cand &b) {
+    if (a.c != b.c) return a.c < b.c;
+    if (a.dist != b.dist) return a.dist < b.dist;
+    if (a.n != b.n) return a.n < b.n;
+    if (a.s0 != b.s0) return a.s0 < b.s0;
+    if (a.s1 != b.s1) return a.s1 < b.s1;
+    return a.s2 < b.s2;
+  });
   if (max_neighbors > 0) {
     std::vector<std::vector<size_t>> by_center(in.nAtoms);
     for (size_t k = 0; k < keep.size(); ++k)
@@ -519,7 +534,7 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
 
     std::lock_guard<std::mutex> lock(m_impl->mutex);
     c10::InferenceMode guard;
-    auto outputs = m_impl->loader->run(inputs);
+  auto outputs = m_impl->loader->run(inputs);
     if (outputs.size() < 2)
       throw std::runtime_error("UmaPot: AOTI package returned <2 tensors");
     auto energies = outputs[0].to(torch::kFloat64).cpu().contiguous();
