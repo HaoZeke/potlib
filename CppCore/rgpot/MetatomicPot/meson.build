@@ -30,7 +30,7 @@ if has_metatomic
     metatomicpot = static_library(
         'metatomicpot',
         'MetatomicPot.cc',
-        dependencies: _deps,
+        dependencies: _deps + _mta_engine_deps,
         cpp_args: _args + ['-DRGPOT_METATOMIC_LINKED=1'],
         include_directories: _incdirs + [mta_inc],
         pic: true,
@@ -81,7 +81,7 @@ if has_metatomic
             'MetatomicPot.cc',
             'MetatomicEngineAbi.cc',
         ],
-        dependencies: _deps + [dl_dep, vesin_dep],
+        dependencies: _deps + _mta_engine_deps + [dl_dep, vesin_dep],
         cpp_args: _args + ['-DRGPOT_MTA_ENGINE_BUILD'],
         # No link_with: _linkto — engine must not NEEDED host pot libs
         include_directories: _incdirs + [mta_inc],
