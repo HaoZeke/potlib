@@ -26,10 +26,9 @@ namespace rgpot {
  *
  * First slice (rgpot-chjn): families lda, gga, mgga_tau; max_order 2
  * (Fock o1 + fxc o2). TDA/RPA sigma assembly uses the singlet
- * spin-adapted o2 kernels (`xck_*_st_o2_p`) instantiated at long
- * double, plus host Coulomb. Dispatch is by kernel name; scalar
- * operand order is read from <name>_scal_names / <name>_n_scal, not
- * hard-coded.
+ * spin-adapted o2 kernels (`xck_*_st_o2_p`) plus host Coulomb.
+ * Dispatch is by kernel name; scalar operand order is read from
+ * <name>_scal_names / <name>_n_scal, not hard-coded.
  *
  * Each XcKernel instance is a name + resolved ABI pointers. The C kernels
  * are reentrant on distinct out/scal buffers. Do not share one `out`
@@ -124,7 +123,6 @@ public:
 
   /// TDA sigma with host Coulomb: v1 = vj + 0.5 * applyFxc(dm(z)).
   /// vj is the host J matrix on the transition DM (nao*nao).
-  /// fxc is the long-double `st_o2_p` template, not the double C ABI.
   int tdaSigma(const XcGrid &grid,
                const std::map<std::string, const double *> &ground,
                const XcMo &mo, const double *z, const double *vj,
