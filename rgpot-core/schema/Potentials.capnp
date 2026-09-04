@@ -2369,6 +2369,41 @@ struct NWChemCdftSpec {
   }
 }
 
+# @struct ExprTerm
+# @brief One named child in an ExprParams composition tree.
+#
+# `name` is the Lepton identifier for this child's energy. `pot` is a
+# recursive PotSpec so an expression can nest another expression.
+# This tree is not a PotentialConfig arm.
+struct ExprTerm {
+  name @0 :Text;
+  pot  @1 :PotSpec;
+}
+
+# @struct ExprParams
+# @brief Expression string plus named PotSpec terms.
+#
+# RPC/config naming for compositions such as 0.5*lj + d3. The C++
+# ExprPot constructor is the first-slice API.
+struct ExprParams {
+  expression @0 :Text;
+  terms      @1 :List(ExprTerm);
+}
+
+# @struct PotSpec
+# @brief Recursive composition spec.
+#
+# `expr` nests another ExprParams. `none` is an unnamed child slot so a
+# term can carry a name (lj, d3) before that pot grows a config struct.
+# Leaf arms land on this union when those pots grow config structs.
+# Not a PotentialConfig union arm. Cap'n Proto unions need two members.
+struct PotSpec {
+  union {
+    expr @0 :ExprParams;
+    none @1 :Void;
+  }
+}
+
 # @struct PotentialConfig
 # @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
 #

@@ -1,1 +1,1 @@
-ExprPot compiles a Lepton energy string over named ``unique_ptr<PotentialBase>`` children (``-Dwith_expr=true``). Construct-time name checks fail closed. No SumPot, no PotentialConfig arm, no XcKernel term.
+ExprPot compiles a Lepton energy string over named ``unique_ptr<PotentialBase>`` children (``-Dwith_expr=true``). Construct-time name checks fail closed. No scale-list type, no PotentialConfig arm, no XcKernel term.

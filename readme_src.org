@@ -26,6 +26,8 @@ the XC kernel.
 =ExprPot= (meson =-Dwith_expr=true=) compiles a Lepton energy string over
 named child =Potential= objects. The parser is vendored OpenMM Lepton;
 there is no pixi muparser feature and no =PotentialConfig.expr= arm.
+RPC/config names the tree as recursive =ExprParams= / =PotSpec=; the C++
+constructor is the first-slice API.
 
 The public wire schema lives in ~CppCore/rgpot/rpc/Potentials.capnp~ and is
 shared by the C++ server, Python integration tests, and the Rust core crate.
@@ -111,7 +113,7 @@ ctest --test-dir build_client --output-on-failure
 | =TBLitePot= | =TBLite=, =TBLiteGFN1=, =TBLiteIPEA1= | Enable with =-Dwith_tblite=true=; use pixi env =tblitebld= or =tbbld= |
 | =D3Pot= | =D3= | In-process Potential summand. Enable with =-Dwith_dftd3=true=; use pixi env =dftd3= or =dftd=. BJ/zero damping, functional key, explicit ATM flag. No =PotentialConfig.d3=. Goldens: =meson test --suite dftd= |
 | =D4Pot= | =D4= | In-process Potential summand. Enable with =-Dwith_dftd4=true=; use pixi env =dftd4= or =dftd=. Functional key, charge, explicit ATM/many-body flag. No =PotentialConfig.d4=. Goldens: =meson test --suite dftd= |
-| =ExprPot= | in-process | Enable with =-Dwith_expr=true=. Vendored OpenMM Lepton (no pixi muparser). Named =Potential= children; construct-time fail-closed names. No =PotentialConfig.expr=. |
+| =ExprPot= | in-process | Enable with =-Dwith_expr=true=. Vendored OpenMM Lepton (no pixi muparser). Named =Potential= children; construct-time fail-closed names. No =PotentialConfig.expr=. Wire tree is =ExprParams= / =PotSpec=; C++ constructor is the first-slice API. |
 | =MetatomicPot= | =Metatomic:<model_path>= | Enable with =-Dwith_metatomic=true=; use pixi env =metatomicbld=. Pip engines: torch 2.7+ |
 | =NWChemPot= | =NWChem= | Frontend always builds; load =libnwchemc= from the split =nwchemc= project at runtime |
 | =CPMDPot= | =CPMD= | Frontend always builds; load =libcpmdc= from the split =cpmdc= project at runtime |
@@ -211,6 +213,7 @@ pixi r prek-install
 pixi r prek
 pixi r rust-test
 pixi r -e rpctest python tests/test_cpmd_params.py
+pixi r -e rpctest python tests/test_expr_params.py
 pixi r -e rpctest python tests/test_nwchem_params.py
 pixi r -e rpctest python tests/test_rpc_integ_cpmd.py
 pixi r -e rpctest python tests/test_rpc_integ_nwchem.py

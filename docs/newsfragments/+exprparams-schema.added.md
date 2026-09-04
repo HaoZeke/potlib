@@ -1,0 +1,1 @@
+Recursive ``ExprTerm`` / ``ExprParams`` / ``PotSpec`` names compositions such as ``0.5*lj + d3`` on the wire. ``PotentialConfig`` stays a single-backend configure union. The C++ ``ExprPot`` constructor is the first-slice API.

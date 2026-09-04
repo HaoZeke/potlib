@@ -4,25 +4,29 @@
 
 * Compose potentials with ExprPot
 
-=ExprPot= (meson =-Dwith_expr=true=) compiles an energy string over named
-child =Potential= objects with vendored OpenMM Lepton.
+=ExprPot= (meson =-Dwith_expr=true=) compiles an energy string over named child
+=Potential= objects with vendored OpenMM Lepton.
 There is no pixi muparser feature.
 One =ExprPot= is one =Potential=, so
-=PotentialHandle::from_impl= / =rgpot_potential_new_eindir= makes that
-one eindir objective for rgmin, rgsaddle, and anneal.
+=PotentialHandle::from_impl= / =rgpot_potential_new_eindir= makes that one
+eindir objective for rgmin, rgsaddle, and anneal.
 See [[file:eindir-anneal.org][rgpot potentials as eindir objectives]].
 
 There is no =PotentialConfig.expr= arm.
 Composition is the C++ constructor, not a wire =configure= union.
+RPC/config can name the same tree as recursive =ExprParams= / =PotSpec= (for
+example =0.5*lj + d3=) without flattening a list onto =PotentialConfig=.
+
+The C++ constructor is the first-slice API.
 
 ** Named terms
 
 The constructor takes an energy string and a
-=std::vector<rgpot::ExprPot::Term>=, where
-=Term= is =std::pair<std::string, std::unique_ptr<PotentialBase>>=.
+=std::vector<rgpot::ExprPot::Term>=, where =Term= is
+=std::pair<std::string, std::unique_ptr<PotentialBase>>=.
 Each name in the string is that child's energy.
-=0.5*lj + morse= means half the Lennard-Jones energy plus the Morse
-energy on the same geometry.
+=0.5*lj + morse= means half the Lennard-Jones energy plus the Morse energy on
+the same geometry.
 
 #+begin_src cpp
 #include "rgpot/ExprPot/ExprPot.hpp"
@@ -50,8 +54,8 @@ rgpot::ExprPot pot("0.5*lj + d3", std::move(terms));
 
 ** Lepton identifier grammar
 
-A term name must be a Lepton identifier: an ASCII letter or underscore
-first, then ASCII letters, digits, or underscores.
+A term name must be a Lepton identifier: an ASCII letter or underscore first,
+then ASCII letters, digits, or underscores.
 =lj=, =morse=, and =d3= are valid.
 =1lj=, =lj-x=, and =lj.x= are not.
 
@@ -81,7 +85,6 @@ There is no finite-difference force path.
 ** What is a term
 
 Terms are =unique_ptr<PotentialBase>= only.
-=D3Pot= and =D4Pot= are ordinary children (enable =-Dwith_dftd3= /
-=-Dwith_dftd4=).
-=XcKernel= is not a term: it is in-process XC collocation, not a
-=Potential=.
+=D3Pot= and =D4Pot= are ordinary children (enable
+=-Dwith_dftd3= / =-Dwith_dftd4=).
+=XcKernel= is not a term: it is in-process XC collocation, not a =Potential=.

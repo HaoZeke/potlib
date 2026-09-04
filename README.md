@@ -32,6 +32,8 @@ the XC kernel.
 `ExprPot` (meson `-Dwith_expr=true`) compiles a Lepton energy string over
 named child `Potential` objects. The parser is vendored OpenMM Lepton;
 there is no pixi muparser feature and no `PotentialConfig.expr` arm.
+RPC/config names the tree as recursive `ExprParams` / `PotSpec`; the C++
+constructor is the first-slice API.
 
 The public wire schema lives in `CppCore/rgpot/rpc/Potentials.capnp` and is
 shared by the C++ server, Python integration tests, and the Rust core crate.
@@ -161,7 +163,7 @@ RPC client types:
 <tr>
 <td class="org-left"><code>ExprPot</code></td>
 <td class="org-left">in-process</td>
-<td class="org-left">Enable with <code>-Dwith_expr=true</code>. Vendored OpenMM Lepton (no pixi muparser). Named <code>Potential</code> children; construct-time fail-closed names. No <code>PotentialConfig.expr</code>.</td>
+<td class="org-left">Enable with <code>-Dwith_expr=true</code>. Vendored OpenMM Lepton (no pixi muparser). Named <code>Potential</code> children; construct-time fail-closed names. No <code>PotentialConfig.expr</code>. Wire tree is <code>ExprParams</code> / <code>PotSpec</code>; C++ constructor is the first-slice API.</td>
 </tr>
 
 <tr>
@@ -192,17 +194,17 @@ one `ExprPot` as one eindir objective for rgmin, rgsaddle, and anneal.
     #include "rgpot/LennardJones/LJPot.hpp"
     #include "rgpot/Morse/MorsePot.hpp"
     #include "rgpot/types/AtomMatrix.hpp"
-    
+
     #include <array>
     #include <memory>
     #include <vector>
-    
+
     int main() {
       std::vector<rgpot::ExprPot::Term> terms;
       terms.emplace_back("lj", std::make_unique<rgpot::LJPot>());
       terms.emplace_back("morse", std::make_unique<rgpot::MorsePot>());
       rgpot::ExprPot pot("0.5*lj + morse", std::move(terms));
-    
+
       rgpot::types::AtomMatrix positions{{1.0, 2.0, 3.0}, {1.5, 2.5, 3.5}};
       std::vector<int> atomTypes{0, 0};
       std::array<std::array<double, 3>, 3> box{{
@@ -276,6 +278,7 @@ Common commands:
     pixi r prek
     pixi r rust-test
     pixi r -e rpctest python tests/test_cpmd_params.py
+    pixi r -e rpctest python tests/test_expr_params.py
     pixi r -e rpctest python tests/test_nwchem_params.py
     pixi r -e rpctest python tests/test_rpc_integ_cpmd.py
     pixi r -e rpctest python tests/test_rpc_integ_nwchem.py
@@ -299,4 +302,3 @@ MIT, with backend-specific notes:
 some potentials are adapted from eOn under BSD-3-Clause terms.
 The unit expression parser in `CppCore/rgpot/units.cc` is derived from
 metatomic-torch (BSD-3-Clause, metatensor developers).
-
