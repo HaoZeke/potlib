@@ -248,6 +248,23 @@ if get_option('with_xtb')
     has_xtb = true
 endif
 
+# s-dftd3 / dftd4 C libs (pkg-config). Potential wrappers are out of scope here.
+has_dftd3 = false
+if get_option('with_dftd3')
+    dftd3_dep = dependency('s-dftd3', required: true)
+    _deps += dftd3_dep
+    _args += ['-DRGPOT_HAS_DFTD3=TRUE']
+    has_dftd3 = true
+endif
+
+has_dftd4 = false
+if get_option('with_dftd4')
+    dftd4_dep = dependency('dftd4', required: true)
+    _deps += dftd4_dep
+    _args += ['-DRGPOT_HAS_DFTD4=TRUE']
+    has_dftd4 = true
+endif
+
 has_xckernel = false
 if get_option('with_xckernel')
     _args += ['-DRGPOT_HAS_XCKERNEL=TRUE']
