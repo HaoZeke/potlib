@@ -465,13 +465,18 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
 
     Replay committed MOs when `{fam}_mo.npz` exists so live gen_vind is
     the same SCF as the pin. A fresh RKS kernel on the same mol/xc
-    already drifts past exclusive 1e-17. Returns True when any live
-    sigma exceeded the exclusive bar vs the previous pin.
+    already drifts past exclusive 1e-17. Pin PySCF to one OpenMP thread:
+    multi-thread gen_vind / gen_tdhf_operation jitters 1-2 ulp, which is
+    already past exclusive 1e-17 on this sto-3g case. Returns True when
+    any live sigma exceeded the exclusive bar vs the previous pin.
     """
     from pyscf import dft as dft_mod
     from pyscf import gto
+    from pyscf import lib as pyscf_lib
     from pyscf.dft import numint as ni_mod
     from pyscf.tdscf.rhf import gen_tdhf_operation
+
+    pyscf_lib.num_threads(1)
 
     if mol is None:
         mol = gto.M(
