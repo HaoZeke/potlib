@@ -4,10 +4,10 @@
 #include "rgpot/ExprPot/ExprPot.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
-#include <cstring>
+#include <map>
 #include <set>
 #include <stdexcept>
 #include <string_view>
@@ -17,7 +17,6 @@
 #include "lepton/Exception.h"
 
 #include "rgpot/ParamHash.hpp"
-#include "rgpot/types/AtomMatrix.hpp"
 
 namespace rgpot {
 namespace {
@@ -61,7 +60,8 @@ struct ExprPot::Impl {
   struct NamedChild {
     std::string name;
     std::unique_ptr<PotentialBase> child;
-    double *var = nullptr;
+    double energyValue = 0.0;
+    Lepton::CompiledExpression dEnergy;
   };
 
   std::string expression;
@@ -71,8 +71,13 @@ struct ExprPot::Impl {
   PotCaps caps{};
 
   void bindVars() {
+    std::map<std::string, double *> locs;
     for (auto &term : terms) {
-      term.var = &energy.getVariableReference(term.name);
+      locs[term.name] = &term.energyValue;
+    }
+    energy.setVariableLocations(locs);
+    for (auto &term : terms) {
+      term.dEnergy.setVariableLocations(locs);
     }
   }
 };
@@ -100,8 +105,9 @@ ExprPot::ExprPot(std::string expression, std::vector<Term> terms)
     if (!term.second) {
       throw std::invalid_argument("ExprPot term '" + term.first + "' is null");
     }
-    m_impl->terms.push_back(Impl::NamedChild{std::move(term.first),
-                                             std::move(term.second), nullptr});
+    m_impl->terms.push_back(
+        Impl::NamedChild{std::move(term.first), std::move(term.second), 0.0,
+                         Lepton::CompiledExpression{}});
   }
 
   Lepton::ParsedExpression parsed;
@@ -130,6 +136,16 @@ ExprPot::ExprPot(std::string expression, std::vector<Term> terms)
     if (seen.find(var) == seen.end()) {
       throw std::invalid_argument("ExprPot identifier '" + var +
                                   "' has no term");
+    }
+  }
+
+  for (auto &term : m_impl->terms) {
+    try {
+      term.dEnergy =
+          parsed.differentiate(term.name).createCompiledExpression();
+    } catch (const Lepton::Exception &ex) {
+      throw std::invalid_argument(std::string("ExprPot differentiate('") +
+                                  term.name + "') failed: " + ex.what());
     }
   }
 
@@ -178,29 +194,39 @@ void ExprPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   out->energy = 0.0;
   out->variance = 0.0;
 
-  types::AtomMatrix positions(in.nAtoms, 3);
-  if (in.nAtoms > 0 && in.pos != nullptr) {
-    std::memcpy(positions.data(), in.pos, n3 * sizeof(double));
-  }
-  std::vector<int> atmtypes;
-  if (in.atmnrs != nullptr) {
-    atmtypes.assign(in.atmnrs, in.atmnrs + static_cast<std::ptrdiff_t>(in.nAtoms));
-  } else {
-    atmtypes.assign(in.nAtoms, 0);
-  }
-  std::array<std::array<double, 3>, 3> box{};
-  if (in.box != nullptr) {
-    std::memcpy(&box, in.box, sizeof(box));
+  const size_t nTerms = m_impl->terms.size();
+  std::vector<double> childForces(nTerms * n3, 0.0);
+  std::vector<double> childVars(nTerms, 0.0);
+  for (size_t i = 0; i < nTerms; ++i) {
+    auto &term = m_impl->terms[i];
+    ForceOut childOut{.F = n3 == 0 ? nullptr : childForces.data() + i * n3,
+                      .energy = 0.0,
+                      .variance = 0.0};
+    ForceBatch batch{.nSystems = 1, .in = &in, .out = &childOut};
+    term.child->forceBatch(batch);
+    term.energyValue = childOut.energy;
+    childVars[i] = childOut.variance;
   }
 
-  for (auto &term : m_impl->terms) {
-    auto [energy, forces, variance] =
-        (*term.child)(positions, atmtypes, box);
-    (void)forces;
-    (void)variance;
-    *term.var = energy;
-  }
   out->energy = m_impl->energy.evaluate();
+
+  double accVar = 0.0;
+  bool allFiniteVar = true;
+  for (size_t i = 0; i < nTerms; ++i) {
+    const double weight = m_impl->terms[i].dEnergy.evaluate();
+    if (out->F != nullptr && n3 > 0) {
+      const double *Fi = childForces.data() + i * n3;
+      for (size_t k = 0; k < n3; ++k) {
+        out->F[k] += weight * Fi[k];
+      }
+    }
+    if (!std::isfinite(childVars[i])) {
+      allFiniteVar = false;
+    } else {
+      accVar += weight * childVars[i];
+    }
+  }
+  out->variance = allFiniteVar ? accVar : 0.0;
 }
 
 PotCaps ExprPot::caps() const noexcept { return m_impl->caps; }
@@ -209,6 +235,15 @@ uint64_t ExprPot::paramsKey() const noexcept { return m_impl->paramsKey; }
 
 const std::string &ExprPot::expression() const noexcept {
   return m_impl->expression;
+}
+
+double ExprPot::dEnergyDTerm(const std::string &name) const {
+  for (const auto &term : m_impl->terms) {
+    if (term.name == name) {
+      return term.dEnergy.evaluate();
+    }
+  }
+  throw std::invalid_argument("ExprPot name '" + name + "' is not a term");
 }
 
 } // namespace rgpot
