@@ -77,6 +77,29 @@ if [[ -n "$LIBS" ]]; then
     cp -f "$real" "$LIBS/librgpot.so"
     echo "soname copies $(basename "$real") -> librgpot.so.3 + librgpot.so"
   fi
+  # Vendor s-dftd3 / dftd4 (and their C deps) next to librgpot so the
+  # installed wheel does not need LD_LIBRARY_PATH or conda.
+  IFS=':' read -r -a _prefs <<< "${CMAKE_PREFIX_PATH:-}:/tmp/rgpot-dftd"
+  for p in "${_prefs[@]}"; do
+    [[ -n "$p" ]] || continue
+    for d in "$p/lib" "$p/lib64"; do
+      [[ -d "$d" ]] || continue
+      while IFS= read -r -d '' src; do
+        cp -a "$src" "$LIBS/"
+        echo "vendor $(basename "$src") -> $(basename "$LIBS")"
+        if command -v patchelf >/dev/null; then
+          patchelf --set-rpath '$ORIGIN' "$LIBS/$(basename "$src")" 2>/dev/null || true
+        fi
+      done < <(find "$d" -maxdepth 1 \( -type f -o -type l \) \( \
+        -name 'libs-dftd3.so*' -o -name 'libdftd4.so*' -o \
+        -name 'libmctc-lib.so*' -o -name 'libtoml-f.so*' -o \
+        -name 'libmulticharge.so*' -o \
+        -name 'libs-dftd3*.dylib' -o -name 'libdftd4*.dylib' -o \
+        -name 'libmctc-lib*.dylib' -o -name 'libtoml-f*.dylib' -o \
+        -name 'libmulticharge*.dylib' \
+      \) -print0 2>/dev/null)
+    done
+  done
 fi
 
 bad=0
