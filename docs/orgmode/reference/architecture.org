@@ -209,6 +209,8 @@ Forces are analytic chain-rule weights from
 =D3Pot= / =D4Pot= are ordinary children.
 =XcKernel= is not a term.
 There is no =PotentialConfig.expr= arm.
+The C++ constructor is the first-slice API; RPC/config names the same
+tree as recursive =ExprParams= / =PotSpec=.
 =PotentialHandle::from_impl= / =rgpot_potential_new_eindir= wraps one
 =ExprPot= as one eindir objective.
 
