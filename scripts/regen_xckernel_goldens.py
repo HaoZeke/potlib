@@ -558,9 +558,8 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> None:
         if z_path.exists():
             zs = np.load(z_path)
         save_npy(z_path, zs)
-        tda_dms = np.array(
-            [2.0 * (Cv @ z.T @ Co.T) for z in zs], dtype=np.float64
-        )
+        # Same contraction as TDA.gen_vind: einsum('xov,pv,qo->xpq', z, Cv, Co*2)
+        tda_dms = np.einsum("xov,pv,qo->xpq", zs, Cv, Co * 2.0)
         save_npy(
             dest / f"tda_{fam}_j.npy",
             np.ascontiguousarray(mf_x.get_j(mol, tda_dms, hermi=0)),
@@ -573,10 +572,10 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> None:
         if xy_path.exists():
             xys = np.load(xy_path)
         save_npy(xy_path, xys)
-        rpa_dms = np.array(
-            [2.0 * (Cv @ x.T @ Co.T + Co @ y @ Cv.T) for x, y in xys],
-            dtype=np.float64,
-        )
+        # Same contraction as gen_tdhf_operation (X then Y).
+        xs, ys = xys[:, 0], xys[:, 1]
+        rpa_dms = np.einsum("xov,pv,qo->xpq", xs, Cv, Co * 2.0)
+        rpa_dms = rpa_dms + np.einsum("xov,qv,po->xpq", ys, Cv, Co * 2.0)
         save_npy(
             dest / f"rpa_{fam}_j.npy",
             np.ascontiguousarray(mf_x.get_j(mol, rpa_dms, hermi=0)),

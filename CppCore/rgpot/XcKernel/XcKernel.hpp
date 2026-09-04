@@ -93,16 +93,15 @@ public:
   [[nodiscard]] static XcFields fieldsFromDensity(const XcGrid &grid,
                                                   const double *P);
 
-  /// dm = occ * Cv @ z^T @ Co^T  (nao*nao). z is (nocc, nvir).
+  /// dm = einsum('ov,pv,qo->pq', z, Cv, Co*occ). Matches PySCF gen_vind.
   static void transitionDm(const XcMo &mo, const double *z, double occ,
                            double *dm);
 
-  /// dm = occ * (Cv @ X^T @ Co^T + Co @ Y @ Cv^T).
+  /// dm = einsum X plus einsum('ov,qv,po->pq', y, Cv, Co*occ).
   static void rpaTransitionDm(const XcMo &mo, const double *x, const double *y,
                               double occ, double *dm);
 
-  /// ov = Co^T @ Vao^T @ Cv  (nocc*nvir). Matches PySCF
-  /// einsum('pq,qo,pv->ov', V, Co, Cv).
+  /// ov = einsum('pq,qo,pv->ov', V, Co, Cv) == (V @ Co)^T @ Cv.
   static void projectOv(const XcMo &mo, const double *Vao, double *ov);
 
   /// (A z)_ia = e_ia z_ia + (Co^T @ v1^T @ Cv)_ia. v1 is AO (nao*nao).

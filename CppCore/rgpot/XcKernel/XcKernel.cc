@@ -151,9 +151,32 @@ XcFields XcKernel::fieldsFromDensity(const XcGrid &grid, const double *P) {
 
 namespace {
 
-using Ld = long double;
-
 #ifdef RGPOT_HAS_XCKERNEL
+// out = dm @ ao with ao laid out (nbf, npts), matching NumPy / PySCF eval_rho.
+void gemm_dm_ao(const double *dm, const double *ao, std::size_t nbf,
+                std::size_t npts, double *out) {
+  for (std::size_t u = 0; u < nbf; ++u) {
+    for (std::size_t g = 0; g < npts; ++g) {
+      double acc = 0.0;
+      for (std::size_t v = 0; v < nbf; ++v) {
+        acc += dm[u * nbf + v] * ao[v * npts + g];
+      }
+      out[u * npts + g] = acc;
+    }
+  }
+}
+
+void contract_rho(const double *left, const double *right, std::size_t nbf,
+                  std::size_t npts, double *rho) {
+  for (std::size_t g = 0; g < npts; ++g) {
+    double acc = 0.0;
+    for (std::size_t u = 0; u < nbf; ++u) {
+      acc += left[u * npts + g] * right[u * npts + g];
+    }
+    rho[g] = acc;
+  }
+}
+
 int apply_fxc_d(const XcKernel &k, const XcGrid &grid,
                 const std::map<std::string, const double *> &ground,
                 const double *dm, double *vxc) {
@@ -166,44 +189,40 @@ int apply_fxc_d(const XcKernel &k, const XcGrid &grid,
     return 2;
   }
 
-  std::vector<Ld> rho_ld(ng, 0.0L);
-  std::vector<Ld> gx(ng, 0.0L);
-  std::vector<Ld> gy(ng, 0.0L);
-  std::vector<Ld> gz(ng, 0.0L);
   const double *chi = grid.chi;
   const double *dchi = grid.dchi;
-  for (std::size_t u = 0; u < nbf; ++u) {
-    for (std::size_t v = 0; v < nbf; ++v) {
-      const Ld Puv = dm[u * nbf + v];
-      const double *chi_u = chi + u * ng;
-      const double *chi_v = chi + v * ng;
-      for (std::size_t g = 0; g < ng; ++g) {
-        rho_ld[g] += Puv * chi_u[g] * chi_v[g];
-      }
-      if (dchi != nullptr) {
-        const double *dx_u = dchi + (0 * nbf + u) * ng;
-        const double *dy_u = dchi + (1 * nbf + u) * ng;
-        const double *dz_u = dchi + (2 * nbf + u) * ng;
-        const double *dx_v = dchi + (0 * nbf + v) * ng;
-        const double *dy_v = dchi + (1 * nbf + v) * ng;
-        const double *dz_v = dchi + (2 * nbf + v) * ng;
-        for (std::size_t g = 0; g < ng; ++g) {
-          gx[g] += Puv * (dx_u[g] * chi_v[g] + chi_u[g] * dx_v[g]);
-          gy[g] += Puv * (dy_u[g] * chi_v[g] + chi_u[g] * dy_v[g]);
-          gz[g] += Puv * (dz_u[g] * chi_v[g] + chi_u[g] * dz_v[g]);
-        }
-      }
-    }
-  }
+  std::vector<double> tmp(nbf * ng, 0.0);
+  gemm_dm_ao(dm, chi, nbf, ng, tmp.data());
   std::vector<double> rho_p1(ng, 0.0);
+  contract_rho(chi, tmp.data(), nbf, ng, rho_p1.data());
+
   std::vector<double> gxd(ng, 0.0);
   std::vector<double> gyd(ng, 0.0);
   std::vector<double> gzd(ng, 0.0);
-  for (std::size_t g = 0; g < ng; ++g) {
-    rho_p1[g] = static_cast<double>(rho_ld[g]);
-    gxd[g] = static_cast<double>(gx[g]);
-    gyd[g] = static_cast<double>(gy[g]);
-    gzd[g] = static_cast<double>(gz[g]);
+  if (dchi != nullptr) {
+    std::vector<double> tmpx(nbf * ng, 0.0);
+    std::vector<double> tmpy(nbf * ng, 0.0);
+    std::vector<double> tmpz(nbf * ng, 0.0);
+    const double *dx = dchi;
+    const double *dy = dchi + nbf * ng;
+    const double *dz = dchi + 2 * nbf * ng;
+    gemm_dm_ao(dm, dx, nbf, ng, tmpx.data());
+    gemm_dm_ao(dm, dy, nbf, ng, tmpy.data());
+    gemm_dm_ao(dm, dz, nbf, ng, tmpz.data());
+    for (std::size_t g = 0; g < ng; ++g) {
+      double ax = 0.0;
+      double ay = 0.0;
+      double az = 0.0;
+      for (std::size_t u = 0; u < nbf; ++u) {
+        const std::size_t ug = u * ng + g;
+        ax += dx[ug] * tmp[ug] + chi[ug] * tmpx[ug];
+        ay += dy[ug] * tmp[ug] + chi[ug] * tmpy[ug];
+        az += dz[ug] * tmp[ug] + chi[ug] * tmpz[ug];
+      }
+      gxd[g] = ax;
+      gyd[g] = ay;
+      gzd[g] = az;
+    }
   }
 
   std::map<std::string, const double *> scal = ground;
@@ -239,23 +258,30 @@ void XcKernel::transitionDm(const XcMo &mo, const double *z, double occ,
   if (z == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
     return;
   }
+  // PySCF gen_vind: einsum('ov,pv,qo->pq', z, Cv, Co*occ)
+  std::vector<double> Co_occ(nao * nocc, 0.0);
+  for (std::size_t q = 0; q < nao; ++q) {
+    for (std::size_t i = 0; i < nocc; ++i) {
+      Co_occ[q * nocc + i] = occ * mo.Co[q * nocc + i];
+    }
+  }
   std::vector<double> tmp(nao * nocc, 0.0);
   for (std::size_t p = 0; p < nao; ++p) {
     for (std::size_t i = 0; i < nocc; ++i) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t a = 0; a < nvir; ++a) {
-        acc += static_cast<Ld>(mo.Cv[p * nvir + a]) * z[i * nvir + a];
+        acc += mo.Cv[p * nvir + a] * z[i * nvir + a];
       }
-      tmp[p * nocc + i] = static_cast<double>(acc);
+      tmp[p * nocc + i] = acc;
     }
   }
   for (std::size_t p = 0; p < nao; ++p) {
     for (std::size_t q = 0; q < nao; ++q) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t i = 0; i < nocc; ++i) {
-        acc += static_cast<Ld>(tmp[p * nocc + i]) * mo.Co[q * nocc + i];
+        acc += tmp[p * nocc + i] * Co_occ[q * nocc + i];
       }
-      dm[p * nao + q] = static_cast<double>(occ * acc);
+      dm[p * nao + q] = acc;
     }
   }
 }
@@ -269,23 +295,24 @@ void XcKernel::rpaTransitionDm(const XcMo &mo, const double *x, const double *y,
   if (y == nullptr || mo.Co == nullptr || mo.Cv == nullptr || dm == nullptr) {
     return;
   }
+  // PySCF gen_tdhf: einsum('ov,qv,po->pq', y, Cv, Co*occ)
   std::vector<double> tmp(nao * nvir, 0.0);
   for (std::size_t p = 0; p < nao; ++p) {
     for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t i = 0; i < nocc; ++i) {
-        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * y[i * nvir + a];
+        acc += (occ * mo.Co[p * nocc + i]) * y[i * nvir + a];
       }
-      tmp[p * nvir + a] = static_cast<double>(acc);
+      tmp[p * nvir + a] = acc;
     }
   }
   for (std::size_t p = 0; p < nao; ++p) {
     for (std::size_t q = 0; q < nao; ++q) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t a = 0; a < nvir; ++a) {
-        acc += static_cast<Ld>(tmp[p * nvir + a]) * mo.Cv[q * nvir + a];
+        acc += tmp[p * nvir + a] * mo.Cv[q * nvir + a];
       }
-      dm[p * nao + q] += static_cast<double>(occ * acc);
+      dm[p * nao + q] += acc;
     }
   }
 }
@@ -304,23 +331,24 @@ void XcKernel::projectOv(const XcMo &mo, const double *Vao, double *ov) {
   if (Vao == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
     return;
   }
-  std::vector<double> tmp(nao * nvir, 0.0);
-  for (std::size_t q = 0; q < nao; ++q) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t p = 0; p < nao; ++p) {
-        acc += static_cast<Ld>(Vao[p * nao + q]) * mo.Cv[p * nvir + a];
+  // PySCF: einsum('pq,qo,pv->ov', V, Co, Cv) == (V @ Co).T @ Cv
+  std::vector<double> tmp(nao * nocc, 0.0);
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t i = 0; i < nocc; ++i) {
+      double acc = 0.0;
+      for (std::size_t q = 0; q < nao; ++q) {
+        acc += Vao[p * nao + q] * mo.Co[q * nocc + i];
       }
-      tmp[q * nvir + a] = static_cast<double>(acc);
+      tmp[p * nocc + i] = acc;
     }
   }
   for (std::size_t i = 0; i < nocc; ++i) {
     for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t q = 0; q < nao; ++q) {
-        acc += static_cast<Ld>(mo.Co[q * nocc + i]) * tmp[q * nvir + a];
+      double acc = 0.0;
+      for (std::size_t p = 0; p < nao; ++p) {
+        acc += tmp[p * nocc + i] * mo.Cv[p * nvir + a];
       }
-      ov[i * nvir + a] = static_cast<double>(acc);
+      ov[i * nvir + a] = acc;
     }
   }
 }
@@ -336,8 +364,7 @@ void XcKernel::tdaSigma(const XcMo &mo, const double *z, const double *v1,
   for (std::size_t i = 0; i < nocc; ++i) {
     for (std::size_t a = 0; a < nvir; ++a) {
       const std::size_t ia = i * nvir + a;
-      sigma[ia] = static_cast<double>(static_cast<Ld>(sigma[ia]) +
-                                      static_cast<Ld>(mo.e_ia[ia]) * z[ia]);
+      sigma[ia] = sigma[ia] + mo.e_ia[ia] * z[ia];
     }
   }
 }
@@ -355,24 +382,25 @@ void XcKernel::rpaSigma(const XcMo &mo, const double *xy, const double *v1,
   }
   const double *y = xy + nov;
   double *bot = sigma + nov;
+  // PySCF: einsum('pq,po,qv->ov', V, Co, Cv) == Co.T @ (V @ Cv)
   std::vector<double> tmp(nao * nvir, 0.0);
   for (std::size_t p = 0; p < nao; ++p) {
     for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t q = 0; q < nao; ++q) {
-        acc += static_cast<Ld>(v1[p * nao + q]) * mo.Cv[q * nvir + a];
+        acc += v1[p * nao + q] * mo.Cv[q * nvir + a];
       }
-      tmp[p * nvir + a] = static_cast<double>(acc);
+      tmp[p * nvir + a] = acc;
     }
   }
   for (std::size_t i = 0; i < nocc; ++i) {
     for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
+      double acc = 0.0;
       for (std::size_t p = 0; p < nao; ++p) {
-        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * tmp[p * nvir + a];
+        acc += mo.Co[p * nocc + i] * tmp[p * nvir + a];
       }
       const std::size_t ia = i * nvir + a;
-      bot[ia] = -static_cast<double>(static_cast<Ld>(mo.e_ia[ia]) * y[ia] + acc);
+      bot[ia] = -(mo.e_ia[ia] * y[ia] + acc);
     }
   }
 }
@@ -409,7 +437,7 @@ int XcKernel::tdaSigma(const XcGrid &grid,
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = static_cast<double>(static_cast<Ld>(vj[k]) + 0.5L * vxc[k]);
+    v1[k] = vj[k] + 0.5 * vxc[k];
   }
   tdaSigma(mo, z, v1.data(), sigma);
   return 0;
@@ -440,7 +468,7 @@ int XcKernel::rpaSigma(const XcGrid &grid,
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = static_cast<double>(static_cast<Ld>(vj[k]) + 0.5L * vxc[k]);
+    v1[k] = vj[k] + 0.5 * vxc[k];
   }
   rpaSigma(mo, xy, v1.data(), sigma);
   return 0;
