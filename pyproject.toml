@@ -133,7 +133,9 @@ before-all = """
 yum install -y gcc-gfortran || dnf install -y gcc-gfortran
 bash scripts/rgpot_wheel_dftd_prefix.sh /tmp/rgpot-dftd
 """
-environment = { PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig:/tmp/rgpot-dftd/lib64/pkgconfig", CMAKE_PREFIX_PATH = "/tmp/rgpot-dftd" }
+# PKG_CONFIG_PATH only. Do not set CMAKE_PREFIX_PATH to the micromamba
+# prefix: that made meson pull unrelated dylibs into librgpot.
+environment = { PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig:/tmp/rgpot-dftd/lib64/pkgconfig" }
 # meson-python vendors librgpot into .rgpot.mesonpy.libs and rewrites RPATHs,
 # but auditwheel still resolves NEEDED against the filesystem. Unpack the
 # wheel and put that directory on LD_LIBRARY_PATH.
@@ -165,7 +167,7 @@ repair-wheel-command = """
 [tool.cibuildwheel.macos]
 # The brew gcc gfortran runtime (libgfortran/libquadmath) is built for
 # macOS 14; delocate refuses to stamp an 11.0 wheel around it.
-environment = { MACOSX_DEPLOYMENT_TARGET = "14.0", PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig", CMAKE_PREFIX_PATH = "/tmp/rgpot-dftd" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0", PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig" }
 before-all = """
 brew list gcc >/dev/null 2>&1 || brew install gcc
 bash scripts/rgpot_wheel_dftd_prefix.sh /tmp/rgpot-dftd
