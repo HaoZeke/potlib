@@ -337,6 +337,30 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'expr',
         )
+        test(
+            'ExprGoldens',
+            executable(
+                'expr_golden_test',
+                sources: ['tests/ExprGoldenTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'expr',
+        )
+        executable(
+            'dump_expr_goldens',
+            sources: ['tests/dump_expr_goldens.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
     endif
     if has_metatomic
         test_array += [
