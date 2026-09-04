@@ -35,7 +35,7 @@
       "bytes": 26270
     },
     "c_vs_numpy/xck_gga_r_o1_ref.npy": {
-      "sha256": "79ad70aa91cc0c720f5d2d0f3c970af6f961369eb6211b039406fa74aa9a4f2d",
+      "sha256": "0eff71771b40e01709c6fac2ea1fbabc2416d8a73ff364dfef1ed991975f9f9f",
       "bytes": 256,
       "shape": [
         4,
@@ -48,7 +48,7 @@
       "bytes": 30552
     },
     "c_vs_numpy/xck_gga_r_o2_ref.npy": {
-      "sha256": "0d8b9c020bca726382c480178e5f7f1570c363f181d9ab0374b0583876a4d7d3",
+      "sha256": "1648955eb9903e028ccc3b0ddd5ce6c8309c7840a9d76b985788c674a9f53d93",
       "bytes": 256,
       "shape": [
         4,
@@ -61,7 +61,7 @@
       "bytes": 23430
     },
     "c_vs_numpy/xck_lda_r_o1_ref.npy": {
-      "sha256": "5e24fd27198cc66331d15c92ac9f26319d9aafcc8793f9deaf6bcd6e3813e371",
+      "sha256": "703ae13068c111bad99b0c9258a2c297ed2788c08cef123ed85967aaa86a6a90",
       "bytes": 256,
       "shape": [
         4,
@@ -74,7 +74,7 @@
       "bytes": 26970
     },
     "c_vs_numpy/xck_mgga_tau_r_o1_ref.npy": {
-      "sha256": "d443cf85a3b4743c420eed423260628aa3166cbbdf889d0f2ed348ada6861033",
+      "sha256": "d4051d74339b21a01599f96853a1563e5976ca60b558b9b8754151910828f053",
       "bytes": 256,
       "shape": [
         4,
@@ -83,7 +83,7 @@
       "dtype": "float64"
     },
     "gga_r_o1_fock_ref.npy": {
-      "sha256": "cb6459057ca8908fd308f974b868eb9adeab2b46c554b1af353a183b4e0edaa6",
+      "sha256": "4f5d46ee9b0eb726d6220a5ae55be837d00098ecd90b55a9984dd55c7087329d",
       "bytes": 256,
       "shape": [
         4,
@@ -105,7 +105,7 @@
       "dtype": "float64"
     },
     "lda_r_o1_fock_ref.npy": {
-      "sha256": "2f70eceb12fd54f54690e754fea77b647137d2bc4312240d70dd3cca3744e6f1",
+      "sha256": "e1e7a8bd4cb787fce97fa71f3afc587b2b55fc22b2562da832b043716d086496",
       "bytes": 256,
       "shape": [
         4,
@@ -118,7 +118,7 @@
       "bytes": 3656
     },
     "mgga_tau_r_o1_fock_ref.npy": {
-      "sha256": "6f6fe885a5733d8802455deeb8764561830d3e04fc2f181e3ca6b2188ccc3a70",
+      "sha256": "6253ac5e9357c99e5810d74961eb0a5a55bfe276910504da2bc5340f17c0b460",
       "bytes": 256,
       "shape": [
         4,
@@ -281,5 +281,6 @@
       "sha256": "7cbdc5ccc474aee80654f252e3e2cc37023dfadc1dd05b633edf5b95e3ac0bde",
       "bytes": 34844
     }
-  }
+  },
+  "pin_source": "dump_xckernel_goldens (host long-double evaluator on rg.terra)"
 }
