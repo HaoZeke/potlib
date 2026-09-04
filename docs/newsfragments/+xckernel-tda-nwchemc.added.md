@@ -1,1 +1,0 @@
-TDA pin operator (H2O/sto-3g singlet roots) is also compared to libnwchemc ``task tddft`` / TDA via ``scripts/compare_xckernel_tda_nwchemc.py``. Exclusive sigma contraction stays 1e-17; the nwchemc root residual is the measured engine value (1e-6).

@@ -1,1 +1,0 @@
-`XcKernel` assembles TDA and RPA sigma over the singlet `st_o2_p` C kernels plus host Coulomb, matching the PySCF `lib.einsum` contraction path and `eval_rho` (`ao @ dm`). The meson golden compares that assembly to committed sigma pins at exclusive 1e-17. The live `TDA.gen_vind` / `gen_tdhf_operation` bar is still open.
