@@ -28,6 +28,10 @@
 #include "rgpot/D3Pot/D3Pot.hpp"
 #endif // RGPOT_HAS_DFTD3
 
+#ifdef RGPOT_HAS_DFTD4
+#include "rgpot/D4Pot/D4Pot.hpp"
+#endif // RGPOT_HAS_DFTD4
+
 #ifdef RGPOT_HAS_METATOMIC
 #include "rgpot/MetatomicPot/MetatomicPot.hpp"
 #endif // RGPOT_HAS_METATOMIC
@@ -192,6 +196,9 @@ int main(int argc, char *argv[]) {
 #ifdef RGPOT_HAS_DFTD3
               << ", D3"
 #endif
+#ifdef RGPOT_HAS_DFTD4
+              << ", D4"
+#endif
 #ifdef RGPOT_HAS_METATOMIC
               << ", Metatomic:<model_path>"
 #endif
@@ -271,6 +278,11 @@ int main(int argc, char *argv[]) {
     std::cout << "Loading D3 potential (BJ PBE ATM)..." << std::endl;
     potential_to_use = std::make_unique<rgpot::D3Pot>();
 #endif // RGPOT_HAS_DFTD3
+#ifdef RGPOT_HAS_DFTD4
+  } else if (pot_type == "D4") {
+    std::cout << "Loading D4 potential (PBE ATM charge 0)..." << std::endl;
+    potential_to_use = std::make_unique<rgpot::D4Pot>();
+#endif // RGPOT_HAS_DFTD4
 #ifdef RGPOT_HAS_METATOMIC
   } else if (pot_type.rfind("Metatomic:", 0) == 0) {
     auto model_path = pot_type.substr(10);
