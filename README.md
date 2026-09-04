@@ -16,6 +16,30 @@ backend-configuration carrier:
 -   `PotentialConfig`: backend setup, with arms such as `none`, `nwchem`, and
     `cpmd`
 
+XC response kernels (`rgpot::XcKernel`, meson `-Dwith_xckernel=true`) are
+in-process only. They are not a `Potential`, and there is no
+`PotentialConfig.xckernel` arm: operands are collocation plus named Libxc
+arrays, not `ForceInput`. See `docs/xckernel.md`.
+`pylibxc` is not on PyPI (`pylibxc2` is an unrelated stub); use the
+conda-forge `libxc` package via `pixi install -e xckernel`.
+
+`D3Pot` and `D4Pot` (meson `-Dwith_dftd3` / `-Dwith_dftd4`) are in-process
+`Potential` summands: construct them and evaluate `ForceInput` to energy and
+forces. There is no `PotentialConfig.d3` or `PotentialConfig.d4` arm.
+A DFT host sums XcKernel + VV10 + D4 itself; dispersion is not folded into
+the XC kernel.
+
+`ExprPot` (meson `-Dwith_expr=true`) compiles a Lepton energy string over
+named child `Potential` objects. The parser is vendored OpenMM Lepton;
+there is no pixi muparser feature and no `PotentialConfig.expr` arm.
+
+In-process `LJPot` vs pyeonclient `Matter` on the same LJ fixture is
+`scripts/time_lj_rgpot_vs_pyeonclient.py` (rg.terra). On rg.terra
+(2026-09-04, 1e6 calls) A (`LJPot::operator()`) was 31-33 ns/call and
+B (in-process pyeonclient `Matter.forces`, not potserv) was 687 to 791
+ns/call. `XcKernel` is not a `Potential` and is not part of that race.
+See `docs/orgmode/howto/exprpot.org`.
+
 The public wire schema lives in `CppCore/rgpot/rpc/Potentials.capnp` and is
 shared by the C++ server, Python integration tests, and the Rust core crate.
 Native rgpot units are eV and Angstrom.
@@ -130,6 +154,24 @@ RPC client types:
 </tr>
 
 <tr>
+<td class="org-left"><code>D3Pot</code></td>
+<td class="org-left"><code>D3</code></td>
+<td class="org-left">In-process Potential summand. Enable with <code>-Dwith_dftd3=true</code>; use pixi env <code>dftd3</code> or <code>dftd</code>. BJ/zero damping, functional key, explicit ATM flag. No <code>PotentialConfig.d3</code>. Goldens: <code>meson test --suite dftd</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><code>D4Pot</code></td>
+<td class="org-left"><code>D4</code></td>
+<td class="org-left">In-process Potential summand. Enable with <code>-Dwith_dftd4=true</code>; use pixi env <code>dftd4</code> or <code>dftd</code>. Functional key, charge, explicit ATM/many-body flag. No <code>PotentialConfig.d4</code>. Goldens: <code>meson test --suite dftd</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><code>ExprPot</code></td>
+<td class="org-left">in-process</td>
+<td class="org-left">Enable with <code>-Dwith_expr=true</code>. Vendored OpenMM Lepton (no pixi muparser). Named <code>Potential</code> children; construct-time fail-closed names. No <code>PotentialConfig.expr</code>.</td>
+</tr>
+
+<tr>
 <td class="org-left"><code>MetatomicPot</code></td>
 <td class="org-left"><code>Metatomic:&lt;model_path&gt;</code></td>
 <td class="org-left">Enable with <code>-Dwith_metatomic=true</code>; use pixi env <code>metatomicbld</code>. Pip engines: torch 2.7+</td>
@@ -148,6 +190,41 @@ RPC client types:
 </tr>
 </tbody>
 </table>
+
+Copyable construct-and-evaluate (meson `-Dwith_expr=true`).
+`PotentialHandle::from_impl` / `rgpot_potential_new_eindir` wraps that
+one `ExprPot` as one eindir objective for rgmin, rgsaddle, and anneal.
+
+    #include "rgpot/ExprPot/ExprPot.hpp"
+    #include "rgpot/LennardJones/LJPot.hpp"
+    #include "rgpot/Morse/MorsePot.hpp"
+    #include "rgpot/types/AtomMatrix.hpp"
+
+    #include <array>
+    #include <memory>
+    #include <vector>
+
+    int main() {
+      std::vector<rgpot::ExprPot::Term> terms;
+      terms.emplace_back("lj", std::make_unique<rgpot::LJPot>());
+      terms.emplace_back("morse", std::make_unique<rgpot::MorsePot>());
+      rgpot::ExprPot pot("0.5*lj + morse", std::move(terms));
+
+      rgpot::types::AtomMatrix positions{{1.0, 2.0, 3.0}, {1.5, 2.5, 3.5}};
+      std::vector<int> atomTypes{0, 0};
+      std::array<std::array<double, 3>, 3> box{{
+          {15.0, 0.0, 0.0},
+          {0.0, 20.0, 0.0},
+          {0.0, 0.0, 30.0},
+      }};
+      auto [energy, forces, variance] = pot(positions, atomTypes, box);
+      (void)forces;
+      (void)variance;
+      (void)energy;
+    }
+
+When the build also has `-Dwith_dftd3=true`, swap the Morse child for
+`D3Pot` and the string `"0.5*lj + d3"`.
 
 Example server commands:
 

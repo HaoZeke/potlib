@@ -61,8 +61,7 @@ let P = S.pins in
         & { name = "Run prek on all files" },
         {
           name = "Audit for large files",
-          uses = P.large_file_auditor,
-          with = { "file-size-threshold" = "1M" },
+          run = "bash ci/gha/audit-large-files.sh",
         },
       ],
     },

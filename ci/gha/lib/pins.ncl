@@ -18,7 +18,6 @@
   gh_release = "softprops/action-gh-release@v2",
   gh_pages = "peaceiris/actions-gh-pages@v4",
   lychee = "lycheeverse/lychee-action@v2",
-  large_file_auditor = "HaoZeke/large-file-auditor@v0.1.0",
   doc_previewer = "HaoZeke/doc-previewer@v0.0.1",
 
   # --- in-repo composite actions (paths, not version pins) ---

@@ -40,11 +40,12 @@
  */
 
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
-#include "rgpot.h"
+#include "rgpot/c_api.hpp"
 #include "rgpot/errors.hpp"
 #include "rgpot/types.hpp"
 
@@ -141,12 +142,36 @@ public:
    *         @c void @c forceImpl(const @c ForceInput&, @c ForceOut*).
    * @param impl Reference to the C++ potential object.
    * @return A new @c PotentialHandle wrapping @a impl.
+   *
+   * The handle is one @c rgpot_potential_t and therefore one
+   * @c eindir_objective_t (first-member IS-A). Child terms stay inside
+   * @a impl; this factory does not build a list of objectives.
    */
   template <typename Impl> static PotentialHandle from_impl(Impl &impl) {
-    auto *handle = rgpot_potential_new(&trampoline_callback<Impl>,
-                                       static_cast<void *>(&impl),
-                                       nullptr // caller owns impl
-    );
+    auto *handle = rgpot_potential_new_eindir(&trampoline_callback<Impl>,
+                                              static_cast<void *>(&impl),
+                                              nullptr, 0, nullptr, nullptr,
+                                              nullptr, nullptr);
+    return PotentialHandle(handle);
+  }
+
+  /**
+   * @brief Wrap @a impl as one eindir objective with molecular context.
+   *
+   * Same trampoline as @c from_impl(Impl&), but calls
+   * @c rgpot_potential_new_eindir with atom count, species, and cell so
+   * hosts that eval through @c eindir_objective_t* have bounds and
+   * species. @c rgpot_potential_calculate still uses the input tensors.
+   */
+  template <typename Impl>
+  static PotentialHandle from_impl(Impl &impl, size_t n_atoms,
+                                   const int32_t *atomic_numbers,
+                                   const double *box_matrix,
+                                   const double *bounds_low = nullptr,
+                                   const double *bounds_high = nullptr) {
+    auto *handle = rgpot_potential_new_eindir(
+        &trampoline_callback<Impl>, static_cast<void *>(&impl), nullptr,
+        n_atoms, atomic_numbers, box_matrix, bounds_low, bounds_high);
     return PotentialHandle(handle);
   }
 

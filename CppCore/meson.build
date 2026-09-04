@@ -72,9 +72,29 @@ if not get_option('with_rpc_client_only')
         _linkto += [xtb_dlopen]
     endif
 
+    if has_xckernel
+        subdir('rgpot/XcKernel')  # in-process XcKernel, not a Potential
+        rgpotentials += [xckernel]
+    endif
+
     if has_tblite
         subdir('rgpot/TBLitePot')  # 'tblitepot'
         rgpotentials += [tblitepot]
+    endif
+
+    if has_dftd3
+        subdir('rgpot/D3Pot')  # 'd3pot'
+        rgpotentials += [d3pot]
+    endif
+
+    if has_dftd4
+        subdir('rgpot/D4Pot')  # 'd4pot'
+        rgpotentials += [d4pot]
+    endif
+
+    if has_expr
+        subdir('rgpot/ExprPot')  # 'exprpot'
+        rgpotentials += [exprpot]
     endif
 
     # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
@@ -154,6 +174,16 @@ if not get_option('with_rpc_client_only')
             depends: [rgpot],
         )
     endif
+    # nm/readelf ELF dump; same host gate as FortranSymbolAudit.
+    if get_option('with_tests') and host_system != 'windows'
+        test(
+            'ExprLeptonSymbols',
+            find_program('../scripts/check_lepton_symbols.sh'),
+            args: [rgpot.full_path(), has_expr ? 'present' : 'absent'],
+            depends: [rgpot],
+            suite: 'expr',
+        )
+    endif
 endif
 
 # Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
@@ -201,6 +231,19 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
             ['XtCallCuH2Pot', 'cuh2_call_xt', 'xt_call_cuh2.cc', ''],
         ]
     endif
+    if has_expr
+        example_array += [
+            ['CallExprPot', 'exprpot_call', 'call_exprpot.cc', ''],
+        ]
+    endif
+    # Not a meson test: scripts/time_lj_rgpot_vs_pyeonclient.py drives this.
+    executable(
+        'time_lj_force',
+        sources: ['examples/time_lj_force.cc'],
+        dependencies: _deps + [vesin_dep] + fortran_rt_deps,
+        link_with: _linkto,
+        cpp_args: _args,
+    )
     foreach example : example_array
         test(
             example.get(0),
@@ -282,6 +325,72 @@ if get_option('with_tests')
         test_array += [
             ['TBLitetest', 'tblite_test', 'TBLitePotTest.cc', ''],
         ]
+    endif
+    if has_dftd3
+        test_array += [
+            ['D3test', 'd3_test', 'D3PotTest.cc', ''],
+        ]
+    endif
+    if has_dftd4
+        test_array += [
+            ['D4test', 'd4_test', 'D4PotTest.cc', ''],
+        ]
+    endif
+    if has_expr and not get_option('with_rpc_client_only')
+        test(
+            'ExprPotTest',
+            executable(
+                'expr_pot_test',
+                sources: ['tests/ExprPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'expr',
+        )
+        test(
+            'ExprGoldens',
+            executable(
+                'expr_golden_test',
+                sources: ['tests/ExprGoldenTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'expr',
+        )
+        executable(
+            'dump_expr_goldens',
+            sources: ['tests/dump_expr_goldens.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+        if get_option('with_rust_core')
+            test(
+                'ExprEindirTest',
+                executable(
+                    'expr_eindir_test',
+                    sources: ['tests/ExprEindirTest.cc'],
+                    dependencies: test_deps,
+                    include_directories: _incdirs + ['.'],
+                    cpp_args: test_args,
+                    link_with: _linkto,
+                    link_language: 'cpp',
+                ),
+                workdir: meson.source_root(),
+                suite: 'expr',
+            )
+        endif
     endif
     if has_metatomic
         test_array += [
@@ -459,6 +568,60 @@ if get_option('with_tests')
         )
     endforeach
 
+    if has_dftd3 or has_dftd4
+        test(
+            'DftdGoldens',
+            executable(
+                'dftd_golden_test',
+                sources: ['tests/DftdGoldenTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'dftd',
+        )
+        executable(
+            'dump_dftd_goldens',
+            sources: ['tests/dump_dftd_goldens.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+    endif
+
+    if has_xckernel
+        test(
+            'XcKernelGoldens',
+            executable(
+                'xckernel_test',
+                sources: ['tests/XcKernelTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'xckernel',
+        )
+        executable(
+            'dump_xckernel_goldens',
+            sources: ['tests/dump_xckernel_goldens.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
+    endif
+
     if has_xtb
         xtb_test_env = environment()
         xtb_test_env.set('RGPOT_XTB_ENGINE', xtb_engine.full_path())
@@ -572,6 +735,15 @@ if not meson.is_subproject()
         endif
         if has_tblite
             _pc_cflags += ['-DRGPOT_HAS_TBLITE_POT=TRUE']
+        endif
+        if has_dftd3
+            _pc_cflags += ['-DRGPOT_HAS_DFTD3_POT=TRUE']
+        endif
+        if has_dftd4
+            _pc_cflags += ['-DRGPOT_HAS_DFTD4_POT=TRUE']
+        endif
+        if has_expr
+            _pc_cflags += ['-DRGPOT_HAS_EXPR=TRUE']
         endif
     endif
     if _rpc_stack

@@ -31,7 +31,7 @@ let P = S.pins in
       id = "prek",
       runs_on = P.ubuntu,
       needs = ["prepare"],
-      role = "prek + large-file auditor (skipped on schedule)",
+      role = "prek + 1MiB tracked-file audit (skipped on schedule)",
     },
     {
       id = "docs_snapper",

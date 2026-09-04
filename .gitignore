@@ -317,10 +317,12 @@ build-eon-min/
 
 # Vendored NWChem source clone (local nwchemc engine builds)
 # Downloaded artifacts live under third_party/, except the vendored vesin
-# sources (single TU + Fortran interface), which are tracked and must ship
-# in the release tarball.
+# sources (single TU + Fortran interface) and OpenMM Lepton, which are
+# tracked and must ship in the release tarball.
 third_party/*
 !third_party/vesin/
+!third_party/libxckernel/
+!third_party/lepton/
 
 # NWChem embed/CLI runtime scratch written to the repo root (CWD) by the
 # nwchem smoke/embed tests. Root-anchored so they never shadow real sources.

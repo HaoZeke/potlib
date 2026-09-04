@@ -1,0 +1,67 @@
+{
+  "host_only": "rg.terra",
+  "regen": "scripts/regen_expr_goldens.py",
+  "fixture": "two_atom_ar",
+  "units": {
+    "energy": "eV",
+    "forces": "eV/A"
+  },
+  "tolerances": {
+    "energy": 1e-14,
+    "forces": 1e-12,
+    "source": "rgpot-2wdt: energy 1e-14 eV, forces 1e-12 eV/A"
+  },
+  "cases": [
+    "identity",
+    "half_lj_plus_morse",
+    "two_lj_minus_lj",
+    "half_paren_lj_plus_morse",
+    "half_lj_plus_d3"
+  ],
+  "files": {
+    "geometry.npz": {
+      "sha256": "7ae1f6eee461110ed4a5fcbd1e7910506ca71aeb72364ed8931233a01d28a8cb",
+      "bytes": 832
+    },
+    "identity_energy.npy": {
+      "sha256": "2fe4b35ffb2c749d9c9e6babd2f1d566ce754abed0c9cea337f19e6786f85e83",
+      "bytes": 136
+    },
+    "identity_forces.npy": {
+      "sha256": "c74e5433754f05dfcb414bf0e47b3d6765d043334fda63256f961dbe3614fda1",
+      "bytes": 176
+    },
+    "half_lj_plus_morse_energy.npy": {
+      "sha256": "2d2917816c7a870145c672fd6fcb8418801bd8dc07a8ac4c2e4f59f1101d362a",
+      "bytes": 136
+    },
+    "half_lj_plus_morse_forces.npy": {
+      "sha256": "e1d90f942ab3c0610bc1078ae5f80d241258c13964921f1fbe4d52fe9fb564e2",
+      "bytes": 176
+    },
+    "two_lj_minus_lj_energy.npy": {
+      "sha256": "2fe4b35ffb2c749d9c9e6babd2f1d566ce754abed0c9cea337f19e6786f85e83",
+      "bytes": 136
+    },
+    "two_lj_minus_lj_forces.npy": {
+      "sha256": "c74e5433754f05dfcb414bf0e47b3d6765d043334fda63256f961dbe3614fda1",
+      "bytes": 176
+    },
+    "half_paren_lj_plus_morse_energy.npy": {
+      "sha256": "e15934a284bf0e2f33be36c2ef4ecd8bf4718354ef07a2f63d11f36168e7a3ce",
+      "bytes": 136
+    },
+    "half_paren_lj_plus_morse_forces.npy": {
+      "sha256": "97bfec4fd14fd4c7f85c7bb41b4b8ec74f8134a0d314dc6efc3f02625a9b758f",
+      "bytes": 176
+    },
+    "half_lj_plus_d3_energy.npy": {
+      "sha256": "c838bdadd89f019e38ea7897c0ff408313ac64bd245e47fe7ac4d798e924012d",
+      "bytes": 136
+    },
+    "half_lj_plus_d3_forces.npy": {
+      "sha256": "7a0d62416adeb7a619fb99a769669da71c329766a1443a0950d196f3334a8c11",
+      "bytes": 176
+    }
+  }
+}
