@@ -93,15 +93,18 @@ public:
   [[nodiscard]] static XcFields fieldsFromDensity(const XcGrid &grid,
                                                   const double *P);
 
-  /// dm = einsum('ov,pv,qo->pq', z, Cv, Co*occ). Matches PySCF gen_vind.
+  /// dm = einsum('qo,ov,pv->pq', Co*occ, z, Cv). Matches lib.einsum path
+  /// ('qo,xov->vxq' then 'vxq,pv->xpq') used by TDA.gen_vind.
   static void transitionDm(const XcMo &mo, const double *z, double occ,
                            double *dm);
 
-  /// dm = einsum X plus einsum('ov,qv,po->pq', y, Cv, Co*occ).
+  /// dm = einsum X plus einsum('po,ov,qv->pq', Co*occ, y, Cv)
+  /// ('po,xov->vxp' then 'vxp,qv->xpq').
   static void rpaTransitionDm(const XcMo &mo, const double *x, const double *y,
                               double occ, double *dm);
 
-  /// ov = einsum('pq,qo,pv->ov', V, Co, Cv) == (V @ Co)^T @ Cv.
+  /// ov = einsum('pv,pq,qo->ov', Cv, V, Co) == Co^T @ (V^T @ Cv).
+  /// Matches lib.einsum path ('pv,xpq->vxq' then 'vxq,qo->xov').
   static void projectOv(const XcMo &mo, const double *Vao, double *ov);
 
   /// (A z)_ia = e_ia z_ia + (Co^T @ v1^T @ Cv)_ia. v1 is AO (nao*nao).
