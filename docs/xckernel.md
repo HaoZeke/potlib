@@ -85,7 +85,7 @@ TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
 `xck_*_st_o2_p` kernels plus host Coulomb. LDA wv is
 `w * rho * (v2rho2_0 + v2rho2_1)` (one fused product, matching
 `nr_rks_fxc_st`) and stage B tiles the grid at PySCF `BLKSIZE` (128).
-GGA stays on the generated C ABI.
+GGA `st_o2_p` uses the generated monomials with the same tiled stage B.
 Transition densities and ov projection follow the PySCF `lib.einsum`
 contraction path (`qo,xov->vxq` then `vxq,pv->xpq` for the TDA DM;
 `pv,xpq->vxq` then `vxq,qo->xov` for the ov block). Perturbed fields
