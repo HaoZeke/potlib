@@ -429,11 +429,22 @@ def regen_pyscf() -> None:
         sys.exit(f"GGA fxc vs nr_rks_fxc rel={err / scale:.3e} exceeds 1e-13")
     save_npy(dest / "gga_fxc_ref.npy", Rref)
 
-    # TDA / RPA pins from live PySCF (tda_validate.py convention).
-    # Operands feed XcKernel::tdaSigma / rpaSigma (st_o2_p + host J).
+    regen_tda_rpa(mol, dest)
+
+
+def regen_tda_rpa(mol=None, dest=None) -> None:
+    """TDA/RPA operands + live-vs-committed exclusive 1e-17 gate.
+
+    Needs PySCF only (no libxckernel Python generator).
+    """
     from pyscf import dft as dft_mod
     from pyscf.dft import numint as ni_tda
     from pyscf.tdscf.rhf import gen_tdhf_operation
+
+    if mol is None or dest is None:
+        mol, _grids, _mf, _dm0, _dm1, _numint = _mol_grid()
+        dest = DATA / "pyscf_h2o_sto3g"
+        dest.mkdir(parents=True, exist_ok=True)
 
     rngz = np.random.default_rng(4)
     rngxy = np.random.default_rng(5)
@@ -605,20 +616,29 @@ def write_manifest() -> None:
 
 def main(argv=None) -> int:
     _require_terra()
-    _ensure_xckernel()
     p = argparse.ArgumentParser()
     p.add_argument("--s2jz", action="store_true")
     p.add_argument("--c-vs-numpy", action="store_true")
     p.add_argument("--pyscf", action="store_true")
+    p.add_argument("--tda", action="store_true")
     p.add_argument("--all", action="store_true")
     args = p.parse_args(argv)
-    do_all = args.all or not (args.s2jz or args.c_vs_numpy or args.pyscf)
+    need_xck = args.all or args.s2jz or args.c_vs_numpy or args.pyscf
+    do_all = args.all or not (
+        args.s2jz or args.c_vs_numpy or args.pyscf or args.tda
+    )
+    if do_all:
+        need_xck = True
+    if need_xck:
+        _ensure_xckernel()
     if do_all or args.s2jz:
         regen_s2jz()
     if do_all or args.c_vs_numpy:
         regen_c_vs_numpy()
     if do_all or args.pyscf:
         regen_pyscf()
+    elif args.tda:
+        regen_tda_rpa()
     write_manifest()
     return 0
 
