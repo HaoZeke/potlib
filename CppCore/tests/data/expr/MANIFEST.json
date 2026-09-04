@@ -1,0 +1,99 @@
+{
+  "host_only": "rg.terra",
+  "regen": "scripts/regen_expr_goldens.py",
+  "fixture": "two_atom_ar_1p5A",
+  "units": {
+    "energy": "eV",
+    "forces": "eV/A"
+  },
+  "tolerances": {
+    "energy": 1e-14,
+    "forces": 1e-12,
+    "source": "rgpot-2wdt: energy 1e-14 eV, forces 1e-12 eV/A vs independent sum"
+  },
+  "cases": [
+    "identity_lj",
+    "half_lj_plus_morse",
+    "two_lj_minus_lj",
+    "half_paren_lj_morse",
+    "half_lj_plus_d3"
+  ],
+  "files": {
+    "positions.npy": {
+      "sha256": "d84054c93e9f6a39e660543ed77dc09ea415c2290a036acbbc3011b69fbd1242",
+      "bytes": 176
+    },
+    "numbers.npy": {
+      "sha256": "341aff56cffa7b19c352300cbb54213627fc194487133d8907f92c5dccf062ed",
+      "bytes": 144
+    },
+    "box.npy": {
+      "sha256": "3183e94a59cf350f6c985a76d264d956bd8b2170fb9b1bb9780ac4fa78f107cc",
+      "bytes": 200
+    },
+    "lj_energy.npy": {
+      "sha256": "2fe4b35ffb2c749d9c9e6babd2f1d566ce754abed0c9cea337f19e6786f85e83",
+      "bytes": 136
+    },
+    "lj_forces.npy": {
+      "sha256": "c74e5433754f05dfcb414bf0e47b3d6765d043334fda63256f961dbe3614fda1",
+      "bytes": 176
+    },
+    "morse_energy.npy": {
+      "sha256": "72e69964d54808cf807aae72e60c72685e46b7008fbdb8bae634d4ea2529c3e0",
+      "bytes": 136
+    },
+    "morse_forces.npy": {
+      "sha256": "f0d20120160b2063f52bdf871854c3fea71f2d79eb5171847aeeebe71b728410",
+      "bytes": 176
+    },
+    "identity_lj_energy.npy": {
+      "sha256": "2fe4b35ffb2c749d9c9e6babd2f1d566ce754abed0c9cea337f19e6786f85e83",
+      "bytes": 136
+    },
+    "identity_lj_forces.npy": {
+      "sha256": "c74e5433754f05dfcb414bf0e47b3d6765d043334fda63256f961dbe3614fda1",
+      "bytes": 176
+    },
+    "half_lj_plus_morse_energy.npy": {
+      "sha256": "2d2917816c7a870145c672fd6fcb8418801bd8dc07a8ac4c2e4f59f1101d362a",
+      "bytes": 136
+    },
+    "half_lj_plus_morse_forces.npy": {
+      "sha256": "e1d90f942ab3c0610bc1078ae5f80d241258c13964921f1fbe4d52fe9fb564e2",
+      "bytes": 176
+    },
+    "two_lj_minus_lj_energy.npy": {
+      "sha256": "2fe4b35ffb2c749d9c9e6babd2f1d566ce754abed0c9cea337f19e6786f85e83",
+      "bytes": 136
+    },
+    "two_lj_minus_lj_forces.npy": {
+      "sha256": "c74e5433754f05dfcb414bf0e47b3d6765d043334fda63256f961dbe3614fda1",
+      "bytes": 176
+    },
+    "half_paren_lj_morse_energy.npy": {
+      "sha256": "e15934a284bf0e2f33be36c2ef4ecd8bf4718354ef07a2f63d11f36168e7a3ce",
+      "bytes": 136
+    },
+    "half_paren_lj_morse_forces.npy": {
+      "sha256": "97bfec4fd14fd4c7f85c7bb41b4b8ec74f8134a0d314dc6efc3f02625a9b758f",
+      "bytes": 176
+    },
+    "d3_energy.npy": {
+      "sha256": "96fe92aa30e6030d44d198913bd7ac11114afef63f768794c92deedb5db7d454",
+      "bytes": 136
+    },
+    "d3_forces.npy": {
+      "sha256": "d1927d2232555d86b97e15fa88141ec960d4251653e1f6868ce1cc9ee864b6b7",
+      "bytes": 176
+    },
+    "half_lj_plus_d3_energy.npy": {
+      "sha256": "c838bdadd89f019e38ea7897c0ff408313ac64bd245e47fe7ac4d798e924012d",
+      "bytes": 136
+    },
+    "half_lj_plus_d3_forces.npy": {
+      "sha256": "7a0d62416adeb7a619fb99a769669da71c329766a1443a0950d196f3334a8c11",
+      "bytes": 176
+    }
+  }
+}
