@@ -174,7 +174,8 @@ if not get_option('with_rpc_client_only')
             depends: [rgpot],
         )
     endif
-    if get_option('with_tests')
+    # nm/readelf ELF dump; same host gate as FortranSymbolAudit.
+    if get_option('with_tests') and host_system != 'windows'
         test(
             'ExprLeptonSymbols',
             find_program('../scripts/check_lepton_symbols.sh'),
