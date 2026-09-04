@@ -4,8 +4,52 @@
 from __future__ import annotations
 
 import difflib
+import re
 import sys
 from pathlib import Path
+
+
+def _struct_body(lines: list[str], name: str, rel: Path) -> list[str]:
+    needle = f"struct {name} {{"
+    try:
+        start = lines.index(needle)
+    except ValueError as exc:
+        raise AssertionError(f"{rel} must expose {name}") from exc
+    depth = 0
+    body: list[str] = []
+    for line in lines[start:]:
+        body.append(line)
+        depth += line.count("{") - line.count("}")
+        if depth == 0:
+            return body
+    raise AssertionError(f"{rel} has unclosed struct {name}")
+
+
+def _assert_expr_potspec(schema_path: Path, lines: list[str]) -> None:
+    rel = schema_path
+    expr_term = "\n".join(_struct_body(lines, "ExprTerm", rel))
+    if not re.search(r"name\s+@0\s*:\s*Text", expr_term):
+        raise AssertionError(f"{rel} ExprTerm.name must be Text")
+    if not re.search(r"pot\s+@1\s*:\s*PotSpec", expr_term):
+        raise AssertionError(f"{rel} ExprTerm.pot must be PotSpec")
+
+    expr_params = "\n".join(_struct_body(lines, "ExprParams", rel))
+    if not re.search(r"expression\s+@0\s*:\s*Text", expr_params):
+        raise AssertionError(f"{rel} ExprParams.expression must be Text")
+    if not re.search(r"terms\s+@1\s*:\s*List\(ExprTerm\)", expr_params):
+        raise AssertionError(f"{rel} ExprParams.terms must be List(ExprTerm)")
+
+    pot_spec = "\n".join(_struct_body(lines, "PotSpec", rel))
+    if not re.search(r"expr\s+@0\s*:\s*ExprParams", pot_spec):
+        raise AssertionError(f"{rel} PotSpec.expr must be ExprParams")
+    if not re.search(r"none\s+@1\s*:\s*Void", pot_spec):
+        raise AssertionError(f"{rel} PotSpec.none must be Void (capnp unions need two arms)")
+    if re.search(r"^\s+(lj|d3|d4|nwchem)\s+@", pot_spec, re.MULTILINE):
+        raise AssertionError(f"{rel} PotSpec must not invent dummy leaf arms")
+
+    cfg = "\n".join(_struct_body(lines, "PotentialConfig", rel))
+    if re.search(r"^\s+(expr|sum|list)\s+@", cfg, re.MULTILINE):
+        raise AssertionError(f"{rel} PotentialConfig must not grow expr/sum/list arms")
 
 
 def main() -> int:
@@ -19,6 +63,7 @@ def main() -> int:
         if "enum CPMDSectionKind {" not in lines:
             rel = schema_path.relative_to(root)
             raise AssertionError(f"{rel} must expose CPMDSectionKind")
+        _assert_expr_potspec(schema_path.relative_to(root), lines)
 
     if cpp_lines == rust_lines:
         return 0
