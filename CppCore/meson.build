@@ -92,6 +92,11 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [d4pot]
     endif
 
+    if has_expr
+        subdir('rgpot/ExprPot')  # 'exprpot'
+        rgpotentials += [exprpot]
+    endif
+
     # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
     subdir('rgpot/MetatomicPot')
     _linkto += [metatomic_dlopen]
@@ -167,6 +172,15 @@ if not get_option('with_rpc_client_only')
             find_program('../scripts/audit_fortran_symbols.sh'),
             args: [rgpot.full_path()],
             depends: [rgpot],
+        )
+    endif
+    if get_option('with_tests')
+        test(
+            'ExprLeptonSymbols',
+            find_program('../scripts/check_lepton_symbols.sh'),
+            args: [rgpot.full_path(), has_expr ? 'present' : 'absent'],
+            depends: [rgpot],
+            suite: 'expr',
         )
     endif
 endif
@@ -307,6 +321,22 @@ if get_option('with_tests')
         test_array += [
             ['D4test', 'd4_test', 'D4PotTest.cc', ''],
         ]
+    endif
+    if has_expr and not get_option('with_rpc_client_only')
+        test(
+            'ExprPotTest',
+            executable(
+                'expr_pot_test',
+                sources: ['tests/ExprPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'expr',
+        )
     endif
     if has_metatomic
         test_array += [
@@ -657,6 +687,9 @@ if not meson.is_subproject()
         endif
         if has_dftd4
             _pc_cflags += ['-DRGPOT_HAS_DFTD4_POT=TRUE']
+        endif
+        if has_expr
+            _pc_cflags += ['-DRGPOT_HAS_EXPR=TRUE']
         endif
     endif
     if _rpc_stack
