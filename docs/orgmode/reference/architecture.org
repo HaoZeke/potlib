@@ -183,6 +183,9 @@ Lighter weight than xtb but fewer methods.
 =D3Config= selects BJ or zero damping, the functional key for C6 parameters,
 and an explicit =atm= flag for the Axilrod-Teller-Muto E(3) term (default on).
 A geometry PES term: =ForceInput= in, energy+forces out. Not an XC kernel.
+In-process constructor (or the =D3= potserv selector). No
+=PotentialConfig.d3= arm until a DFT host sums =XcKernel= + VV10 + D3/D4
+on the wire.
 
 - =D4Pot= (=-Dwith_dftd4=true=) :: Grimme DFT-D4 via the
 [[https://github.com/dftd4/dftd4][dftd4]] ISO C API.
@@ -190,6 +193,9 @@ A geometry PES term: =ForceInput= in, energy+forces out. Not an XC kernel.
 =dftd4_new_structure=, and an explicit =atm= flag for the many-body
 (=mdb=) term (default on). Charge scaling stays inside dftd4.
 A geometry PES term: =ForceInput= in, energy+forces out. Not an XC kernel.
+In-process constructor (or the =D4= potserv selector). No
+=PotentialConfig.d4= arm until a DFT host sums =XcKernel= + VV10 + D4
+on the wire.
 
 - =MetatomicPot= (=-Dwith_metatomic=true=) :: Pre-trained ML atomistic models
 via

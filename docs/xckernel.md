@@ -22,6 +22,11 @@ It is **not** a geometry PES.
   carries `ForceInput` / `PotentialResult` / `PotentialConfig` for energy
   surfaces. Kernel operands are not those carriers, and no DFT host sends
   `chi` / `dchi` / weights over potserv in this slice.
+- Dispersion is a Potential summand, not an XC kernel. `D3Pot` / `D4Pot`
+  stay in-process (`ForceInput` in, energy+forces out). No
+  `PotentialConfig.d3` / `PotentialConfig.d4` arm until a DFT host sums
+  XcKernel + VV10 + D4 on the wire. Do not fold D3/D4 into
+  `XcKernel::contract` or `applyFxc`.
 - The default wheel and default meson build do **not** ship the Python
   generator. `with_xckernel` defaults to false.
 

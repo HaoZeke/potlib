@@ -2380,6 +2380,8 @@ struct NWChemCdftSpec {
 # Tagged union: exactly one backend's options (or none). Add new arms as new
 # potentials gain runtime knobs (e.g. metatomic @2 :MetatomicParams).
 # `calculate` geometry stays on ForceInput; this struct is method/backend setup only.
+# D3Pot/D4Pot stay in-process constructors; no d3/d4 arm until a DFT host
+# sums XcKernel + VV10 + D4 on the wire.
 struct PotentialConfig {
   union {
     none      @0 :Void;         # No backend-specific options (or no-op configure).
