@@ -120,7 +120,7 @@ skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 # D3/D4 flags are extra setup-args so `python -m build --sdist` does not
 # require pkg-config s-dftd3. Expr + XcKernel stay in meson-python.args.
 config-settings = "setup-args=-Dwith_dftd3=true setup-args=-Dwith_dftd4=true"
-test-command = "python -c \"import rgpot; assert rgpot.has_expr and rgpot.has_dftd3 and rgpot.has_dftd4 and rgpot.has_xckernel, (rgpot.has_expr, rgpot.has_dftd3, rgpot.has_dftd4, rgpot.has_xckernel); print(rgpot.__file__, len(rgpot.XcKernel.catalog()))\""
+test-command = "python -c \"import pathlib,subprocess,sys; cores=list(pathlib.Path(sys.prefix).rglob('_core*.so')); print('cores', cores); [print(subprocess.check_output(['readelf','-d',str(c)],text=True)) for c in cores]; import rgpot; assert rgpot.has_expr and rgpot.has_dftd3 and rgpot.has_dftd4 and rgpot.has_xckernel, (rgpot.has_expr, rgpot.has_dftd3, rgpot.has_dftd4, rgpot.has_xckernel); print(rgpot.__file__, len(rgpot.XcKernel.catalog()))\""
 
 # meson skips the limited_api kwarg under these interpreters anyway; the
 # explicit -D flag makes meson-python drop the abi3 tag to match.

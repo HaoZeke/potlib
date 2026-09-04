@@ -79,16 +79,22 @@ _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
 # linking the static convenience libs again would just duplicate symbols
 # into the extension.
 _py_link = [rgpot]
-# Header/compile flags only. Global _deps includes torch when
-# with_metatomic=true; putting those link_args on _core makes
-# `import rgpot` NEEDED libtorch_cpu (the pip contract is numpy-only).
+# Header/compile flags only. Do not iterate _deps: that list includes
+# torch when with_metatomic=true, and even a partial_dependency walk
+# can leak link_args onto _core (NEEDED libtorch_cpu).
 _py_hdr_deps = []
-foreach _d : _deps
-    _py_hdr_deps += _d.partial_dependency(
+if has_dftd3
+    _py_hdr_deps += dftd3_dep.partial_dependency(
         includes: true,
         compile_args: true,
     )
-endforeach
+endif
+if has_dftd4
+    _py_hdr_deps += dftd4_dep.partial_dependency(
+        includes: true,
+        compile_args: true,
+    )
+endif
 # Do not link cuh2 into the pip extension: the umbrella already carries the
 # slab helpers, and LJ + metatomic dlopen are the product.
 
