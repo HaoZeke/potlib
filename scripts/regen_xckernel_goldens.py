@@ -460,12 +460,26 @@ def _gate_pin(path: Path, live: np.ndarray, label: str) -> bool:
     return rel > 1e-17
 
 
+def _keep_host_j(path: Path, live: np.ndarray, label: str) -> None:
+    """Keep committed host J. Live get_j extras drift ~1e-15 and would
+    move the exclusive 1e-17 C compare if rewritten.
+    """
+    if path.exists():
+        prev = np.load(path)
+        err = float(np.max(np.abs(np.asarray(live) - prev)))
+        print(f"  {label} J live vs committed abs={err:.3e} (kept committed)")
+        return
+    save_npy(path, live)
+
+
 def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
     """TDA/RPA sigma pins plus host-J / MO / st_o2_p operands.
 
     Host J is the get_j matrix the response actually contracts (captured
     inside gen_vind / gen_tdhf_operation), not a second get_j on a
-    separately rebuilt transition DM.
+    separately rebuilt transition DM. Re-regen keeps committed
+    tda_*_j.npy / rpa_*_j.npy: live get_j extras drift ~1e-15 and would
+    move the exclusive 1e-17 C compare.
 
     Replay committed MOs when `{fam}_mo.npz` exists so live gen_vind is
     the same SCF as the pin. A fresh RKS kernel on the same mol/xc
@@ -608,7 +622,7 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
         sig, tda_j = _capture_j(
             lambda: vind(zs.reshape(3, -1)).reshape(3, nocc, nvir)
         )
-        save_npy(dest / f"tda_{fam}_j.npy", tda_j)
+        _keep_host_j(dest / f"tda_{fam}_j.npy", tda_j, f"{fam} TDA")
         drifted = _gate_pin(dest / f"tda_{fam}_sigma_ref.npy", sig, f"{fam} TDA") or drifted
         op, _ = gen_tdhf_operation(mf_x, singlet=True)
         xys = rngxy.standard_normal((3, 2, nocc, nvir))
@@ -619,7 +633,7 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
         rpa, rpa_j = _capture_j(
             lambda: op(xys.reshape(3, -1)).reshape(3, 2, nocc, nvir)
         )
-        save_npy(dest / f"rpa_{fam}_j.npy", rpa_j)
+        _keep_host_j(dest / f"rpa_{fam}_j.npy", rpa_j, f"{fam} RPA")
         drifted = _gate_pin(dest / f"rpa_{fam}_sigma_ref.npy", rpa, f"{fam} RPA") or drifted
         print(f"  {fam} TDA/RPA pins nocc={nocc} nvir={nvir} ngrid={ng}")
     return drifted
