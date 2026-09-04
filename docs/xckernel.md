@@ -65,5 +65,13 @@ named file is missing. Regenerator:
 
 That script refuses to run off rg.terra. Tolerances are the paper/README
 bars: C vs NumPy `1e-16`, Fock vs PySCF exclusive `1e-15`, fxc vs PySCF
-`1e-13`. `--pyscf` Fock compares long-double stage A/B to live `nr_rks`
-and exits when `rel > 1e-15`. Do not invent looser values.
+`1e-13`, TDA/RPA vs PySCF exclusive `1e-17`. `--pyscf` Fock compares
+long-double stage A/B to live `nr_rks` and exits when `rel > 1e-15`.
+`--pyscf` TDA/RPA compares live `TDA.gen_vind` / `gen_tdhf_operation`
+to the committed sigma pins and exits when `rel > 1e-17`. Do not invent
+looser values.
+
+`rgpot::XcKernel::tdaSigma` / `rpaSigma` assemble the singlet supervector
+over `xck_*_st_o2_p` plus host-owned Coulomb (`get_j`, hermi=0). Meson
+compares those contractions elementwise to
+`pyscf_h2o_sto3g/{tda,rpa}_{lda,gga}_sigma_ref.npy`.
