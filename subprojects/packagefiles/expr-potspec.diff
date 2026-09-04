@@ -1,0 +1,54 @@
+diff --git a/Potentials.capnp b/Potentials.capnp
+index 0655766..9648d34 100644
+--- a/Potentials.capnp
++++ b/Potentials.capnp
+@@ -2365,14 +2365,49 @@ struct NWChemCdftSpec {
+     unspecified @0;
+     becke       @1;
+     mulliken    @2;
+     lowdin      @3;
+   }
+ }
+ 
++# @struct ExprTerm
++# @brief One named child in an ExprParams composition tree.
++#
++# `name` is the Lepton identifier used in ExprParams.expression.
++# `pot` is a PotSpec so a child may itself be an expression.
++struct ExprTerm {
++  name @0 :Text;
++  pot @1 :PotSpec;
++}
++
++# @struct ExprParams
++# @brief Recursive PES algebra for RPC/config. Not a PotentialConfig arm.
++#
++# The C++ ExprPot constructor (expression string plus named
++# unique_ptr<PotentialBase> children) is the first-slice API.
++# This tree names the same composition on the wire (e.g. "0.5*lj + d3")
++# without a flat scale list. Leaf PotSpec arms land when those pots
++# grow config structs; do not invent dummy leaves.
++struct ExprParams {
++  expression @0 :Text;
++  terms @1 :List(ExprTerm);
++}
++
++# @struct PotSpec
++# @brief Recursive potential tree used only for composition.
++#
++# Not a PotentialConfig arm. PotentialConfig stays a single-backend
++# configure union (none / nwchem / cpmd / metatomic).
++struct PotSpec {
++  union {
++    expr @0 :ExprParams;
++    none @1 :Void; # Empty node. Leaf arms land when those pots grow config structs.
++  }
++}
++
+ # @struct PotentialConfig
+ # @brief **rgpot user parameters (extensible, in/out via Cap'n Proto only).**
+ #
+ # This is the single user-facing options carrier for rgpot: pass in to configure
+ # a live Potential (RPC `configure` or in-process apply), and/or round-trip out
+ # when a backend supports get. One schema for wire + embed - no parallel
+ # TOML/JSON/YAML option files for backends.
