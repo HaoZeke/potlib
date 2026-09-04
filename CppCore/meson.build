@@ -368,7 +368,7 @@ if get_option('with_tests')
                     'expr_eindir_test',
                     sources: ['tests/ExprEindirTest.cc'],
                     dependencies: test_deps,
-                    include_directories: _incdirs + ['.'],
+                    include_directories: _incdirs + ['.', 'tests/support'],
                     cpp_args: test_args,
                     link_with: _linkto,
                     link_language: 'cpp',
