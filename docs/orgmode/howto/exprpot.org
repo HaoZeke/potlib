@@ -87,3 +87,43 @@ Terms are =unique_ptr<PotentialBase>= only.
 =-Dwith_dftd4=).
 =XcKernel= is not a term: it is in-process XC collocation, not a
 =Potential=.
+
+** In-process LJ vs pyeonclient Matter
+
+pyeonclient is the eOn algorithm layer (=Matter.relax=, Dimer, NEB).
+rgpot is the PES. eOn =PotType.LJ= constructs =rgpot::LJPot= with
+=LJConfig{}= (in-process, not potserv RPC).
+A claim that ExprPot or XcKernel beats pyeonclient is a category error
+unless the race is the same geometry, same pot, same host job.
+XcKernel is not a =Potential= and is not timed here.
+
+=scripts/time_inprocess_lj_rgpot_vs_pyeonclient.py= times N force calls
+on the ExprPotTest two-atom Ar fixture (1.5 A pair, 40 A cell, default
+LJ). Run it on rg.terra. It prints =A_ljpot_ns_per_call= (rgpot
+=LJPot= =operator()= via the nanobind binding) and
+=B_pyeonclient_matter_ns_per_call= (Matter =forces= after
+=setPositions=, so each iteration is a real force call).
+=C_exprpot_lj_ns_per_call= is printed only when the rgpot build
+exports =ExprPot= (=-Dwith_expr=true=). The PyPI wheel ships
+=with_expr= off.
+
+Optional C++ path: =CppCore/examples/time_lj_inprocess.cc= (meson
+=-Dwith_examples=true=) times =LJPot::operator()= without Python, and
+=ExprPot("lj")= when =-Dwith_expr=true=.
+
+Measured on rgam5terra, 2026-09-04, pinned CPU 0, N=100000, warmup=200,
+rgpot 3.0.2 wheel (module =__version__= 2.5.2), pyeonclient 0.4.0
+wheel (module =__version__= 0.3.6). Five consecutive runs, same
+process image:
+
+| run | A ns/call | B ns/call |
+|-----+-----------+-----------|
+|   1 |  1411.510 |  1173.947 |
+|   2 |  1411.835 |   850.435 |
+|   3 |  1423.633 |  1184.725 |
+|   4 |  1402.368 |  1168.029 |
+|   5 |   899.643 |   705.861 |
+
+Both paths report energy =-3.203362431126e-01= eV on this fixture.
+C was skipped (wheel has no =ExprPot=). These walls are not a claim
+that rgpot beats pyeonclient or the reverse.

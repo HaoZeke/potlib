@@ -26,6 +26,14 @@ the XC kernel.
 =ExprPot= (meson =-Dwith_expr=true=) compiles a Lepton energy string over
 named child =Potential= objects. The parser is vendored OpenMM Lepton;
 there is no pixi muparser feature and no =PotentialConfig.expr= arm.
+In-process LJ vs pyeonclient Matter on the ExprPotTest two-atom Ar
+fixture is timed by =scripts/time_inprocess_lj_rgpot_vs_pyeonclient.py=
+on rg.terra (prints ns/call). Measured 2026-09-04 on rgam5terra,
+N=100000: A (=LJPot= =operator()=) 899.643 to 1423.633 ns/call, B
+(pyeonclient Matter) 705.861 to 1184.725 ns/call, same energy
+=-0.3203362431126= eV. C (=ExprPot("lj")=) is skipped on the wheel
+(=with_expr= off). XcKernel is not a =Potential= and is not in that
+race. See =docs/orgmode/howto/exprpot.org=.
 
 The public wire schema lives in ~CppCore/rgpot/rpc/Potentials.capnp~ and is
 shared by the C++ server, Python integration tests, and the Rust core crate.

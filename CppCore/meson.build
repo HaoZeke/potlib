@@ -215,6 +215,9 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
             ['CallCuH2Pot', 'cuh2_call', 'call_cuh2.cc', ''],
         ]
     endif
+    example_array += [
+        ['TimeLJInprocess', 'time_lj_inprocess', 'time_lj_inprocess.cc', ''],
+    ]
     if has_eigen
         example_array += [
             ['EigenCallLJPot', 'ljpot_call_eig', 'eigen_call_ljpot.cc', ''],
