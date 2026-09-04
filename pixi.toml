@@ -26,7 +26,6 @@ xckernel = { features = ["xckernel"] }
 xckerneltest = { features = ["xckernel", "xckerneltest"] }
 dftd3 = { features = ["dftd3"] }
 dftd4 = { features = ["dftd4"] }
-expr = { features = ["expr"] }
 tblitebld = { features = ["tblite"] }
 tbbld = { features = ["xtb", "tblite"] }
 metatomicbld = { features = ["metatomic"] }
@@ -46,12 +45,6 @@ simple-dftd3 = ">=1.2.0,<2"
 # dftd4 C library from conda-forge. Not a PyPI stub.
 [feature.dftd4.dependencies]
 dftd4 = ">=3.7.0,<5"
-
-# muparser C++ math parser. conda-forge name is muparser; pkg-config
-# name is muparser; header is muParser.h. Keep feature-gated: default
-# workspace deps stay muparser-free.
-[feature.expr.dependencies]
-muparser = ">=2.3.4,<3"
 
 # libxckernel generation + numerical evaluation (rgpot-4c7j).
 # pylibxc is NOT on PyPI: the pylibxc2 name there is an unrelated empty stub.

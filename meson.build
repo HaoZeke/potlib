@@ -272,8 +272,8 @@ endif
 
 has_expr = false
 if get_option('with_expr')
-    expr_dep = dependency('muparser', required: true)
-    _deps += expr_dep
+    subdir('third_party/lepton')
+    _deps += lepton_dep
     _args += ['-DRGPOT_HAS_EXPR=TRUE']
     has_expr = true
 endif
