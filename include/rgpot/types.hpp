@@ -28,6 +28,7 @@
 #include <cstring>
 #include <vector>
 
+#include "rgpot/eindir_compat.h"
 #include "rgpot.h"
 
 namespace rgpot {

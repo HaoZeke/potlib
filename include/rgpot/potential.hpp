@@ -44,7 +44,9 @@
 #include <utility>
 #include <vector>
 
+#include "rgpot/eindir_compat.h"
 #include "rgpot.h"
+#include "rgpot/ForceStructs.hpp"
 #include "rgpot/errors.hpp"
 #include "rgpot/types.hpp"
 
@@ -147,6 +149,46 @@ public:
                                        static_cast<void *>(&impl),
                                        nullptr // caller owns impl
     );
+    return PotentialHandle(handle);
+  }
+
+  /**
+   * @brief Wrap a C++ potential as one eindir objective with molecular
+   *        context.
+   *
+   * Calls @c rgpot_potential_new_eindir so the handle is a
+   * @c rgpot_potential_t* and, via the first-member embed, an
+   * @c eindir_objective_t*.  One @c calculate() (or one
+   * @c rgpot_potential_calculate) evaluates the whole impl, including an
+   * @c ExprPot combo such as @c 0.5*lj + morse.
+   *
+   * The caller retains ownership of @a impl and must keep it alive for
+   * the lifetime of the returned handle.
+   *
+   * @tparam Impl A type with
+   *         @c void @c forceImpl(const @c ForceInput&, @c ForceOut*).
+   * @param impl            Reference to the C++ potential object.
+   * @param n_atoms         Atom count stored on the eindir objective.
+   * @param atomic_numbers  Length @a n_atoms; copied into the handle.
+   * @param box_matrix      Flat 3x3 cell, 9 doubles; copied into the handle.
+   * @param bounds_low      Optional length @c n_atoms*3; @c nullptr uses
+   *                        the eindir default of -50 per coordinate.
+   * @param bounds_high     Optional length @c n_atoms*3; @c nullptr uses
+   *                        the eindir default of +50 per coordinate.
+   * @return A new @c PotentialHandle wrapping @a impl as one objective.
+   */
+  template <typename Impl>
+  static PotentialHandle from_impl_eindir(Impl &impl, size_t n_atoms,
+                                          const int *atomic_numbers,
+                                          const double *box_matrix,
+                                          const double *bounds_low = nullptr,
+                                          const double *bounds_high = nullptr) {
+    auto *handle = rgpot_potential_new_eindir(
+        &trampoline_callback<Impl>, static_cast<void *>(&impl),
+        nullptr, // caller owns impl
+        static_cast<uintptr_t>(n_atoms),
+        reinterpret_cast<const int32_t *>(atomic_numbers), box_matrix,
+        bounds_low, bounds_high);
     return PotentialHandle(handle);
   }
 

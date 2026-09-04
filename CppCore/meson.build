@@ -361,6 +361,22 @@ if get_option('with_tests')
             link_language: 'cpp',
             install: false,
         )
+        if get_option('with_rust_core')
+            test(
+                'ExprEindir',
+                executable(
+                    'expr_eindir_test',
+                    sources: ['tests/ExprEindirTest.cc'],
+                    dependencies: test_deps,
+                    include_directories: _incdirs + ['.'],
+                    cpp_args: test_args,
+                    link_with: _linkto,
+                    link_language: 'cpp',
+                ),
+                workdir: meson.source_root(),
+                suite: 'expr',
+            )
+        endif
     endif
     if has_metatomic
         test_array += [
