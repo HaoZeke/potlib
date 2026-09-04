@@ -79,6 +79,16 @@ _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
 # linking the static convenience libs again would just duplicate symbols
 # into the extension.
 _py_link = [rgpot]
+# Header/compile flags only. Global _deps includes torch when
+# with_metatomic=true; putting those link_args on _core makes
+# `import rgpot` NEEDED libtorch_cpu (the pip contract is numpy-only).
+_py_hdr_deps = []
+foreach _d : _deps
+    _py_hdr_deps += _d.partial_dependency(
+        includes: true,
+        compile_args: true,
+    )
+endforeach
 # Do not link cuh2 into the pip extension: the umbrella already carries the
 # slab helpers, and LJ + metatomic dlopen are the product.
 
@@ -101,7 +111,7 @@ if _nb_free_threaded
     py.extension_module(
         '_core',
         sources: _core_sources,
-        dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+        dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
         include_directories: _py_incs,
         link_with: _py_link,
         cpp_args: _nb_cpp_args,
@@ -118,7 +128,7 @@ else
         py.extension_module(
             '_core',
             sources: _core_sources,
-            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
             include_directories: _py_incs,
             link_with: _py_link,
             cpp_args: _nb_cpp_args,
@@ -136,7 +146,7 @@ else
         py.extension_module(
             '_core',
             sources: _core_sources,
-            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
             include_directories: _py_incs,
             link_with: _py_link,
             cpp_args: _nb_cpp_args,

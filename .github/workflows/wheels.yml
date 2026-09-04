@@ -67,6 +67,13 @@ jobs:
               || { echo "wheel missing D4Pot; -Dwith_dftd4 lost" >&2; exit 1; }
             echo "$demangled" | grep -q 'rgpot::XcKernel' \
               || { echo "wheel missing XcKernel; -Dwith_xckernel lost" >&2; exit 1; }
+            core=$(find _whlx -name '_core*.so' | head -1)
+            test -n "${core}" || { echo "no _core in wheel" >&2; exit 1; }
+            if readelf -d "${core}" | grep -q 'libtorch'; then
+              echo "_core NEEDs libtorch; pip import would require torch" >&2
+              readelf -d "${core}"
+              exit 1
+            fi
           done
       - uses: actions/upload-artifact@v4
         with:
