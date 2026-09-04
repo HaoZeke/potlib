@@ -3,6 +3,7 @@
 
 #include "rgpot/XcKernel/XcKernel.hpp"
 
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <unordered_map>
@@ -10,6 +11,10 @@
 
 #ifdef RGPOT_HAS_XCKERNEL
 #include "xckernel.h"
+#include "xckernel/kernels/xck_lda_st_o2_p.hpp"
+
+#include <algorithm>
+#include <cstring>
 
 namespace {
 
@@ -202,6 +207,82 @@ void add_contract_rho(const double *left, const double *right, std::size_t nbf,
   }
 }
 
+// PySCF dft.gen_grid.BLKSIZE. nr_rks_fxc / _dot_ao_ao tile the grid
+// this wide; a single fused sum_g U(u,g) c(g) V(v,g) over all points
+// is 1-8 ulp farther from gen_vind on the sto-3g TDA/RPA pins.
+constexpr std::size_t kPyscfBlk = 128;
+
+void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
+                     const double *c, const double *V, double *out) {
+  const auto ng = static_cast<std::size_t>(npts);
+  const auto nb = static_cast<std::size_t>(nbf);
+  std::vector<double> aow(nb * kPyscfBlk, 0.0);
+  for (std::size_t g0 = 0; g0 < ng; g0 += kPyscfBlk) {
+    const std::size_t nblk = std::min(kPyscfBlk, ng - g0);
+    for (std::size_t u = 0; u < nb; ++u) {
+      const double *Ug = U + u * ng + g0;
+      double *aw = aow.data() + u * nblk;
+      for (std::size_t t = 0; t < nblk; ++t) {
+        aw[t] = Ug[t] * c[g0 + t];
+      }
+    }
+    for (std::size_t u = 0; u < nb; ++u) {
+      for (std::size_t v = 0; v < nb; ++v) {
+        double s = 0.0;
+        const double *aw = aow.data() + u * nblk;
+        const double *Vg = V + v * ng + g0;
+        for (std::size_t t = 0; t < nblk; ++t) {
+          s += aw[t] * Vg[t];
+        }
+        out[u * nb + v] += s;
+      }
+    }
+  }
+}
+
+int fill_scal_ptrs(const XcKernel &k,
+                   const std::map<std::string, const double *> &scal,
+                   std::vector<const double *> *ptrs) {
+  const auto names = k.scalNames();
+  ptrs->assign(static_cast<std::size_t>(k.nScal()), nullptr);
+  for (int i = 0; i < k.nScal(); ++i) {
+    auto it = scal.find(names[static_cast<std::size_t>(i)]);
+    if (it == scal.end() || it->second == nullptr) {
+      return 3;
+    }
+    (*ptrs)[static_cast<std::size_t>(i)] = it->second;
+  }
+  return 0;
+}
+
+int contract_st_blocked(const XcKernel &k, const XcGrid &grid,
+                        const std::map<std::string, const double *> &scal,
+                        double *out) {
+  std::vector<const double *> ptrs;
+  const int rc = fill_scal_ptrs(k, scal, &ptrs);
+  if (rc != 0) {
+    return rc;
+  }
+  const auto npts = grid.npts;
+  const auto nbf = grid.nbf;
+  const auto n2 = static_cast<std::size_t>(nbf) * static_cast<std::size_t>(nbf);
+  std::memset(out, 0, n2 * sizeof(double));
+  std::vector<double> c(static_cast<std::size_t>(npts), 0.0);
+  const double *const *fields = ptrs.data();
+  const double *const *xc = ptrs.data() + k.nFields();
+  const double *chi = grid.chi;
+  if (k.name() == "xck_lda_st_o2_p") {
+    xckernel::stage_a<double, double>(
+        npts, 2, xckernel::detail_xck_lda_st_o2_p::c0,
+        xckernel::detail_xck_lda_st_o2_p::o0,
+        xckernel::detail_xck_lda_st_o2_p::f0,
+        xckernel::detail_xck_lda_st_o2_p::NFLD, fields, xc, c.data());
+    blocked_stage_b(npts, nbf, chi, c.data(), chi, out);
+    return 0;
+  }
+  return k.contract(grid, scal, out);
+}
+
 int apply_fxc_d(const XcKernel &k, const XcGrid &grid,
                 const std::map<std::string, const double *> &ground,
                 const double *dm, double *vxc) {
@@ -251,7 +332,7 @@ int apply_fxc_d(const XcKernel &k, const XcGrid &grid,
       scal[name] = gzd.data();
     }
   }
-  return k.contract(grid, scal, vxc);
+  return contract_st_blocked(k, grid, scal, vxc);
 }
 #endif
 

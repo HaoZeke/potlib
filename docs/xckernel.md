@@ -77,10 +77,12 @@ that bar (MO/energy noise ~1e-15); the exclusive gate is MO-replay
 written before that exit. Do not invent looser values.
 
 TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
-`xck_*_st_o2_p` C kernels plus host Coulomb. Transition densities and ov
-projection follow the PySCF `lib.einsum` contraction path
-(`qo,xov->vxq` then `vxq,pv->xpq` for the TDA DM; `pv,xpq->vxq` then
-`vxq,qo->xov` for the ov block). Perturbed fields follow PySCF
-`eval_rho` (`c0 = ao @ dm`, GGA `hermi=0` adds `ao @ dm.T`). Coulomb
-`J` stays host-owned (pinned `tda_*_j.npy` / `rpa_*_j.npy` from PySCF
-`get_j` on that same DM).
+`xck_*_st_o2_p` kernels plus host Coulomb. LDA stage B tiles the grid
+at PySCF `BLKSIZE` (128), matching `nr_rks_fxc` / `_dot_ao_ao`.
+Transition densities and ov projection follow the PySCF `lib.einsum`
+contraction path (`qo,xov->vxq` then `vxq,pv->xpq` for the TDA DM;
+`pv,xpq->vxq` then `vxq,qo->xov` for the ov block). Perturbed fields
+follow PySCF `eval_rho` (`c0 = ao @ dm`, GGA `hermi=0` adds
+`ao @ dm.T`). Coulomb `J` stays host-owned (pinned `tda_*_j.npy` /
+`rpa_*_j.npy` from the `get_j` call inside `gen_vind` /
+`gen_tdhf_operation`).
