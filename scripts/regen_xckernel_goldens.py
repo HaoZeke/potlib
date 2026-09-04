@@ -429,29 +429,163 @@ def regen_pyscf() -> None:
         sys.exit(f"GGA fxc vs nr_rks_fxc rel={err / scale:.3e} exceeds 1e-13")
     save_npy(dest / "gga_fxc_ref.npy", Rref)
 
-    # TDA / RPA pins from live PySCF (tda_validate.py convention)
+    regen_tda_rpa(mol=mol, dest=dest)
+
+
+def _gate_pin(path: Path, live: np.ndarray, label: str) -> bool:
+    """Exclusive 1e-17 live-vs-committed. Returns True when the bar is red."""
+    if not path.exists():
+        save_npy(path, live)
+        return False
+    prev = np.load(path)
+    err = float(np.max(np.abs(live - prev)))
+    scale = float(np.max(np.abs(prev)) or 1.0)
+    rel = err / scale
+    print(f"  {label} live vs previous pin abs={err:.3e} rel={rel:.3e}")
+    save_npy(path, live)
+    return rel > 1e-17
+
+
+def regen_tda_rpa(mol=None, dest: Path | None = None) -> None:
+    """TDA/RPA sigma pins plus host-J / MO / st_o2_p operands.
+
+    Replay committed MOs when `{fam}_mo.npz` exists so live gen_vind is
+    the same SCF as the pin. A fresh RKS kernel on the same mol/xc
+    already drifts past exclusive 1e-17.
+    """
     from pyscf import dft as dft_mod
+    from pyscf import gto
+    from pyscf.dft import numint as ni_mod
     from pyscf.tdscf.rhf import gen_tdhf_operation
+
+    if mol is None:
+        mol = gto.M(
+            atom="O 0 0 0; H 0 0 0.96; H 0 0.93 -0.24",
+            basis="sto-3g",
+            verbose=0,
+        )
+    if dest is None:
+        dest = DATA / "pyscf_h2o_sto3g"
+    dest.mkdir(parents=True, exist_ok=True)
 
     rngz = np.random.default_rng(4)
     rngxy = np.random.default_rng(5)
+    ni_tda = ni_mod.NumInt()
+    drifted = False
     for fam, xc in (("lda", "LDA_X,"), ("gga", "GGA_X_PBE,")):
         mf_x = dft_mod.RKS(mol)
         mf_x.xc = xc
         mf_x.verbose = 0
-        mf_x.kernel()
+        mf_x.grids.level = 3
+        mo_path = dest / f"{fam}_mo.npz"
+        if mo_path.exists():
+            pinned = np.load(mo_path)
+            mf_x.build()
+            mf_x.grids.build()
+            nocc = int((pinned["mo_occ"] > 0).sum())
+            nao = int(pinned["Co"].shape[0])
+            mo_coeff = np.zeros((nao, nao), dtype=np.float64)
+            mo_coeff[:, :nocc] = pinned["Co"]
+            mo_coeff[:, nocc:] = pinned["Cv"]
+            mf_x.mo_coeff = mo_coeff
+            mf_x.mo_energy = np.ascontiguousarray(pinned["mo_energy"])
+            mf_x.mo_occ = np.ascontiguousarray(pinned["mo_occ"])
+            mf_x.converged = True
+        else:
+            mf_x.kernel()
         td = mf_x.TDA()
         td.singlet = True
         vind, _hdiag = td.gen_vind(mf_x)
         nocc = int((mf_x.mo_occ > 0).sum())
         nvir = mol.nao - nocc
+        Co = np.ascontiguousarray(mf_x.mo_coeff[:, mf_x.mo_occ > 0])
+        Cv = np.ascontiguousarray(mf_x.mo_coeff[:, mf_x.mo_occ == 0])
+        e_ia = np.ascontiguousarray(
+            mf_x.mo_energy[mf_x.mo_occ == 0]
+            - mf_x.mo_energy[mf_x.mo_occ > 0, None]
+        )
+        save_npz(
+            dest / f"{fam}_mo.npz",
+            Co=Co,
+            Cv=Cv,
+            e_ia=e_ia,
+            mo_energy=np.ascontiguousarray(mf_x.mo_energy),
+            mo_occ=np.ascontiguousarray(mf_x.mo_occ),
+        )
+        grids_x = mf_x.grids
+        xctype = "LDA" if fam == "lda" else "GGA"
+        deriv = 0 if xctype == "LDA" else 1
+        ao = ni_tda.eval_ao(mol, grids_x.coords, deriv=deriv)
+        dm0_x = mf_x.make_rdm1()
+        rho = ni_tda.eval_rho(mol, ao, dm0_x, xctype=xctype)
+        rho_s = rho * 0.5
+        _exc, vxc, fxc = dft_mod.libxc.eval_xc(
+            xc, (rho_s, rho_s), spin=1, deriv=2
+        )[:3]
+        ng = int(len(grids_x.weights))
+
+        def _col(arr):
+            arr = np.asarray(arr)
+            return arr if arr.shape[0] == ng else arr.T
+
+        scal = {"w": np.ascontiguousarray(grids_x.weights)}
+        names_v = ["vrho"] if xctype == "LDA" else ["vrho", "vsigma"]
+        names_f = (
+            ["v2rho2"]
+            if xctype == "LDA"
+            else ["v2rho2", "v2rhosigma", "v2sigma2"]
+        )
+        for name, arr in zip(
+            names_v + names_f,
+            list(vxc[: len(names_v)]) + list(fxc[: len(names_f)]),
+        ):
+            A = _col(arr)
+            for c in range(A.shape[1]):
+                scal[f"{name}_{c}"] = np.ascontiguousarray(A[:, c])
+        if xctype == "LDA":
+            chi = np.ascontiguousarray(ao.T)
+            dchi = np.zeros((3,) + chi.shape)
+        else:
+            chi = np.ascontiguousarray(ao[0].T)
+            dchi = np.ascontiguousarray(np.transpose(ao[1:4], (0, 2, 1)))
+            _expand_into(scal, "grad_rho_a", rho[1:4] * 0.5)
+        extra = dict(scal)
+        extra.update(chi=chi, dchi=dchi, w=grids_x.weights, dm0=dm0_x)
+        save_npz(dest / f"{fam}_st_operands.npz", **extra)
+
         zs = rngz.standard_normal((3, nocc, nvir))
+        z_path = dest / f"tda_{fam}_z.npy"
+        if z_path.exists():
+            zs = np.load(z_path)
+        save_npy(z_path, zs)
+        tda_dms = np.array(
+            [2.0 * (Cv @ z.T @ Co.T) for z in zs], dtype=np.float64
+        )
+        save_npy(
+            dest / f"tda_{fam}_j.npy",
+            np.ascontiguousarray(mf_x.get_j(mol, tda_dms, hermi=0)),
+        )
         sig = vind(zs.reshape(3, -1)).reshape(3, nocc, nvir)
-        save_npy(dest / f"tda_{fam}_sigma_ref.npy", sig)
+        drifted = _gate_pin(dest / f"tda_{fam}_sigma_ref.npy", sig, f"{fam} TDA") or drifted
         op, _ = gen_tdhf_operation(mf_x, singlet=True)
         xys = rngxy.standard_normal((3, 2, nocc, nvir))
+        xy_path = dest / f"rpa_{fam}_xy.npy"
+        if xy_path.exists():
+            xys = np.load(xy_path)
+        save_npy(xy_path, xys)
+        rpa_dms = np.array(
+            [2.0 * (Cv @ x.T @ Co.T + Co @ y @ Cv.T) for x, y in xys],
+            dtype=np.float64,
+        )
+        save_npy(
+            dest / f"rpa_{fam}_j.npy",
+            np.ascontiguousarray(mf_x.get_j(mol, rpa_dms, hermi=0)),
+        )
         rpa = op(xys.reshape(3, -1)).reshape(3, 2, nocc, nvir)
-        save_npy(dest / f"rpa_{fam}_sigma_ref.npy", rpa)
+        drifted = _gate_pin(dest / f"rpa_{fam}_sigma_ref.npy", rpa, f"{fam} RPA") or drifted
+        print(f"  {fam} TDA/RPA pins nocc={nocc} nvir={nvir} ngrid={ng}")
+    if drifted:
+        sys.exit("TDA/RPA live vs committed exceeded exclusive 1e-17")
 
 
 def write_manifest() -> None:
@@ -489,6 +623,8 @@ def write_manifest() -> None:
             "xck_gga_r_o1",
             "xck_gga_r_o2",
             "xck_mgga_tau_r_o1",
+            "xck_lda_st_o2_p",
+            "xck_gga_st_o2_p",
         ],
         "libxc_ids": ["LDA_X", "GGA_X_PBE", "MGGA_X_SCAN"],
         "files": files,
@@ -501,20 +637,26 @@ def write_manifest() -> None:
 
 def main(argv=None) -> int:
     _require_terra()
-    _ensure_xckernel()
     p = argparse.ArgumentParser()
     p.add_argument("--s2jz", action="store_true")
     p.add_argument("--c-vs-numpy", action="store_true")
     p.add_argument("--pyscf", action="store_true")
+    p.add_argument("--tda-rpa", action="store_true")
     p.add_argument("--all", action="store_true")
     args = p.parse_args(argv)
-    do_all = args.all or not (args.s2jz or args.c_vs_numpy or args.pyscf)
+    do_all = args.all or not (
+        args.s2jz or args.c_vs_numpy or args.pyscf or args.tda_rpa
+    )
+    if do_all or args.s2jz or args.c_vs_numpy or args.pyscf:
+        _ensure_xckernel()
     if do_all or args.s2jz:
         regen_s2jz()
     if do_all or args.c_vs_numpy:
         regen_c_vs_numpy()
     if do_all or args.pyscf:
         regen_pyscf()
+    elif args.tda_rpa:
+        regen_tda_rpa()
     write_manifest()
     return 0
 
