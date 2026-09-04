@@ -97,6 +97,43 @@ def _numpy_eval(ki, chi, dchi, lapl_chi, hess_chi, scal):
     return fn(*args), scal_order(ck)
 
 
+def _stage_b(U, c, V):
+    return (U * c) @ V.T
+
+
+def _fock_longdouble(fam: str, chi, dchi, scal) -> np.ndarray:
+    """Restricted Fock via long-double stage A/B (evaluator.hpp).
+
+    Float64 NumPy einsum over the H2O/sto-3g level-3 grid lands MGGA-tau
+    vs nr_rks at rel=1.50e-15, past exclusive 1e-15. Same tables as
+    xck_{lda,gga,mgga_tau}_r_o1 accumulate in long double.
+    """
+    ld = np.longdouble
+    chi_ld = np.ascontiguousarray(chi, dtype=ld)
+    dchi_ld = np.ascontiguousarray(dchi, dtype=ld)
+    w = np.ascontiguousarray(scal["w"], dtype=ld)
+    vrho = np.ascontiguousarray(scal["vrho"], dtype=ld)
+    nbf = int(chi_ld.shape[0])
+    out = np.zeros((nbf, nbf), dtype=ld)
+    out += _stage_b(chi_ld, vrho * w, chi_ld)
+    if fam != "lda":
+        vsigma = np.ascontiguousarray(scal["vsigma"], dtype=ld)
+        for ax, key in enumerate(("grad_rho_x", "grad_rho_y", "grad_rho_z")):
+            c = (
+                ld(2.0)
+                * np.ascontiguousarray(scal[key], dtype=ld)
+                * vsigma
+                * w
+            )
+            out += _stage_b(chi_ld, c, dchi_ld[ax])
+            out += _stage_b(dchi_ld[ax], c, chi_ld)
+    if fam == "mgga_tau":
+        c = ld(0.5) * np.ascontiguousarray(scal["vtau"], dtype=ld) * w
+        for ax in range(3):
+            out += _stage_b(dchi_ld[ax], c, dchi_ld[ax])
+    return np.ascontiguousarray(out, dtype=np.float64)
+
+
 def _expand_into(scal, key, val):
     val = np.ascontiguousarray(val, dtype=np.float64)
     if val.ndim == 2 and val.shape[0] == 3:
@@ -275,7 +312,6 @@ def regen_pyscf() -> None:
     from pylibxc import LibXCFunctional
     from pyscf.dft import numint as ni_mod
 
-    from xckernel.engine.kernel import fock
     from xckernel.engine.response import response_fock
     from xckernel.tests.response_validate import _pert_fields
 
@@ -343,21 +379,14 @@ def regen_pyscf() -> None:
         extra = dict(scal)
         extra.update(chi=chi, dchi=dchi, w=grids.weights, dm0=dm0)
         save_npz(dest / f"{stem}_operands.npz", **extra)
-        ref_xk, _ = _numpy_eval(
-            fock(fam),
-            chi,
-            dchi,
-            np.zeros_like(chi),
-            np.zeros((6,) + chi.shape),
-            scal,
-        )
+        ref_xk = _fock_longdouble(fam, chi, dchi, scal)
         _, _, vref = ni.nr_rks(mol, grids, xcname + ",", dm0)
         err = float(np.max(np.abs(ref_xk - vref)))
         scale = float(np.max(np.abs(vref)) or 1.0)
         rel = err / scale
         print(f"  {fam} Fock vs nr_rks abs={err:.3e} rel={rel:.3e}")
-        if rel > 1e-14:
-            sys.exit(f"{fam} Fock vs nr_rks rel={rel:.3e} exceeds ~1e-15 decade")
+        if rel > 1e-15:
+            sys.exit(f"{fam} Fock vs nr_rks rel={rel:.3e} exceeds exclusive 1e-15")
         save_npy(dest / f"{stem}_ref.npy", vref)
         save_npy(dest / f"{stem}_xk.npy", ref_xk)
 

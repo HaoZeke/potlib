@@ -64,5 +64,6 @@ named file is missing. Regenerator:
     pixi run -e xckerneltest -- python scripts/regen_xckernel_goldens.py
 
 That script refuses to run off rg.terra. Tolerances are the paper/README
-bars: C vs NumPy `1e-16`, Fock vs PySCF `1e-15`, fxc vs PySCF `1e-13`.
-Do not invent looser values.
+bars: C vs NumPy `1e-16`, Fock vs PySCF exclusive `1e-15`, fxc vs PySCF
+`1e-13`. `--pyscf` Fock compares long-double stage A/B to live `nr_rks`
+and exits when `rel > 1e-15`. Do not invent looser values.
