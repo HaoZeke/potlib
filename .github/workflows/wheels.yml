@@ -29,6 +29,10 @@ on:
       - "pyproject.toml"
       - "meson.build"
       - "CppCore/**"
+      - "python/**"
+      - "scripts/rgpot_wheel_dftd_prefix.sh"
+      - "third_party/lepton/**"
+      - "third_party/libxckernel/**"
       - ".github/workflows/wheels.yml"
 
 jobs:
@@ -54,6 +58,15 @@ jobs:
               echo "wheel carries ${n}/8 Fortran kernels; -Dwith_fortran_pots lost" >&2
               exit 1
             fi
+            demangled=$(nm -C "${lib}" 2>/dev/null || nm "${lib}")
+            echo "$demangled" | grep -q 'rgpot::ExprPot' \
+              || { echo "wheel missing ExprPot; -Dwith_expr lost" >&2; exit 1; }
+            echo "$demangled" | grep -q 'rgpot::D3Pot' \
+              || { echo "wheel missing D3Pot; -Dwith_dftd3 lost" >&2; exit 1; }
+            echo "$demangled" | grep -q 'rgpot::D4Pot' \
+              || { echo "wheel missing D4Pot; -Dwith_dftd4 lost" >&2; exit 1; }
+            echo "$demangled" | grep -q 'rgpot::XcKernel' \
+              || { echo "wheel missing XcKernel; -Dwith_xckernel lost" >&2; exit 1; }
           done
       - uses: actions/upload-artifact@v4
         with:

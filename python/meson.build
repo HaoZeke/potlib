@@ -90,6 +90,7 @@ endif
 _nb_cpp_args = _args + [
     '-DNB_DOMAIN=rgpot',
     '-Wno-unused-parameter',
+    '-DRGPOT_PY_VERSION="@0@"'.format(meson.project_version()),
 ]
 
 _core_sources = files('bind/bind_module.cpp') + [_nb_combined]
