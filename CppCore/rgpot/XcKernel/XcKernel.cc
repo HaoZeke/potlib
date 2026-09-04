@@ -331,22 +331,22 @@ void XcKernel::projectOv(const XcMo &mo, const double *Vao, double *ov) {
   if (Vao == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
     return;
   }
-  // PySCF: einsum('pq,qo,pv->ov', V, Co, Cv) == (V @ Co).T @ Cv
-  std::vector<double> tmp(nao * nocc, 0.0);
+  // einsum('pq,po,qv->ov', V, Co, Cv) == Co.T @ (V @ Cv)
+  std::vector<double> tmp(nao * nvir, 0.0);
   for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t i = 0; i < nocc; ++i) {
+    for (std::size_t a = 0; a < nvir; ++a) {
       double acc = 0.0;
       for (std::size_t q = 0; q < nao; ++q) {
-        acc += Vao[p * nao + q] * mo.Co[q * nocc + i];
+        acc += Vao[p * nao + q] * mo.Cv[q * nvir + a];
       }
-      tmp[p * nocc + i] = acc;
+      tmp[p * nvir + a] = acc;
     }
   }
   for (std::size_t i = 0; i < nocc; ++i) {
     for (std::size_t a = 0; a < nvir; ++a) {
       double acc = 0.0;
       for (std::size_t p = 0; p < nao; ++p) {
-        acc += tmp[p * nocc + i] * mo.Cv[p * nvir + a];
+        acc += mo.Co[p * nocc + i] * tmp[p * nvir + a];
       }
       ov[i * nvir + a] = acc;
     }
@@ -431,13 +431,13 @@ int XcKernel::tdaSigma(const XcGrid &grid,
   std::vector<double> dm(nao * nao, 0.0);
   std::vector<double> vxc(nao * nao, 0.0);
   std::vector<double> v1(nao * nao, 0.0);
-  transitionDm(mo, z, 2.0, dm.data());
+  transitionDm(mo, z, 1.0, dm.data());
   const int rc = apply_fxc_d(*this, grid, ground, dm.data(), vxc.data());
   if (rc != 0) {
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = vj[k] + 0.5 * vxc[k];
+    v1[k] = vj[k] + vxc[k];
   }
   tdaSigma(mo, z, v1.data(), sigma);
   return 0;
@@ -462,13 +462,13 @@ int XcKernel::rpaSigma(const XcGrid &grid,
   std::vector<double> dm(nao * nao, 0.0);
   std::vector<double> vxc(nao * nao, 0.0);
   std::vector<double> v1(nao * nao, 0.0);
-  rpaTransitionDm(mo, xy, xy + nov, 2.0, dm.data());
+  rpaTransitionDm(mo, xy, xy + nov, 1.0, dm.data());
   const int rc = apply_fxc_d(*this, grid, ground, dm.data(), vxc.data());
   if (rc != 0) {
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = vj[k] + 0.5 * vxc[k];
+    v1[k] = vj[k] + vxc[k];
   }
   rpaSigma(mo, xy, v1.data(), sigma);
   return 0;

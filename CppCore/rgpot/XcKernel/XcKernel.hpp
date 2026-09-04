@@ -101,10 +101,10 @@ public:
   static void rpaTransitionDm(const XcMo &mo, const double *x, const double *y,
                               double occ, double *dm);
 
-  /// ov = einsum('pq,qo,pv->ov', V, Co, Cv) == (V @ Co)^T @ Cv.
+  /// ov = einsum('pq,po,qv->ov', V, Co, Cv) == Co^T @ (V @ Cv).
   static void projectOv(const XcMo &mo, const double *Vao, double *ov);
 
-  /// (A z)_ia = e_ia z_ia + (Co^T @ v1^T @ Cv)_ia. v1 is AO (nao*nao).
+  /// (A z)_ia = e_ia z_ia + (Co^T @ v1 @ Cv)_ia. v1 is AO (nao*nao).
   static void tdaSigma(const XcMo &mo, const double *z, const double *v1,
                        double *sigma);
 
@@ -120,8 +120,9 @@ public:
                const std::map<std::string, const double *> &ground,
                const double *dm, double *vxc) const;
 
-  /// TDA sigma with host Coulomb: v1 = vj + 0.5 * applyFxc(dm(z)).
-  /// vj is the host J matrix on the transition DM (nao*nao).
+  /// TDA sigma with host Coulomb: v1 = vj + applyFxc(dm_alpha(z)).
+  /// vj is the host J matrix on the spin-summed transition DM (nao*nao).
+  /// applyFxc sees the alpha DM (occ=1) so st_o2_p gets rho_a_p1.
   int tdaSigma(const XcGrid &grid,
                const std::map<std::string, const double *> &ground,
                const XcMo &mo, const double *z, const double *vj,

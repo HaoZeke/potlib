@@ -73,8 +73,8 @@ long-double stage A/B to live `nr_rks` and exits when `rel > 1e-15`.
 looser values.
 
 TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
-`xck_*_st_o2_p` C kernels plus host Coulomb. Transition densities, ov
-projection, and perturbed fields follow the PySCF `gen_vind` /
-`gen_tdhf_operation` einsum order (scale `Co` by occupancy first;
-`eval_rho` GEMM for `rho_p1`). Coulomb `J` stays host-owned (pinned
-`tda_*_j.npy` / `rpa_*_j.npy` from PySCF `get_j` on that same DM).
+`xck_*_st_o2_p` C kernels plus host Coulomb. The fxc kernel sees the
+alpha transition DM (`occ=1`, so `rho_a_p1` is alpha) and `v1 = J + vxc`.
+Occupied/virtual projection is `einsum('pq,po,qv->ov', V, Co, Cv)`
+(`Co^T @ (V @ Cv)`). Coulomb `J` stays host-owned (pinned `tda_*_j.npy`
+/ `rpa_*_j.npy` from PySCF `get_j` on the spin-summed DM).
