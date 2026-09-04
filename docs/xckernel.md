@@ -85,7 +85,9 @@ TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
 `xck_*_st_o2_p` kernels plus host Coulomb. LDA wv is
 `w * rho * (v2rho2_0 + v2rho2_1)` (one fused product, matching
 `nr_rks_fxc_st`) and stage B tiles the grid at PySCF `BLKSIZE` (128).
-GGA `st_o2_p` uses the generated monomials with the same tiled stage B.
+GGA `st_o2_p` `applyFxc` uses the generated 7-term monomials through
+the host long-double evaluator (`contract()`). Double tiled stage B
+misses exclusive `1e-17` vs live `gen_vind` on this sto-3g pin.
 Transition densities and ov projection follow the PySCF `lib.einsum`
 contraction path (`qo,xov->vxq` then `vxq,pv->xpq` for the TDA DM;
 `pv,xpq->vxq` then `vxq,qo->xov` for the ov block). Perturbed fields

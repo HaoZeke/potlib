@@ -1,1 +1,1 @@
-GGA TDA/RPA ``st_o2_p`` now tiles stage B at PySCF ``BLKSIZE=128`` (same as LDA) instead of an unblocked long-double grid sum.
+GGA TDA/RPA ``applyFxc`` keeps the generated 7-term monomials on the host long-double evaluator so C matches live ``gen_vind`` at exclusive 1e-17.
