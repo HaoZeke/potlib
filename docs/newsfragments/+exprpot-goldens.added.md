@@ -1,1 +1,0 @@
-ExprPot algebra goldens pin identity ``lj``, ``0.5*lj + morse``, ``2*lj - lj``, and ``0.5*(lj+morse)`` under ``CppCore/tests/data/expr/`` (energy 1e-14 eV, forces 1e-12 eV/A). Missing fixtures fail closed. Optional ``0.5*lj + d3`` when ``-Dwith_dftd3=true``.

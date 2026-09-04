@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.1.0](https://github.com/OmniPotentRPC/rgpot/tree/3.1.0) - 2026-09-04
+
+### Added
+
+- A wheels workflow builds and publishes the Python package. rgpot had none:
+  2.5.4 reached PyPI hand-built from a branch, with no tag and no
+  main-branch source behind it, which is how the version surfaces drifted
+  apart in the first place. A `v*` tag now builds manylinux and macOS
+  wheels plus an sdist with cibuildwheel and publishes them; a manual run
+  defaults to TestPyPI so an upload can be rehearsed before the
+  irreversible one.
+
+  The build step refuses a wheel whose `librgpot` carries fewer than the
+  eight Fortran `bind(c)` entry points, so the potentials cannot silently
+  fall out of the artifact again.
+- Add `scripts/time_lj_rgpot_vs_pyeonclient.py` to time in-process `LJPot`
+  against pyeonclient `Matter` on the ExprPotTest two-atom LJ fixture.
+- D3Pot wraps the s-dftd3 ISO C API (``-Dwith_dftd3=true``, pixi env ``dftd3``). Config selects BJ/zero damping, a functional key, and an explicit ATM three-body flag. In-process Potential summand; no ``PotentialConfig.d3`` arm.
+- D4Pot wraps the dftd4 ISO C API (``-Dwith_dftd4=true``, pixi env ``dftd4``). Config selects a functional key, total charge, and an explicit ATM/many-body flag. In-process Potential summand; no ``PotentialConfig.d4`` arm.
+- ExprPot algebra goldens pin identity ``lj``, ``0.5*lj + morse``, ``2*lj - lj``, and ``0.5*(lj+morse)`` under ``CppCore/tests/data/expr/`` (energy 1e-14 eV, forces 1e-12 eV/A). Missing fixtures fail closed. Optional ``0.5*lj + d3`` when ``-Dwith_dftd3=true``.
+- ExprPot compiles a Lepton energy string over named ``unique_ptr<PotentialBase>`` children (``-Dwith_expr=true``). Construct-time name checks fail closed. No PotentialConfig arm, no XcKernel term.
+- ExprPot forces use analytic Lepton ``differentiate(name)`` weights compiled at construct: ``F = sum_i (df/dE_i) F_i``. No finite difference, no muParser.
+- ExprPot wraps through ``PotentialHandle::from_impl`` / ``rgpot_potential_new_eindir`` as one eindir objective. A single ``rgpot_potential_calculate`` returns ``0.5*lj + morse``.
+- Golden masters pin D3 BJ ATM on/off and D4 PBE energy and forces against s-dftd3 / dftd4 on a water-octamer cube (``meson test --suite dftd``).
+- In-process `XcKernel` contracts Libxc derivative arrays into AO XC Fock and fxc matrices via the libxckernel C ABI (`-Dwith_xckernel=true`, off by default). This is not a `Potential` and has no `PotentialConfig` arm.
+- Optional conda-forge s-dftd3 / dftd4 gates (``-Dwith_dftd3`` / ``-Dwith_dftd4``, pixi features ``dftd3`` / ``dftd4``). Default workspace and wheel stay free of those libraries.
+- Optional vendored OpenMM Lepton gate (``-Dwith_expr``, ``third_party/lepton``). Default workspace and wheel stay free of Lepton object code.
+- RPC/config can name a recursive ``ExprParams`` / ``PotSpec`` tree (for example ``0.5*lj + d3``). ``PotentialConfig`` stays a single-backend configure union. The C++ ``ExprPot`` constructor remains the first-slice API.
+- TDA pin operator (H2O/sto-3g singlet roots) is also compared to libnwchemc ``task tddft`` / TDA via ``scripts/compare_xckernel_tda_nwchemc.py``. Exclusive sigma contraction stays 1e-17; the nwchemc root residual is the measured engine value (1e-6).
+- `Potential::forceBatch` evaluates several independent systems in one call.
+  The default `forceBatchImpl` loops over `forceImpl`, so every existing kernel answers a batch without an override.
+  When the result cache is on, hits are served per system and only the misses reach the kernel as one compact batch.
+- `XcKernel` assembles TDA and RPA sigma over the singlet `st_o2_p` C kernels plus host Coulomb, matching the PySCF `lib.einsum` contraction path and `eval_rho` (`ao @ dm`). The meson golden and live `TDA.gen_vind` / `gen_tdhf_operation` both meet exclusive 1e-17 against those committed sigma pins.
+- `rgpot-core` can load any minimum-profile backend by prefix, keep one persistent session, and exchange the shared `PotentialConfig`, `ForceInput`, and `PotentialResult` carriers in-process.
+
+### Changed
+
+- Docs credit Antics and load only `antics.js`; Umami tracker and label are gone.
+- The 1 MiB large-file CI gate now allowlists ``CppCore/tests/data/``, ``third_party/``, and ``pixi.lock`` (XcKernel goldens and the lockfile). Other tracked files still fail at 1 MiB.
+
+### Fixed
+
+- D3Pot now passes a sigma buffer to ``dftd3_get_dispersion`` so s-dftd3 fills the gradient (forces were previously left at zero).
+- GGA TDA/RPA ``applyFxc`` keeps the generated 7-term monomials on the host long-double evaluator so C matches live ``gen_vind`` at exclusive 1e-17.
+- LDA TDA/RPA fxc forms `wv = w * rho * (v2rho2_0 + v2rho2_1)` and tiles
+  stage B at PySCF `BLKSIZE` (128). `--tda-rpa` pins host J from the
+  `get_j` call inside `gen_vind` / `gen_tdhf_operation`.
+- The cp312 wheel now carries the `abi3` tag: `tool.meson-python.limited-api`
+  declares the stable-ABI build to meson-python, so one cp312-abi3 wheel
+  installs on every CPython >= 3.12 instead of 3.12 alone.
+- The metatomic torch dependency links on macOS. Its link arguments carried
+  `-rpath-link` and `--as-needed`, which are GNU ld only: Apple's linker
+  rejects them outright, so any Darwin build with `-Dwith_metatomic=true`
+  died with "unknown options" while producing `librgpot.3.dylib`. Those
+  flags now apply on GNU linkers only; Apple's resolves the dylibs from the
+  library path and their install names.
+- Wheel publish falls back to the `pypi-rgpot` / `testpypi-rgpot`
+  `PYPI_TOKEN` until a matching trusted publisher is registered.
+
+  cibuildwheel `build` must be a space-separated string so cp310, cp311,
+  and the cp312 abi3 wheel all ship (a TOML array only built cp310).
+- `--pyscf` Fock live-PySCF regen now fails above exclusive 1e-15 after long-double stage A/B (mGGA-tau float64 einsum was 1.50e-15).
+- `--tda-rpa` keeps committed TDA/RPA host-J pins. Live `get_j` jitters
+  about 1e-15 on this case and is reported, not written over the Coulomb
+  pin the exclusive 1e-17 C compare uses.
+- `--tda-rpa` now writes same-SCF extras and MANIFEST before the exclusive 1e-17 live-vs-committed gate; sigma/J pins are the MO-replay `gen_vind` / `get_j` (a fresh RKS is not bit-stable at that scale).
+- `--tda-rpa` regen pins PySCF to one OpenMP thread and replays committed MOs so live `gen_vind` / `gen_tdhf_operation` can meet exclusive 1e-17 against the sigma pins.
+
+
 ## [3.0.2](https://github.com/OmniPotentRPC/rgpot/tree/3.0.2) - 2026-08-08
 
 ### Fixed
