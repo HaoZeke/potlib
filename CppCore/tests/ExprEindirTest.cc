@@ -105,8 +105,8 @@ double maxAbsForceDiff(const AtomMatrix &a, const std::vector<double> &flat) {
   return worst;
 }
 
-void checkCombo(const Geom &geom, rgpot::PotentialHandle &handle,
-                double e_cpp, const AtomMatrix &f_cpp, double e_pin,
+void checkCombo(Geom &geom, rgpot::PotentialHandle &handle, double e_cpp,
+                const AtomMatrix &f_cpp, double e_pin,
                 const AtomMatrix &f_pin) {
   REQUIRE(handle.raw() != nullptr);
 
