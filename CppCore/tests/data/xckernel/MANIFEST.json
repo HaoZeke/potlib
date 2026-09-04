@@ -6,7 +6,8 @@
     "c_vs_numpy": 1e-16,
     "fock_vs_pyscf": 1e-15,
     "fxc_vs_pyscf": 1e-13,
-    "tda_rpa_vs_pyscf": 1e-17
+    "tda_rpa_vs_pyscf": 1e-17,
+    "tda_nwchemc_vs_pin_operator": 1e-06
   },
   "seeds": {
     "randgrid": 1,
@@ -380,6 +381,38 @@
     "randgrid_s1_nbf4_ng200_operands.npz": {
       "sha256": "7cbdc5ccc474aee80654f252e3e2cc37023dfadc1dd05b633edf5b95e3ac0bde",
       "bytes": 34844
+    },
+    "pyscf_h2o_sto3g/tda_lda_nwchemc_roots.npy": {
+      "sha256": "6fc39b911224aaf2c2aa2b3bf77fae979bf03ad0ad1b8acbe79262b8dd95088a",
+      "bytes": 168,
+      "shape": [
+        5
+      ],
+      "dtype": "float64"
+    },
+    "pyscf_h2o_sto3g/tda_lda_pyscf_roots.npy": {
+      "sha256": "ec9a04cfcdb82af6bb346a46ebfb67e569ff0bcf0ec7d0aa68a2862770678acc",
+      "bytes": 168,
+      "shape": [
+        5
+      ],
+      "dtype": "float64"
+    },
+    "pyscf_h2o_sto3g/tda_gga_nwchemc_roots.npy": {
+      "sha256": "831334dcc3ff230430e8070901ae93f4ec8dd0eba3cad4098ce3b257d47926e2",
+      "bytes": 168,
+      "shape": [
+        5
+      ],
+      "dtype": "float64"
+    },
+    "pyscf_h2o_sto3g/tda_gga_pyscf_roots.npy": {
+      "sha256": "c584e88c9cdf1908d7db9cac37c6d99511709b46366ecc93883174b7f6881201",
+      "bytes": 168,
+      "shape": [
+        5
+      ],
+      "dtype": "float64"
     }
   }
 }

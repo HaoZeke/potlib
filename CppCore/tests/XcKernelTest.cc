@@ -33,6 +33,9 @@ constexpr double kCVsNumpy = 1e-16;
 constexpr double kFockVsPyscf = 1e-15;
 constexpr double kFxcVsPyscf = 1e-13;
 constexpr double kTdaRpaVsPyscf = 1e-17;
+// Measured libnwchemc TDA roots vs pin-operator TDA.kernel on this
+// sto-3g case (7.44e-7 Ha). Not a loosened sigma-contraction bar.
+constexpr double kTdaNwchemcVsPin = 1e-6;
 
 void require_file(const std::string &path) {
   REQUIRE(std::filesystem::exists(path));
@@ -211,6 +214,10 @@ TEST_CASE("golden fixtures exist (fail closed)", "[xckernel][golden]") {
       "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/rpa_gga_xy.npy",
       "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/rpa_lda_j.npy",
       "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/rpa_gga_j.npy",
+      "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/tda_lda_nwchemc_roots.npy",
+      "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/tda_gga_nwchemc_roots.npy",
+      "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/tda_lda_pyscf_roots.npy",
+      "CppCore/tests/data/xckernel/pyscf_h2o_sto3g/tda_gga_pyscf_roots.npy",
   };
   for (const char *p : required) {
     require_file(p);
@@ -385,5 +392,23 @@ TEST_CASE("PySCF TDA/RPA sigma pins at 1e-17 (4e7y)",
     UNSCOPED_INFO(c.fam << " RPA rel=" << rpa_rel << " abs=" << rpa_abs);
     CHECK(tda_rel <= kTdaRpaVsPyscf);
     CHECK(rpa_rel <= kTdaRpaVsPyscf);
+  }
+}
+
+TEST_CASE("TDA pin operator vs libnwchemc roots",
+          "[xckernel][golden][tda][nwchemc]") {
+  const std::string root = std::string(kData) + "/pyscf_h2o_sto3g";
+  for (const char *fam : {"lda", "gga"}) {
+    auto nw = load_npy(root + "/tda_" + std::string(fam) + "_nwchemc_roots.npy");
+    auto pin = load_npy(root + "/tda_" + std::string(fam) + "_pyscf_roots.npy");
+    REQUIRE(nw.shape.size() == 1);
+    REQUIRE(pin.shape.size() == 1);
+    REQUIRE(nw.shape[0] == pin.shape[0]);
+    REQUIRE(nw.shape[0] == 5);
+    const double rel = max_rel(nw.data, pin.data);
+    const double absd = max_abs(nw.data, pin.data);
+    UNSCOPED_INFO(fam << " nwchemc vs pin-operator rel=" << rel
+                      << " abs=" << absd);
+    CHECK(rel <= kTdaNwchemcVsPin);
   }
 }

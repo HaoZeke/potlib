@@ -81,6 +81,13 @@ that bar (MO/energy noise ~1e-15); the exclusive gate is MO-replay
 `gen_vind`, not a new SCF. Same-SCF extras and `MANIFEST.json` are
 written before that exit. Do not invent looser values.
 
+`scripts/compare_xckernel_tda_nwchemc.py` (rg.terra) calls `libnwchemc`
+`nwchemc_energy` with `theory=tddft` / TDA on the same H2O/sto-3g
+geometry and writes `tda_{lda,gga}_nwchemc_roots.npy`. That is the
+second engine check of the pin operator (TDA.kernel on committed MOs).
+The exclusive 1e-17 bar remains the C sigma contraction; the nwchemc
+root residual is the measured engine value (`1e-6`).
+
 TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
 `xck_*_st_o2_p` kernels plus host Coulomb. LDA wv is
 `w * rho * (v2rho2_0 + v2rho2_1)` (one fused product, matching
