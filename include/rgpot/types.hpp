@@ -28,8 +28,7 @@
 #include <cstring>
 #include <vector>
 
-#include "rgpot/eindir_abi.hpp"
-#include "rgpot.h"
+#include "rgpot/c_api.hpp"
 
 namespace rgpot {
 

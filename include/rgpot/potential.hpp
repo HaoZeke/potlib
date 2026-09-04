@@ -45,8 +45,7 @@
 #include <utility>
 #include <vector>
 
-#include "rgpot/eindir_abi.hpp"
-#include "rgpot.h"
+#include "rgpot/c_api.hpp"
 #include "rgpot/errors.hpp"
 #include "rgpot/types.hpp"
 
