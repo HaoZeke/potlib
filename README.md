@@ -199,17 +199,17 @@ one `ExprPot` as one eindir objective for rgmin, rgsaddle, and anneal.
     #include "rgpot/LennardJones/LJPot.hpp"
     #include "rgpot/Morse/MorsePot.hpp"
     #include "rgpot/types/AtomMatrix.hpp"
-    
+
     #include <array>
     #include <memory>
     #include <vector>
-    
+
     int main() {
       std::vector<rgpot::ExprPot::Term> terms;
       terms.emplace_back("lj", std::make_unique<rgpot::LJPot>());
       terms.emplace_back("morse", std::make_unique<rgpot::MorsePot>());
       rgpot::ExprPot pot("0.5*lj + morse", std::move(terms));
-    
+
       rgpot::types::AtomMatrix positions{{1.0, 2.0, 3.0}, {1.5, 2.5, 3.5}};
       std::vector<int> atomTypes{0, 0};
       std::array<std::array<double, 3>, 3> box{{
@@ -306,4 +306,3 @@ MIT, with backend-specific notes:
 some potentials are adapted from eOn under BSD-3-Clause terms.
 The unit expression parser in `CppCore/rgpot/units.cc` is derived from
 metatomic-torch (BSD-3-Clause, metatensor developers).
-

@@ -12,7 +12,8 @@ exclude = """(?x)(
     ^rgpot-core/target/|
     ^subprojects/(?!.*\\.wrap$)|
     ^CppCore/tests/data/|
-    ^third_party/libxckernel/
+    ^third_party/libxckernel/|
+    ^third_party/lepton/
 )"""
 
 # Fast native implementations (no clone / no Python env).
