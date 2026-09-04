@@ -27,7 +27,8 @@ namespace rgpot {
  * First slice (rgpot-chjn): families lda, gga, mgga_tau; max_order 2
  * (Fock o1 + fxc o2). TDA/RPA sigma assembly uses the singlet
  * spin-adapted o2 kernels (`xck_*_st_o2_p`) plus host Coulomb.
- * LDA TDA/RPA stage B tiles the grid at PySCF BLKSIZE=128.
+ * TDA/RPA stage A stays double (not long-double); LDA wv is
+ * w*rho*(v2rho2_0+v2rho2_1). Stage B tiles at PySCF BLKSIZE=128.
  * Dispatch is by kernel name; scalar operand order is read from
  * <name>_scal_names / <name>_n_scal, not hard-coded.
  *

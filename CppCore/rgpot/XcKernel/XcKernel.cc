@@ -11,6 +11,7 @@
 
 #ifdef RGPOT_HAS_XCKERNEL
 #include "xckernel.h"
+#include "xckernel/kernels/xck_gga_st_o2_p.hpp"
 #include "xckernel/kernels/xck_lda_st_o2_p.hpp"
 
 #include <algorithm>
@@ -212,6 +213,26 @@ void add_contract_rho(const double *left, const double *right, std::size_t nbf,
 // is 1-8 ulp farther from gen_vind on the sto-3g TDA/RPA pins.
 constexpr std::size_t kPyscfBlk = 128;
 
+// Double stage A. The evaluator.hpp double specialization accumulates in
+// long double; that extra rounding is 1 ulp off gen_vind on these pins.
+void stage_a_d(std::int64_t npts, std::int64_t nm, const double *cf,
+               const std::int32_t *off, const std::uint16_t *fid,
+               std::int64_t nfld, const double *const *fields,
+               const double *const *xc, double *c) {
+  for (std::int64_t g = 0; g < npts; ++g) {
+    double acc = 0.0;
+    for (std::int64_t m = 0; m < nm; ++m) {
+      double t = cf[m];
+      for (std::int32_t f = off[m]; f < off[m + 1]; ++f) {
+        const std::uint16_t id = fid[f];
+        t *= (id < nfld) ? fields[id][g] : xc[id - nfld][g];
+      }
+      acc += t;
+    }
+    c[g] = acc;
+  }
+}
+
 void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
                      const double *c, const double *V, double *out) {
   const auto ng = static_cast<std::size_t>(npts);
@@ -226,6 +247,7 @@ void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
         aw[t] = Ug[t] * c[g0 + t];
       }
     }
+    // u-v-t reduction matches numpy (chi*c) @ chi.T on nbf=7, blk=128.
     for (std::size_t u = 0; u < nb; ++u) {
       for (std::size_t v = 0; v < nb; ++v) {
         double s = 0.0;
@@ -272,12 +294,36 @@ int contract_st_blocked(const XcKernel &k, const XcGrid &grid,
   const double *const *xc = ptrs.data() + k.nFields();
   const double *chi = grid.chi;
   if (k.name() == "xck_lda_st_o2_p") {
-    xckernel::stage_a<double, double>(
-        npts, 2, xckernel::detail_xck_lda_st_o2_p::c0,
-        xckernel::detail_xck_lda_st_o2_p::o0,
-        xckernel::detail_xck_lda_st_o2_p::f0,
-        xckernel::detail_xck_lda_st_o2_p::NFLD, fields, xc, c.data());
+    // numpy/PySCF wv: w * rho * (v2rho2_0 + v2rho2_1). Two separate
+    // monomials (long-double or double) land 1 ulp off gen_vind.
+    const double *w = fields[0];
+    const double *rho = fields[1];
+    const double *v20 = xc[0];
+    const double *v21 = xc[1];
+    for (std::int64_t g = 0; g < npts; ++g) {
+      c[static_cast<std::size_t>(g)] = w[g] * rho[g] * (v20[g] + v21[g]);
+    }
     blocked_stage_b(npts, nbf, chi, c.data(), chi, out);
+    return 0;
+  }
+  if (k.name() == "xck_gga_st_o2_p") {
+    const double *dchi = grid.dchi;
+    if (dchi == nullptr) {
+      return 2;
+    }
+    using namespace xckernel::detail_xck_gga_st_o2_p;
+    auto stage = [&](std::int64_t nm, const double *cf, const std::int32_t *off,
+                     const std::uint16_t *fid, const double *U, const double *V) {
+      stage_a_d(npts, nm, cf, off, fid, NFLD, fields, xc, c.data());
+      blocked_stage_b(npts, nbf, U, c.data(), V, out);
+    };
+    stage(11, c0, o0, f0, chi, chi);
+    stage(21, c1, o1, f1, chi, dchi + 0 * nbf * npts);
+    stage(21, c2, o2, f2, chi, dchi + 1 * nbf * npts);
+    stage(21, c3, o3, f3, chi, dchi + 2 * nbf * npts);
+    stage(21, c4, o4, f4, dchi + 0 * nbf * npts, chi);
+    stage(21, c5, o5, f5, dchi + 1 * nbf * npts, chi);
+    stage(21, c6, o6, f6, dchi + 2 * nbf * npts, chi);
     return 0;
   }
   return k.contract(grid, scal, out);
