@@ -143,6 +143,12 @@ RPC client types:
 </tr>
 
 <tr>
+<td class="org-left"><code>D4Pot</code></td>
+<td class="org-left"><code>D4</code></td>
+<td class="org-left">Enable with <code>-Dwith_dftd4=true</code>; use pixi env <code>dftd4</code>. Functional key, charge, explicit ATM/mdb flag</td>
+</tr>
+
+<tr>
 <td class="org-left"><code>MetatomicPot</code></td>
 <td class="org-left"><code>Metatomic:&lt;model_path&gt;</code></td>
 <td class="org-left">Enable with <code>-Dwith_metatomic=true</code>; use pixi env <code>metatomicbld</code>. Pip engines: torch 2.7+</td>
