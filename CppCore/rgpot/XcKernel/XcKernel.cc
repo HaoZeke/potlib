@@ -11,6 +11,7 @@
 
 #ifdef RGPOT_HAS_XCKERNEL
 #include "xckernel.h"
+#include "xckernel/kernels/xck_gga_st_o2_p.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -211,6 +212,26 @@ void add_contract_rho(const double *left, const double *right, std::size_t nbf,
 // is 1-8 ulp farther from gen_vind on the sto-3g TDA/RPA pins.
 constexpr std::size_t kPyscfBlk = 128;
 
+// Double stage A (PySCF wv). The host evaluator specialization uses
+// long double and lands a few ulp off gen_vind on GGA st_o2_p.
+void stage_a_double(std::int64_t npts, std::int64_t nm, const double *cf,
+                    const std::int32_t *off, const std::uint16_t *fid,
+                    std::int64_t nfld, const double *const *fields,
+                    const double *const *xc, double *c) {
+  for (std::int64_t g = 0; g < npts; ++g) {
+    double acc = 0.0;
+    for (std::int64_t m = 0; m < nm; ++m) {
+      double t = cf[m];
+      for (std::int32_t f = off[m]; f < off[m + 1]; ++f) {
+        const std::uint16_t id = fid[f];
+        t *= (id < nfld) ? fields[id][g] : xc[id - nfld][g];
+      }
+      acc += t;
+    }
+    c[static_cast<std::size_t>(g)] = acc;
+  }
+}
+
 void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
                      const double *c, const double *V, double *out) {
   const auto ng = static_cast<std::size_t>(npts);
@@ -281,6 +302,32 @@ int contract_st_blocked(const XcKernel &k, const XcGrid &grid,
       c[static_cast<std::size_t>(g)] = w[g] * rho[g] * (v20[g] + v21[g]);
     }
     blocked_stage_b(npts, nbf, chi, c.data(), chi, out);
+    return 0;
+  }
+  if (k.name() == "xck_gga_st_o2_p") {
+    // Same monomials as the generated kernel; stage B tiles at
+    // PySCF BLKSIZE=128. The generated path uses unblocked
+    // long-double stage_b and misses exclusive 1e-17 vs gen_vind.
+    if (grid.dchi == nullptr) {
+      return 2;
+    }
+    namespace D = xckernel::detail_xck_gga_st_o2_p;
+    const double *dx = grid.dchi;
+    const double *dy = grid.dchi + nbf * npts;
+    const double *dz = grid.dchi + 2 * nbf * npts;
+    auto term = [&](std::int64_t nm, const double *cf, const std::int32_t *off,
+                    const std::uint16_t *fid, const double *U,
+                    const double *V) {
+      stage_a_double(npts, nm, cf, off, fid, D::NFLD, fields, xc, c.data());
+      blocked_stage_b(npts, nbf, U, c.data(), V, out);
+    };
+    term(11, D::c0, D::o0, D::f0, chi, chi);
+    term(21, D::c1, D::o1, D::f1, chi, dx);
+    term(21, D::c2, D::o2, D::f2, chi, dy);
+    term(21, D::c3, D::o3, D::f3, chi, dz);
+    term(21, D::c4, D::o4, D::f4, dx, chi);
+    term(21, D::c5, D::o5, D::f5, dy, chi);
+    term(21, D::c6, D::o6, D::f6, dz, chi);
     return 0;
   }
   return k.contract(grid, scal, out);
