@@ -11,7 +11,6 @@
 
 #ifdef RGPOT_HAS_XCKERNEL
 #include "xckernel.h"
-#include "xckernel/kernels/xck_gga_st_o2_p.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -212,26 +211,6 @@ void add_contract_rho(const double *left, const double *right, std::size_t nbf,
 // is 1-8 ulp farther from gen_vind on the sto-3g TDA/RPA pins.
 constexpr std::size_t kPyscfBlk = 128;
 
-// Double stage A (PySCF wv). The host evaluator specialization uses
-// long double and lands a few ulp off gen_vind on GGA st_o2_p.
-void stage_a_double(std::int64_t npts, std::int64_t nm, const double *cf,
-                    const std::int32_t *off, const std::uint16_t *fid,
-                    std::int64_t nfld, const double *const *fields,
-                    const double *const *xc, double *c) {
-  for (std::int64_t g = 0; g < npts; ++g) {
-    double acc = 0.0;
-    for (std::int64_t m = 0; m < nm; ++m) {
-      double t = cf[m];
-      for (std::int32_t f = off[m]; f < off[m + 1]; ++f) {
-        const std::uint16_t id = fid[f];
-        t *= (id < nfld) ? fields[id][g] : xc[id - nfld][g];
-      }
-      acc += t;
-    }
-    c[static_cast<std::size_t>(g)] = acc;
-  }
-}
-
 void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
                      const double *c, const double *V, double *out) {
   const auto ng = static_cast<std::size_t>(npts);
@@ -258,6 +237,188 @@ void blocked_stage_b(std::int64_t npts, std::int64_t nbf, const double *U,
       }
     }
   }
+}
+
+// PySCF dft.xc_deriv.transform_fxc (spin=1 GGA) then singlet
+// fxc[0,:,0]+fxc[0,:,1]. Closed-shell fill for the ABI names that
+// omit the last Libxc column (bb = aa).
+void gga_st_fxc4(const double vs[3], const double frr[3], const double frg[6],
+                 const double fgg[6], const double ga[3], double fxc_s[4][4]) {
+  double vp[4][4][2][2];
+  std::memset(vp, 0, sizeof(vp));
+  vp[0][0][0][0] = frr[0];
+  vp[0][0][0][1] = frr[1];
+  vp[0][0][1][0] = frr[1];
+  vp[0][0][1][1] = frr[2];
+
+  double M[3][3];
+  M[0][0] = fgg[0];
+  M[0][1] = fgg[1];
+  M[0][2] = fgg[2];
+  M[1][0] = fgg[1];
+  M[1][1] = fgg[3];
+  M[1][2] = fgg[4];
+  M[2][0] = fgg[2];
+  M[2][1] = fgg[4];
+  M[2][2] = fgg[5];
+  double tmp[3][2][2];
+  for (int i = 0; i < 3; ++i) {
+    tmp[i][0][0] = 2.0 * M[i][0];
+    tmp[i][0][1] = M[i][1];
+    tmp[i][1][0] = M[i][1];
+    tmp[i][1][1] = 2.0 * M[i][2];
+  }
+  double qgg_spin[2][2][2][2];
+  for (int b = 0; b < 2; ++b) {
+    for (int d = 0; d < 2; ++d) {
+      qgg_spin[0][0][b][d] = 2.0 * tmp[0][b][d];
+      qgg_spin[0][1][b][d] = tmp[1][b][d];
+      qgg_spin[1][0][b][d] = tmp[1][b][d];
+      qgg_spin[1][1][b][d] = 2.0 * tmp[2][b][d];
+    }
+  }
+  double sfg[2][2];
+  sfg[0][0] = 2.0 * vs[0];
+  sfg[0][1] = vs[1];
+  sfg[1][0] = vs[1];
+  sfg[1][1] = 2.0 * vs[2];
+  for (int x = 0; x < 3; ++x) {
+    for (int y = 0; y < 3; ++y) {
+      const double gxgy = ga[x] * ga[y];
+      for (int b = 0; b < 2; ++b) {
+        for (int d = 0; d < 2; ++d) {
+          double acc = 0.0;
+          for (int a = 0; a < 2; ++a) {
+            for (int c = 0; c < 2; ++c) {
+              acc += qgg_spin[a][b][c][d] * gxgy;
+            }
+          }
+          if (x == y) {
+            acc += sfg[b][d];
+          }
+          vp[1 + x][1 + y][b][d] = acc;
+        }
+      }
+    }
+  }
+
+  double st[2][2][2];
+  for (int r = 0; r < 2; ++r) {
+    const double uu = frg[r * 3 + 0];
+    const double ud = frg[r * 3 + 1];
+    const double dd = frg[r * 3 + 2];
+    st[r][0][0] = 2.0 * uu;
+    st[r][0][1] = ud;
+    st[r][1][0] = ud;
+    st[r][1][1] = 2.0 * dd;
+  }
+  for (int x = 0; x < 3; ++x) {
+    for (int r = 0; r < 2; ++r) {
+      for (int b = 0; b < 2; ++b) {
+        double acc = 0.0;
+        for (int a = 0; a < 2; ++a) {
+          acc += st[r][a][b] * ga[x];
+        }
+        vp[0][1 + x][r][b] = acc;
+        vp[1 + x][0][b][r] = acc;
+      }
+    }
+  }
+
+  for (int x = 0; x < 4; ++x) {
+    for (int y = 0; y < 4; ++y) {
+      fxc_s[x][y] = vp[x][y][0][0] + vp[x][y][0][1];
+    }
+  }
+}
+
+void hermi_sum(double *v, std::size_t nbf) {
+  for (std::size_t u = 0; u < nbf; ++u) {
+    for (std::size_t vj = 0; vj <= u; ++vj) {
+      const double s = v[u * nbf + vj] + v[vj * nbf + u];
+      v[u * nbf + vj] = s;
+      v[vj * nbf + u] = s;
+    }
+  }
+}
+
+int contract_gga_st_pyscf(const XcGrid &grid, const double *const *fields,
+                          const double *const *xc, double *out) {
+  if (grid.dchi == nullptr) {
+    return 2;
+  }
+  const auto npts = static_cast<std::size_t>(grid.npts);
+  const auto nbf = static_cast<std::size_t>(grid.nbf);
+  const double *w = fields[0];
+  const double *gax = fields[1];
+  const double *gay = fields[2];
+  const double *gaz = fields[3];
+  const double *rho1x = fields[4];
+  const double *rho1y = fields[5];
+  const double *rho1z = fields[6];
+  const double *rho1 = fields[7];
+  const double *chi = grid.chi;
+  const double *dx = grid.dchi;
+  const double *dy = grid.dchi + nbf * npts;
+  const double *dz = grid.dchi + 2 * nbf * npts;
+
+  std::vector<double> wv0(npts, 0.0);
+  std::vector<double> wv1(npts, 0.0);
+  std::vector<double> wv2(npts, 0.0);
+  std::vector<double> wv3(npts, 0.0);
+  for (std::size_t g = 0; g < npts; ++g) {
+    const double vs[3] = {xc[0][g], xc[1][g], xc[0][g]};
+    const double frr[3] = {xc[2][g], xc[3][g], xc[2][g]};
+    const double frg[6] = {xc[4][g], xc[5][g], xc[6][g],
+                           xc[7][g], xc[8][g], xc[4][g]};
+    const double fgg[6] = {xc[9][g],  xc[10][g], xc[11][g],
+                           xc[12][g], xc[13][g], xc[9][g]};
+    const double ga[3] = {gax[g], gay[g], gaz[g]};
+    double fxc_s[4][4];
+    gga_st_fxc4(vs, frr, frg, fgg, ga, fxc_s);
+    const double r1[4] = {rho1[g], rho1x[g], rho1y[g], rho1z[g]};
+    double acc[4] = {0.0, 0.0, 0.0, 0.0};
+    for (int x = 0; x < 4; ++x) {
+      for (int y = 0; y < 4; ++y) {
+        acc[x] += fxc_s[x][y] * r1[y];
+      }
+      acc[x] *= w[g];
+    }
+    wv0[g] = 0.5 * acc[0];
+    wv1[g] = acc[1];
+    wv2[g] = acc[2];
+    wv3[g] = acc[3];
+  }
+
+  std::vector<double> aow(nbf * kPyscfBlk, 0.0);
+  for (std::size_t g0 = 0; g0 < npts; g0 += kPyscfBlk) {
+    const std::size_t nblk = std::min(kPyscfBlk, npts - g0);
+    for (std::size_t u = 0; u < nbf; ++u) {
+      const double *chi_u = chi + u * npts + g0;
+      const double *dx_u = dx + u * npts + g0;
+      const double *dy_u = dy + u * npts + g0;
+      const double *dz_u = dz + u * npts + g0;
+      double *aw = aow.data() + u * nblk;
+      for (std::size_t t = 0; t < nblk; ++t) {
+        const std::size_t g = g0 + t;
+        aw[t] = chi_u[t] * wv0[g] + dx_u[t] * wv1[g] + dy_u[t] * wv2[g] +
+                dz_u[t] * wv3[g];
+      }
+    }
+    for (std::size_t u = 0; u < nbf; ++u) {
+      const double *chi_u = chi + u * npts + g0;
+      for (std::size_t v = 0; v < nbf; ++v) {
+        const double *aw = aow.data() + v * nblk;
+        double s = 0.0;
+        for (std::size_t t = 0; t < nblk; ++t) {
+          s += chi_u[t] * aw[t];
+        }
+        out[u * nbf + v] += s;
+      }
+    }
+  }
+  hermi_sum(out, nbf);
+  return 0;
 }
 
 int fill_scal_ptrs(const XcKernel &k,
@@ -287,13 +448,12 @@ int contract_st_blocked(const XcKernel &k, const XcGrid &grid,
   const auto nbf = grid.nbf;
   const auto n2 = static_cast<std::size_t>(nbf) * static_cast<std::size_t>(nbf);
   std::memset(out, 0, n2 * sizeof(double));
-  std::vector<double> c(static_cast<std::size_t>(npts), 0.0);
   const double *const *fields = ptrs.data();
   const double *const *xc = ptrs.data() + k.nFields();
-  const double *chi = grid.chi;
   if (k.name() == "xck_lda_st_o2_p") {
     // PySCF nr_rks_fxc_st wv is w * rho * (v2rho2_0 + v2rho2_1).
     // Two monomials (w*rho*v20 + w*rho*v21) land 1 ulp off gen_vind.
+    std::vector<double> c(static_cast<std::size_t>(npts), 0.0);
     const double *w = fields[0];
     const double *rho = fields[1];
     const double *v20 = xc[0];
@@ -301,34 +461,15 @@ int contract_st_blocked(const XcKernel &k, const XcGrid &grid,
     for (std::int64_t g = 0; g < npts; ++g) {
       c[static_cast<std::size_t>(g)] = w[g] * rho[g] * (v20[g] + v21[g]);
     }
-    blocked_stage_b(npts, nbf, chi, c.data(), chi, out);
+    blocked_stage_b(npts, nbf, grid.chi, c.data(), grid.chi, out);
     return 0;
   }
   if (k.name() == "xck_gga_st_o2_p") {
-    // Same monomials as the generated kernel; stage B tiles at
-    // PySCF BLKSIZE=128. The generated path uses unblocked
-    // long-double stage_b and misses exclusive 1e-17 vs gen_vind.
-    if (grid.dchi == nullptr) {
-      return 2;
-    }
-    namespace D = xckernel::detail_xck_gga_st_o2_p;
-    const double *dx = grid.dchi;
-    const double *dy = grid.dchi + nbf * npts;
-    const double *dz = grid.dchi + 2 * nbf * npts;
-    auto term = [&](std::int64_t nm, const double *cf, const std::int32_t *off,
-                    const std::uint16_t *fid, const double *U,
-                    const double *V) {
-      stage_a_double(npts, nm, cf, off, fid, D::NFLD, fields, xc, c.data());
-      blocked_stage_b(npts, nbf, U, c.data(), V, out);
-    };
-    term(11, D::c0, D::o0, D::f0, chi, chi);
-    term(21, D::c1, D::o1, D::f1, chi, dx);
-    term(21, D::c2, D::o2, D::f2, chi, dy);
-    term(21, D::c3, D::o3, D::f3, chi, dz);
-    term(21, D::c4, D::o4, D::f4, dx, chi);
-    term(21, D::c5, D::o5, D::f5, dy, chi);
-    term(21, D::c6, D::o6, D::f6, dz, chi);
-    return 0;
+    // PySCF nr_rks_fxc_st: transform_fxc(spin=1) -> singlet
+    // fxc[0,:,0]+fxc[0,:,1] -> einsum rho1,fxc,w -> wv[0]*=0.5
+    // -> scale_ao + blocked chi@aow + hermi_sum. Generated
+    // 7-term monomials stay on k.contract (C-vs-NumPy / fxc pins).
+    return contract_gga_st_pyscf(grid, fields, xc, out);
   }
   return k.contract(grid, scal, out);
 }

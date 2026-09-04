@@ -28,8 +28,10 @@ namespace rgpot {
  * (Fock o1 + fxc o2). TDA/RPA sigma assembly uses the singlet
  * spin-adapted o2 kernels (`xck_*_st_o2_p`) plus host Coulomb.
  * LDA TDA/RPA forms wv as w*rho*(v2rho2_0+v2rho2_1) and tiles
- * stage B at PySCF BLKSIZE=128. GGA st_o2_p uses the generated
- * monomials with the same tiled stage B.
+ * stage B at PySCF BLKSIZE=128. GGA st_o2_p applyFxc follows
+ * nr_rks_fxc_st: transform_fxc(spin=1) singlet 4x4, einsum
+ * rho1,fxc,w, wv[0]*=0.5, scale_ao, blocked chi@aow, hermi_sum.
+ * Generated 7-term monomials stay on contract() for C-vs-NumPy.
  * Dispatch is by kernel name; scalar operand order is read from
  * <name>_scal_names / <name>_n_scal, not hard-coded.
  *
