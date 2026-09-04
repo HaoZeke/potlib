@@ -308,7 +308,7 @@ def _mol_grid():
     return mol, grids, mf, dm0, dm1, numint
 
 
-def regen_pyscf() -> None:
+def regen_pyscf() -> list[str]:
     from pylibxc import LibXCFunctional
     from pyscf.dft import numint as ni_mod
 
@@ -429,13 +429,14 @@ def regen_pyscf() -> None:
         sys.exit(f"GGA fxc vs nr_rks_fxc rel={err / scale:.3e} exceeds 1e-13")
     save_npy(dest / "gga_fxc_ref.npy", Rref)
 
-    regen_tda_rpa(mol, dest)
+    return regen_tda_rpa(mol, dest)
 
 
-def regen_tda_rpa(mol=None, dest=None) -> None:
+def regen_tda_rpa(mol=None, dest=None) -> list[str]:
     """TDA/RPA operands + live-vs-committed exclusive 1e-17 gate.
 
     Needs PySCF only (no libxckernel Python generator).
+    Writes same-SCF pins, then returns drifted live-vs-committed rows.
     """
     from pyscf import dft as dft_mod
     from pyscf.dft import numint as ni_tda
@@ -448,6 +449,7 @@ def regen_tda_rpa(mol=None, dest=None) -> None:
 
     rngz = np.random.default_rng(4)
     rngxy = np.random.default_rng(5)
+    drifted = []
     for fam, xc in (("lda", "LDA_X,"), ("gga", "GGA_X_PBE,")):
         mf_x = dft_mod.RKS(mol)
         mf_x.xc = xc
@@ -531,12 +533,8 @@ def regen_tda_rpa(mol=None, dest=None) -> None:
             rel = err / scale
             print(f"  {fam} TDA live vs pin abs={err:.3e} rel={rel:.3e}")
             if rel > 1e-17:
-                sys.exit(
-                    f"{fam} TDA live vs committed pin rel={rel:.3e} "
-                    "exceeds exclusive 1e-17"
-                )
-        else:
-            save_npy(tda_pin, sig)
+                drifted.append(f"{fam} TDA rel={rel:.3e}")
+        save_npy(tda_pin, sig)
         op, _ = gen_tdhf_operation(mf_x, singlet=True)
         xys = rngxy.standard_normal((3, 2, nocc, nvir))
         save_npy(dest / f"rpa_{fam}_xy.npy", xys)
@@ -560,13 +558,10 @@ def regen_tda_rpa(mol=None, dest=None) -> None:
             rel = err / scale
             print(f"  {fam} RPA live vs pin abs={err:.3e} rel={rel:.3e}")
             if rel > 1e-17:
-                sys.exit(
-                    f"{fam} RPA live vs committed pin rel={rel:.3e} "
-                    "exceeds exclusive 1e-17"
-                )
-        else:
-            save_npy(rpa_pin, rpa)
+                drifted.append(f"{fam} RPA rel={rel:.3e}")
+        save_npy(rpa_pin, rpa)
         print(f"  {fam} TDA/RPA pins nocc={nocc} nvir={nvir} ngrid={ng}")
+    return drifted
 
 
 def write_manifest() -> None:
@@ -635,11 +630,17 @@ def main(argv=None) -> int:
         regen_s2jz()
     if do_all or args.c_vs_numpy:
         regen_c_vs_numpy()
+    drifted: list[str] = []
     if do_all or args.pyscf:
-        regen_pyscf()
+        drifted = regen_pyscf()
     elif args.tda:
-        regen_tda_rpa()
+        drifted = regen_tda_rpa()
     write_manifest()
+    if drifted:
+        sys.exit(
+            "TDA/RPA live vs committed pin exceeds exclusive 1e-17: "
+            + "; ".join(drifted)
+        )
     return 0
 
 
