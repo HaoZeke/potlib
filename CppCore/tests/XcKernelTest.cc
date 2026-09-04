@@ -150,6 +150,20 @@ TEST_CASE("XcKernel is not a Potential and has no PotType", "[xckernel][api]") {
   REQUIRE(schema.find("XcKernel") == std::string::npos);
 }
 
+TEST_CASE("XcKernel sources do not mention D3 or D4", "[xckernel][api]") {
+  const char *files[] = {
+      "CppCore/rgpot/XcKernel/XcKernel.hpp",
+      "CppCore/rgpot/XcKernel/XcKernel.cc",
+      "CppCore/rgpot/XcKernel/meson.build",
+      "CppCore/rgpot/XcKernel/kernel_table.inc",
+  };
+  for (const char *p : files) {
+    const std::string txt = slurp(p);
+    REQUIRE(txt.find("D3") == std::string::npos);
+    REQUIRE(txt.find("D4") == std::string::npos);
+  }
+}
+
 TEST_CASE("golden fixtures exist (fail closed)", "[xckernel][golden]") {
   const char *required[] = {
       "CppCore/tests/data/xckernel/MANIFEST.json",

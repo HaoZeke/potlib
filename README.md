@@ -23,6 +23,12 @@ arrays, not `ForceInput`. See `docs/xckernel.md`.
 `pylibxc` is not on PyPI (`pylibxc2` is an unrelated stub); use the
 conda-forge `libxc` package via `pixi install -e xckernel`.
 
+`D3Pot` and `D4Pot` (meson `-Dwith_dftd3` / `-Dwith_dftd4`) are in-process
+`Potential` summands: construct them and evaluate `ForceInput` to energy and
+forces. There is no `PotentialConfig.d3` or `PotentialConfig.d4` arm.
+A DFT host sums XcKernel + VV10 + D4 itself; dispersion is not folded into
+the XC kernel.
+
 The public wire schema lives in `CppCore/rgpot/rpc/Potentials.capnp` and is
 shared by the C++ server, Python integration tests, and the Rust core crate.
 Native rgpot units are eV and Angstrom.
@@ -139,13 +145,13 @@ RPC client types:
 <tr>
 <td class="org-left"><code>D3Pot</code></td>
 <td class="org-left"><code>D3</code></td>
-<td class="org-left">Enable with <code>-Dwith_dftd3=true</code>; use pixi env <code>dftd3</code> or <code>dftd</code>. BJ/zero damping, functional key, explicit ATM flag. Goldens: <code>meson test --suite dftd</code></td>
+<td class="org-left">In-process Potential summand. Enable with <code>-Dwith_dftd3=true</code>; use pixi env <code>dftd3</code> or <code>dftd</code>. BJ/zero damping, functional key, explicit ATM flag. No <code>PotentialConfig.d3</code>. Goldens: <code>meson test --suite dftd</code></td>
 </tr>
 
 <tr>
 <td class="org-left"><code>D4Pot</code></td>
 <td class="org-left"><code>D4</code></td>
-<td class="org-left">Enable with <code>-Dwith_dftd4=true</code>; use pixi env <code>dftd4</code> or <code>dftd</code>. Functional key, charge, explicit ATM/many-body flag. Goldens: <code>meson test --suite dftd</code></td>
+<td class="org-left">In-process Potential summand. Enable with <code>-Dwith_dftd4=true</code>; use pixi env <code>dftd4</code> or <code>dftd</code>. Functional key, charge, explicit ATM/many-body flag. No <code>PotentialConfig.d4</code>. Goldens: <code>meson test --suite dftd</code></td>
 </tr>
 
 <tr>

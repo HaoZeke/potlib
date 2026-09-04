@@ -31,6 +31,11 @@ struct D3Config {
 /**
  * Grimme DFT-D3 dispersion via the s-dftd3 ISO C API (``dftd3.h``).
  *
+ * In-process Potential summand: ForceInput in, energy+forces out. Do not
+ * fold this into XcKernel::contract or applyFxc. No PotentialConfig.d3
+ * arm until a DFT host sums XcKernel + VV10 + D4 on the wire
+ * (rgpot-8mse; rgpot-uw9w / rgpot-eipa add this as Edisp from rgpot-2ftk).
+ *
  * Each instance owns ``dftd3_error`` / ``dftd3_structure`` / ``dftd3_model``
  * / ``dftd3_param`` handles. First force builds the structure and model;
  * later forces call ``dftd3_update_structure``. Do not share one instance

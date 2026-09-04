@@ -31,6 +31,11 @@ struct D4Config {
 /**
  * Grimme DFT-D4 dispersion via the dftd4 ISO C API (``dftd4.h``).
  *
+ * In-process Potential summand: ForceInput in, energy+forces out. Do not
+ * fold this into XcKernel::contract or applyFxc. No PotentialConfig.d4
+ * arm until a DFT host sums XcKernel + VV10 + D4 on the wire
+ * (rgpot-8mse; rgpot-uw9w / rgpot-eipa add this as Edisp from rgpot-2ftk).
+ *
  * Each instance owns ``dftd4_error`` / ``dftd4_structure`` / ``dftd4_model``
  * / ``dftd4_param`` handles. First force builds the structure and model;
  * later forces call ``dftd4_update_structure``. Do not share one instance

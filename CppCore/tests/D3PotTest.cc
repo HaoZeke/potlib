@@ -12,8 +12,10 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "rgpot/D3Pot/D3Pot.hpp"
@@ -131,6 +133,18 @@ CapiDisp capi_d3_bj_pbe(const Octamer &g, bool atm, bool pass_sigma) {
   dftd3_delete_structure(&mol);
   dftd3_delete_error(&err);
   return out;
+}
+
+TEST_CASE("D3Pot is a Potential with no PotentialConfig.d3 arm",
+          "[d3][schema]") {
+  STATIC_REQUIRE(
+      std::is_base_of_v<rgpot::Potential<rgpot::D3Pot>, rgpot::D3Pot>);
+  std::ifstream in("CppCore/rgpot/rpc/Potentials.capnp");
+  REQUIRE(in);
+  const std::string schema((std::istreambuf_iterator<char>(in)),
+                           std::istreambuf_iterator<char>());
+  REQUIRE(schema.find("d3 @") == std::string::npos);
+  REQUIRE(schema.find("d4 @") == std::string::npos);
 }
 
 TEST_CASE("D3Pot default is BJ PBE with ATM on", "[d3][config]") {

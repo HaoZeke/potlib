@@ -17,6 +17,12 @@ backend-configuration carrier:
 - ~PotentialConfig~: backend setup, with arms such as ~none~, ~nwchem~, and
   ~cpmd~
 
+=D3Pot= and =D4Pot= (meson =-Dwith_dftd3= / =-Dwith_dftd4=) are in-process
+=Potential= summands: construct them and evaluate =ForceInput= to energy and
+forces. There is no =PotentialConfig.d3= or =PotentialConfig.d4= arm.
+A DFT host sums XcKernel + VV10 + D4 itself; dispersion is not folded into
+the XC kernel.
+
 The public wire schema lives in ~CppCore/rgpot/rpc/Potentials.capnp~ and is
 shared by the C++ server, Python integration tests, and the Rust core crate.
 Native rgpot units are eV and Angstrom.
@@ -99,8 +105,8 @@ ctest --test-dir build_client --output-on-failure
 | =CuH2Pot= | =CuH2= | Built-in Cu-H EAM potential |
 | =XTBPot= | =XTB=, =GFNFF=, =GFN0xTB=, =GFN1xTB= | Enable with =-Dwith_xtb=true=; use pixi env =xtbbld= or =tbbld= |
 | =TBLitePot= | =TBLite=, =TBLiteGFN1=, =TBLiteIPEA1= | Enable with =-Dwith_tblite=true=; use pixi env =tblitebld= or =tbbld= |
-| =D3Pot= | =D3= | Enable with =-Dwith_dftd3=true=; use pixi env =dftd3= or =dftd=. BJ/zero damping, functional key, explicit ATM flag. Goldens: =meson test --suite dftd= |
-| =D4Pot= | =D4= | Enable with =-Dwith_dftd4=true=; use pixi env =dftd4= or =dftd=. Functional key, charge, explicit ATM/many-body flag. Goldens: =meson test --suite dftd= |
+| =D3Pot= | =D3= | In-process Potential summand. Enable with =-Dwith_dftd3=true=; use pixi env =dftd3= or =dftd=. BJ/zero damping, functional key, explicit ATM flag. No =PotentialConfig.d3=. Goldens: =meson test --suite dftd= |
+| =D4Pot= | =D4= | In-process Potential summand. Enable with =-Dwith_dftd4=true=; use pixi env =dftd4= or =dftd=. Functional key, charge, explicit ATM/many-body flag. No =PotentialConfig.d4=. Goldens: =meson test --suite dftd= |
 | =MetatomicPot= | =Metatomic:<model_path>= | Enable with =-Dwith_metatomic=true=; use pixi env =metatomicbld=. Pip engines: torch 2.7+ |
 | =NWChemPot= | =NWChem= | Frontend always builds; load =libnwchemc= from the split =nwchemc= project at runtime |
 | =CPMDPot= | =CPMD= | Frontend always builds; load =libcpmdc= from the split =cpmdc= project at runtime |

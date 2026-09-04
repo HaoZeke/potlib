@@ -11,7 +11,11 @@
 
 #include <array>
 #include <cmath>
+#include <fstream>
+#include <iterator>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 #include "rgpot/D4Pot/D4Pot.hpp"
@@ -36,6 +40,18 @@ static void fill_water(AtomMatrix &positions, std::vector<int> &atmtypes,
           kWaterPos[i * 3 + j];
   atmtypes.assign(kWaterZ, kWaterZ + 3);
   box = {{{100.0, 0.0, 0.0}, {0.0, 100.0, 0.0}, {0.0, 0.0, 100.0}}};
+}
+
+TEST_CASE("D4Pot is a Potential with no PotentialConfig.d4 arm",
+          "[d4][schema]") {
+  STATIC_REQUIRE(
+      std::is_base_of_v<rgpot::Potential<rgpot::D4Pot>, rgpot::D4Pot>);
+  std::ifstream in("CppCore/rgpot/rpc/Potentials.capnp");
+  REQUIRE(in);
+  const std::string schema((std::istreambuf_iterator<char>(in)),
+                           std::istreambuf_iterator<char>());
+  REQUIRE(schema.find("d3 @") == std::string::npos);
+  REQUIRE(schema.find("d4 @") == std::string::npos);
 }
 
 TEST_CASE("D4Pot default is PBE charge 0 with ATM on", "[d4][config]") {
