@@ -28,9 +28,11 @@ namespace rgpot {
  * @ingroup rgpot_potentials
  *
  * The constructor parses @p expression with @c Lepton::Parser::parse,
- * compiles it once, and binds each term name through
- * @c CompiledExpression::getVariableReference. Unknown, duplicate,
- * unused, or non-identifier names fail closed before any force call.
+ * compiles the energy once, and compiles
+ * @c ParsedExpression::differentiate(name) once per term. Unknown,
+ * duplicate, unused, or non-identifier names fail closed before any
+ * force call. Forces are the chain rule
+ * @f$F = \sum_i (\partial f/\partial E_i)\, F_i@f$.
  */
 class ExprPot : public Potential<ExprPot> {
 public:
@@ -49,6 +51,11 @@ public:
   [[nodiscard]] PotCaps caps() const noexcept override;
   [[nodiscard]] uint64_t paramsKey() const noexcept override;
   [[nodiscard]] const std::string &expression() const noexcept;
+
+  /// Analytic @f$\partial f/\partial E_{\mathrm{name}}@f$ from the
+  /// construct-time compiled derivative, evaluated at the last child
+  /// energies (zero if no force call has run).
+  [[nodiscard]] double dEnergyDTerm(const std::string &name) const;
 
 private:
   struct Impl;
