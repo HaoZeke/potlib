@@ -264,7 +264,7 @@
       "dtype": "float64"
     },
     "pyscf_h2o_sto3g/rpa_gga_sigma_ref.npy": {
-      "sha256": "d7f8d0d60b92fb91b92a54650fb052940ef68bfc5dc6cc1abb56754292b43a83",
+      "sha256": "de1ad06ff39b28ea315279bd38a1204835367d1c9c17ffeb62bfaffd07b803e0",
       "bytes": 608,
       "shape": [
         3,
@@ -296,7 +296,7 @@
       "dtype": "float64"
     },
     "pyscf_h2o_sto3g/rpa_lda_sigma_ref.npy": {
-      "sha256": "af1f01ed6aba01342beece97060ce40604a0ab433bf725ec0fe9335214a19463",
+      "sha256": "0c858b6d329139bb3272474c9230fc816f8101476e1c573d8937b2a278765229",
       "bytes": 608,
       "shape": [
         3,
@@ -328,7 +328,7 @@
       "dtype": "float64"
     },
     "pyscf_h2o_sto3g/tda_gga_sigma_ref.npy": {
-      "sha256": "4ad024c257c6b62c996d04a643003f70743e55aac13540bf88c53dd470dbb355",
+      "sha256": "2d02f1493b173da1fe2f0ab94e23f0a3fa088285049c071b8b8bd8194bde9329",
       "bytes": 368,
       "shape": [
         3,
@@ -358,7 +358,7 @@
       "dtype": "float64"
     },
     "pyscf_h2o_sto3g/tda_lda_sigma_ref.npy": {
-      "sha256": "cf13a333f18f354a553a2ed6d6505011e95d161aa41dadf48e6bc062dd0ef7f1",
+      "sha256": "c859d1d1073abf4a04e743c2df6a1c38916a06d33485e797d6e560aabe5549c6",
       "bytes": 368,
       "shape": [
         3,
@@ -381,5 +381,6 @@
       "sha256": "7cbdc5ccc474aee80654f252e3e2cc37023dfadc1dd05b633edf5b95e3ac0bde",
       "bytes": 34844
     }
-  }
+  },
+  "tda_rpa_pin_source": "dump_xckernel_goldens TDA/RPA C assembly on rg.terra"
 }
