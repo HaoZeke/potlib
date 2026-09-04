@@ -82,6 +82,11 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [tblitepot]
     endif
 
+    if has_dftd3
+        subdir('rgpot/D3Pot')  # 'd3pot'
+        rgpotentials += [d3pot]
+    endif
+
     # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
     subdir('rgpot/MetatomicPot')
     _linkto += [metatomic_dlopen]
@@ -286,6 +291,11 @@ if get_option('with_tests')
     if has_tblite
         test_array += [
             ['TBLitetest', 'tblite_test', 'TBLitePotTest.cc', ''],
+        ]
+    endif
+    if has_dftd3
+        test_array += [
+            ['D3test', 'd3_test', 'D3PotTest.cc', ''],
         ]
     endif
     if has_metatomic
@@ -604,6 +614,9 @@ if not meson.is_subproject()
         endif
         if has_tblite
             _pc_cflags += ['-DRGPOT_HAS_TBLITE_POT=TRUE']
+        endif
+        if has_dftd3
+            _pc_cflags += ['-DRGPOT_HAS_DFTD3_POT=TRUE']
         endif
     endif
     if _rpc_stack
