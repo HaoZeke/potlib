@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <set>
 #include <stdexcept>
 #include <string_view>
@@ -62,6 +64,7 @@ struct ExprPot::Impl {
     std::string name;
     std::unique_ptr<PotentialBase> child;
     double *var = nullptr;
+    Lepton::CompiledExpression dfdE;
   };
 
   std::string expression;
@@ -73,6 +76,15 @@ struct ExprPot::Impl {
   void bindVars() {
     for (auto &term : terms) {
       term.var = &energy.getVariableReference(term.name);
+    }
+    for (auto &term : terms) {
+      std::map<std::string, double *> locs;
+      for (const auto &var : term.dfdE.getVariables()) {
+        locs[var] = &energy.getVariableReference(var);
+      }
+      if (!locs.empty()) {
+        term.dfdE.setVariableLocations(locs);
+      }
     }
   }
 };
@@ -100,8 +112,8 @@ ExprPot::ExprPot(std::string expression, std::vector<Term> terms)
     if (!term.second) {
       throw std::invalid_argument("ExprPot term '" + term.first + "' is null");
     }
-    m_impl->terms.push_back(Impl::NamedChild{std::move(term.first),
-                                             std::move(term.second), nullptr});
+    m_impl->terms.push_back(Impl::NamedChild{
+        std::move(term.first), std::move(term.second), nullptr, {}});
   }
 
   Lepton::ParsedExpression parsed;
@@ -133,11 +145,20 @@ ExprPot::ExprPot(std::string expression, std::vector<Term> terms)
     }
   }
 
+  for (auto &term : m_impl->terms) {
+    try {
+      term.dfdE = parsed.differentiate(term.name).createCompiledExpression();
+    } catch (const Lepton::Exception &ex) {
+      throw std::invalid_argument(std::string("ExprPot differentiate('") +
+                                  term.name + "') failed: " + ex.what());
+    }
+  }
+
   m_impl->bindVars();
   m_impl->expression = std::move(expression);
 
   Fnv1a fp;
-  fp.u64(/*kKernelVersion=*/1);
+  fp.u64(/*kKernelVersion=*/2);
   fp.str(m_impl->expression);
   PotCaps caps;
   caps.reentrancy = Reentrancy::PerInstance;
@@ -193,14 +214,39 @@ void ExprPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     std::memcpy(&box, in.box, sizeof(box));
   }
 
+  const size_t nTerms = m_impl->terms.size();
+  std::vector<types::AtomMatrix> childForces;
+  std::vector<double> childVars;
+  childForces.reserve(nTerms);
+  childVars.reserve(nTerms);
+
   for (auto &term : m_impl->terms) {
     auto [energy, forces, variance] =
         (*term.child)(positions, atmtypes, box);
-    (void)forces;
-    (void)variance;
     *term.var = energy;
+    childForces.push_back(std::move(forces));
+    childVars.push_back(variance);
   }
   out->energy = m_impl->energy.evaluate();
+
+  bool allVarFinite = true;
+  double variance = 0.0;
+  for (size_t i = 0; i < nTerms; ++i) {
+    const double w = m_impl->terms[i].dfdE.evaluate();
+    if (out->F != nullptr) {
+      const double *f = childForces[i].data();
+      const size_t nf = std::min(n3, childForces[i].size());
+      for (size_t k = 0; k < nf; ++k) {
+        out->F[k] += w * f[k];
+      }
+    }
+    if (!std::isfinite(childVars[i])) {
+      allVarFinite = false;
+    } else {
+      variance += w * childVars[i];
+    }
+  }
+  out->variance = allVarFinite ? variance : 0.0;
 }
 
 PotCaps ExprPot::caps() const noexcept { return m_impl->caps; }

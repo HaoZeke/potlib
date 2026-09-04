@@ -28,9 +28,10 @@ namespace rgpot {
  * @ingroup rgpot_potentials
  *
  * The constructor parses @p expression with @c Lepton::Parser::parse,
- * compiles it once, and binds each term name through
- * @c CompiledExpression::getVariableReference. Unknown, duplicate,
+ * compiles the energy, and compiles one
+ * @c ParsedExpression::differentiate(name) per term. Unknown, duplicate,
  * unused, or non-identifier names fail closed before any force call.
+ * Forces are the chain rule @f$F = \sum_i (\partial f/\partial E_i) F_i@f$.
  */
 class ExprPot : public Potential<ExprPot> {
 public:
