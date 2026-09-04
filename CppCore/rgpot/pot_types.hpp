@@ -43,7 +43,8 @@ enum class PotType {
   FeHe,        //!<  Fe-He embedded atom with species-dependent terms.
   WaterH,      //!<  TIP4P water with an interacting hydrogen atom.
   D3,          //!<  Grimme DFT-D3 via s-dftd3 (BJ/zero, optional ATM).
-  D4           //!<  Grimme DFT-D4 via dftd4 (functional, charge, optional ATM).
+  D4,          //!<  Grimme DFT-D4 via dftd4 (functional, charge, optional ATM).
+  Expr         //!<  Named-child PES algebra compiled with OpenMM Lepton.
 };
 
 } // namespace rgpot

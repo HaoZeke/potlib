@@ -92,6 +92,11 @@ if not get_option('with_rpc_client_only')
         rgpotentials += [d4pot]
     endif
 
+    if has_expr
+        subdir('rgpot/ExprPot')  # 'exprpot': Lepton energy over named children
+        rgpotentials += [exprpot]
+    endif
+
     # MetatomicDlopen frontend always (no torch). Engine/fat pot when has_metatomic.
     subdir('rgpot/MetatomicPot')
     _linkto += [metatomic_dlopen]
@@ -483,6 +488,23 @@ if get_option('with_tests')
             workdir: meson.source_root() + test.get(3),
         )
     endforeach
+
+    if has_expr
+        test(
+            'ExprPotTest',
+            executable(
+                'expr_pot_test',
+                sources: ['tests/ExprPotTest.cc'],
+                dependencies: test_deps,
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+            ),
+            workdir: meson.source_root(),
+            suite: 'expr',
+        )
+    endif
 
     if has_xckernel
         test(
