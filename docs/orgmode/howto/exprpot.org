@@ -13,7 +13,9 @@ one eindir objective for rgmin, rgsaddle, and anneal.
 See [[file:eindir-anneal.org][rgpot potentials as eindir objectives]].
 
 There is no =PotentialConfig.expr= arm.
-Composition is the C++ constructor, not a wire =configure= union.
+The C++ constructor is the first-slice API.
+RPC/config names the same tree as recursive =ExprParams= / =PotSpec=
+(expression plus named =ExprTerm= children), not a =configure= union.
 
 ** Named terms
 
