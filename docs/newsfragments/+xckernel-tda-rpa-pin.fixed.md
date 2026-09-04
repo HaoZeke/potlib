@@ -1,0 +1,1 @@
+`--tda-rpa` now writes same-SCF extras and MANIFEST before the exclusive 1e-17 live-vs-committed gate; sigma/J pins are the MO-replay `gen_vind` / `get_j` (a fresh RKS is not bit-stable at that scale).

@@ -69,8 +69,11 @@ bars: C vs NumPy `1e-16`, Fock vs PySCF exclusive `1e-15`, fxc vs PySCF
 long-double stage A/B to live `nr_rks` and exits when `rel > 1e-15`.
 `--tda-rpa` (also part of `--pyscf`) replays committed MOs, writes host-J
 / `st_o2_p` operands, and exits when live `gen_vind` /
-`gen_tdhf_operation` drifted past exclusive `1e-17`. Do not invent
-looser values.
+`gen_tdhf_operation` drifted past exclusive `1e-17`. A fresh RKS kernel
+on the same mol/xc is past that bar (MO/energy noise ~1e-15); the
+exclusive gate is MO-replay `gen_vind`, not a new SCF. Same-SCF extras
+and `MANIFEST.json` are written before that exit. Do not invent looser
+values.
 
 TDA/RPA assembly is `XcKernel::tdaSigma` / `rpaSigma` over the singlet
 `xck_*_st_o2_p` C kernels plus host Coulomb. Transition densities and ov

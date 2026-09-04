@@ -14,6 +14,16 @@ import socket
 import sys
 from pathlib import Path
 
+# Single-thread BLAS before NumPy loads it. Fresh RKS is not bit-stable at
+# exclusive 1e-17; MO-replay gen_vind is, only if the contraction is serial.
+for _thr in (
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(_thr, "1")
+
 import numpy as np
 
 PIN = "d6a9d57ba3fe0f2763667ce168d0c0ef21cff4a4"
@@ -308,7 +318,7 @@ def _mol_grid():
     return mol, grids, mf, dm0, dm1, numint
 
 
-def regen_pyscf() -> None:
+def regen_pyscf() -> bool:
     from pylibxc import LibXCFunctional
     from pyscf.dft import numint as ni_mod
 
@@ -429,11 +439,15 @@ def regen_pyscf() -> None:
         sys.exit(f"GGA fxc vs nr_rks_fxc rel={err / scale:.3e} exceeds 1e-13")
     save_npy(dest / "gga_fxc_ref.npy", Rref)
 
-    regen_tda_rpa(mol=mol, dest=dest)
+    return regen_tda_rpa(mol=mol, dest=dest)
 
 
 def _gate_pin(path: Path, live: np.ndarray, label: str) -> bool:
-    """Exclusive 1e-17 live-vs-committed. Returns True when the bar is red."""
+    """Exclusive 1e-17 live-vs-committed. Returns True when the bar is red.
+
+    Always writes `live` so MO/J/z/sigma stay same-SCF even when the
+    previous pin is stale. The caller writes MANIFEST before exiting.
+    """
     if not path.exists():
         save_npy(path, live)
         return False
@@ -446,12 +460,13 @@ def _gate_pin(path: Path, live: np.ndarray, label: str) -> bool:
     return rel > 1e-17
 
 
-def regen_tda_rpa(mol=None, dest: Path | None = None) -> None:
+def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
     """TDA/RPA sigma pins plus host-J / MO / st_o2_p operands.
 
     Replay committed MOs when `{fam}_mo.npz` exists so live gen_vind is
     the same SCF as the pin. A fresh RKS kernel on the same mol/xc
-    already drifts past exclusive 1e-17.
+    already drifts past exclusive 1e-17. Returns True when any live
+    sigma exceeded the exclusive bar vs the previous pin.
     """
     from pyscf import dft as dft_mod
     from pyscf import gto
@@ -583,8 +598,7 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> None:
         rpa = op(xys.reshape(3, -1)).reshape(3, 2, nocc, nvir)
         drifted = _gate_pin(dest / f"rpa_{fam}_sigma_ref.npy", rpa, f"{fam} RPA") or drifted
         print(f"  {fam} TDA/RPA pins nocc={nocc} nvir={nvir} ngrid={ng}")
-    if drifted:
-        sys.exit("TDA/RPA live vs committed exceeded exclusive 1e-17")
+    return drifted
 
 
 def write_manifest() -> None:
@@ -648,15 +662,18 @@ def main(argv=None) -> int:
     )
     if do_all or args.s2jz or args.c_vs_numpy or args.pyscf:
         _ensure_xckernel()
+    drifted = False
     if do_all or args.s2jz:
         regen_s2jz()
     if do_all or args.c_vs_numpy:
         regen_c_vs_numpy()
     if do_all or args.pyscf:
-        regen_pyscf()
+        drifted = regen_pyscf() or drifted
     elif args.tda_rpa:
-        regen_tda_rpa()
+        drifted = regen_tda_rpa() or drifted
     write_manifest()
+    if drifted:
+        sys.exit("TDA/RPA live vs committed exceeded exclusive 1e-17")
     return 0
 
 
