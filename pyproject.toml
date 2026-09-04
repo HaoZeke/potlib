@@ -89,6 +89,7 @@ setup = [
   "-Dwith_xckernel=false",
   "-Dwith_dftd3=false",
   "-Dwith_dftd4=false",
+  "-Dwith_expr=false",
   "-Dwith_tblite=false",
   "-Dwith_rust_core=false",
   "-Dwith_cache=false",

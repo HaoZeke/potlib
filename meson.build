@@ -270,6 +270,14 @@ if get_option('with_dftd4')
     has_dftd4 = true
 endif
 
+has_expr = false
+if get_option('with_expr')
+    expr_dep = dependency('muparser', required: true)
+    _deps += expr_dep
+    _args += ['-DRGPOT_HAS_EXPR=TRUE']
+    has_expr = true
+endif
+
 # NWChemPot frontend always builds and dlopens the split nwchemc engine
 # (libnwchemc.so) at runtime. rgpot carries no in-process NWChem embed.
 _args += ['-DRGPOT_HAS_NWCHEM_FRONTEND=TRUE']
