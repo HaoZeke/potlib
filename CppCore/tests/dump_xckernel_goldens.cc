@@ -13,9 +13,7 @@
 
 using rgpot::XcGrid;
 using rgpot::XcKernel;
-using rgpot::XcMo;
 using rgpot::testio::NpyArray;
-using rgpot::testio::load_npy;
 using rgpot::testio::load_npz;
 using rgpot::testio::save_npy;
 
@@ -119,79 +117,6 @@ int main() {
     const std::string base = std::string(data) + "/c_vs_numpy/" + k;
     auto op = load_npz(base + "_operands.npz");
     dump(base + "_ref.npy", run_kernel(k, op, 4, 60, false), 4);
-  }
-
-  const std::string root = std::string(data) + "/pyscf_h2o_sto3g";
-  struct Td {
-    const char *fam;
-    const char *kernel;
-  };
-  const Td tds[] = {{"lda", "xck_lda_st_o2_p"}, {"gga", "xck_gga_st_o2_p"}};
-  for (const auto &c : tds) {
-    auto mo_npz = load_npz(root + "/" + std::string(c.fam) + "_mo.npz");
-    auto op = load_npz(root + "/" + std::string(c.fam) + "_st_operands.npz");
-    auto zs = load_npy(root + "/tda_" + std::string(c.fam) + "_z.npy");
-    auto tda_j = load_npy(root + "/tda_" + std::string(c.fam) + "_j.npy");
-    auto xys = load_npy(root + "/rpa_" + std::string(c.fam) + "_xy.npy");
-    auto rpa_j = load_npy(root + "/rpa_" + std::string(c.fam) + "_j.npy");
-    const auto nz = static_cast<std::int64_t>(zs.shape[0]);
-    const auto nocc = static_cast<std::int64_t>(zs.shape[1]);
-    const auto nvir = static_cast<std::int64_t>(zs.shape[2]);
-    const auto nao = static_cast<std::int64_t>(mo_npz.at("Co").shape[0]);
-    const auto npts = static_cast<std::int64_t>(op.at("chi").shape[1]);
-    XcKernel k(c.kernel);
-    std::vector<double> dchi_c;
-    XcGrid g = grid_from_npz(op, nao, npts, &dchi_c, false);
-    std::map<std::string, const double *> ground;
-    for (const auto &name : k.scalNames()) {
-      if (name.find("_p1") != std::string::npos) {
-        continue;
-      }
-      ground[name] = op.at(name).data.data();
-    }
-    XcMo mo;
-    mo.nao = nao;
-    mo.nocc = nocc;
-    mo.nvir = nvir;
-    mo.Co = mo_npz.at("Co").data.data();
-    mo.Cv = mo_npz.at("Cv").data.data();
-    mo.e_ia = mo_npz.at("e_ia").data.data();
-
-    std::vector<double> got_tda(static_cast<std::size_t>(nz * nocc * nvir), 0.0);
-    for (std::int64_t iz = 0; iz < nz; ++iz) {
-      const double *z =
-          zs.data.data() + static_cast<std::size_t>(iz * nocc * nvir);
-      const double *vj =
-          tda_j.data.data() + static_cast<std::size_t>(iz * nao * nao);
-      double *sig = got_tda.data() + static_cast<std::size_t>(iz * nocc * nvir);
-      if (k.tdaSigma(g, ground, mo, z, vj, sig) != 0) {
-        std::fprintf(stderr, "tdaSigma failed %s\n", c.fam);
-        return 4;
-      }
-    }
-    save_npy(root + "/tda_" + std::string(c.fam) + "_sigma_ref.npy", got_tda,
-             {static_cast<std::size_t>(nz), static_cast<std::size_t>(nocc),
-              static_cast<std::size_t>(nvir)});
-    std::printf("wrote tda_%s_sigma_ref.npy\n", c.fam);
-
-    std::vector<double> got_rpa(static_cast<std::size_t>(nz * 2 * nocc * nvir),
-                                0.0);
-    for (std::int64_t iz = 0; iz < nz; ++iz) {
-      const double *xy =
-          xys.data.data() + static_cast<std::size_t>(iz * 2 * nocc * nvir);
-      const double *vj =
-          rpa_j.data.data() + static_cast<std::size_t>(iz * nao * nao);
-      double *sig =
-          got_rpa.data() + static_cast<std::size_t>(iz * 2 * nocc * nvir);
-      if (k.rpaSigma(g, ground, mo, xy, vj, sig) != 0) {
-        std::fprintf(stderr, "rpaSigma failed %s\n", c.fam);
-        return 5;
-      }
-    }
-    save_npy(root + "/rpa_" + std::string(c.fam) + "_sigma_ref.npy", got_rpa,
-             {static_cast<std::size_t>(nz), 2, static_cast<std::size_t>(nocc),
-              static_cast<std::size_t>(nvir)});
-    std::printf("wrote rpa_%s_sigma_ref.npy\n", c.fam);
   }
   return 0;
 }

@@ -463,6 +463,10 @@ def _gate_pin(path: Path, live: np.ndarray, label: str) -> bool:
 def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
     """TDA/RPA sigma pins plus host-J / MO / st_o2_p operands.
 
+    Host J is the get_j matrix the response actually contracts (captured
+    inside gen_vind / gen_tdhf_operation), not a second get_j on a
+    separately rebuilt transition DM.
+
     Replay committed MOs when `{fam}_mo.npz` exists so live gen_vind is
     the same SCF as the pin. A fresh RKS kernel on the same mol/xc
     already drifts past exclusive 1e-17. Pin PySCF to one OpenMP thread:
@@ -578,13 +582,33 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
         if z_path.exists():
             zs = np.load(z_path)
         save_npy(z_path, zs)
-        # Same contraction as TDA.gen_vind: einsum('xov,pv,qo->xpq', z, Cv, Co*2)
-        tda_dms = np.einsum("xov,pv,qo->xpq", zs, Cv, Co * 2.0)
-        save_npy(
-            dest / f"tda_{fam}_j.npy",
-            np.ascontiguousarray(mf_x.get_j(mol, tda_dms, hermi=0)),
+
+        def _capture_j(fn):
+            """Host J from the get_j call inside gen_vind / gen_tdhf_operation."""
+            held = []
+            orig = mf_x.get_j
+
+            def wrapped(*args, **kwargs):
+                jmat = orig(*args, **kwargs)
+                held.append(np.ascontiguousarray(jmat))
+                return jmat
+
+            mf_x.get_j = wrapped
+            try:
+                out = fn()
+            finally:
+                mf_x.get_j = orig
+            if not held:
+                raise RuntimeError("response did not call get_j")
+            last = held[-1]
+            if last.ndim == 2:
+                last = np.stack(held, axis=0)
+            return out, last
+
+        sig, tda_j = _capture_j(
+            lambda: vind(zs.reshape(3, -1)).reshape(3, nocc, nvir)
         )
-        sig = vind(zs.reshape(3, -1)).reshape(3, nocc, nvir)
+        save_npy(dest / f"tda_{fam}_j.npy", tda_j)
         drifted = _gate_pin(dest / f"tda_{fam}_sigma_ref.npy", sig, f"{fam} TDA") or drifted
         op, _ = gen_tdhf_operation(mf_x, singlet=True)
         xys = rngxy.standard_normal((3, 2, nocc, nvir))
@@ -592,15 +616,10 @@ def regen_tda_rpa(mol=None, dest: Path | None = None) -> bool:
         if xy_path.exists():
             xys = np.load(xy_path)
         save_npy(xy_path, xys)
-        # Same contraction as gen_tdhf_operation (X then Y).
-        xs, ys = xys[:, 0], xys[:, 1]
-        rpa_dms = np.einsum("xov,pv,qo->xpq", xs, Cv, Co * 2.0)
-        rpa_dms = rpa_dms + np.einsum("xov,qv,po->xpq", ys, Cv, Co * 2.0)
-        save_npy(
-            dest / f"rpa_{fam}_j.npy",
-            np.ascontiguousarray(mf_x.get_j(mol, rpa_dms, hermi=0)),
+        rpa, rpa_j = _capture_j(
+            lambda: op(xys.reshape(3, -1)).reshape(3, 2, nocc, nvir)
         )
-        rpa = op(xys.reshape(3, -1)).reshape(3, 2, nocc, nvir)
+        save_npy(dest / f"rpa_{fam}_j.npy", rpa_j)
         drifted = _gate_pin(dest / f"rpa_{fam}_sigma_ref.npy", rpa, f"{fam} RPA") or drifted
         print(f"  {fam} TDA/RPA pins nocc={nocc} nvir={nvir} ngrid={ng}")
     return drifted
