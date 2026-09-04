@@ -479,6 +479,16 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'xckernel',
         )
+        executable(
+            'dump_xckernel_goldens',
+            sources: ['tests/dump_xckernel_goldens.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            install: false,
+        )
     endif
 
     if has_xtb

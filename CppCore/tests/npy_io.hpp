@@ -82,6 +82,46 @@ inline NpyArray load_npy(const std::string &path) {
   return load_npy_stream(in, path);
 }
 
+inline void save_npy(const std::string &path, const std::vector<double> &data,
+                     const std::vector<std::size_t> &shape) {
+  std::size_t n = 1;
+  for (auto d : shape) {
+    n *= d;
+  }
+  if (data.size() != n) {
+    throw std::runtime_error("save_npy size mismatch: " + path);
+  }
+  std::ostringstream hdr;
+  hdr << "{'descr': '<f8', 'fortran_order': False, 'shape': (";
+  for (std::size_t i = 0; i < shape.size(); ++i) {
+    if (i) {
+      hdr << ", ";
+    }
+    hdr << shape[i];
+  }
+  if (shape.size() == 1) {
+    hdr << ",";
+  }
+  hdr << "), }";
+  std::string header = hdr.str();
+  while ((10 + header.size()) % 64 != 63) {
+    header.push_back(' ');
+  }
+  header.push_back('\n');
+  const auto hlen = static_cast<std::uint16_t>(header.size());
+  std::ofstream out(path, std::ios::binary);
+  if (!out) {
+    throw std::runtime_error("cannot write npy: " + path);
+  }
+  out.write("\x93NUMPY", 6);
+  const unsigned char ver[2] = {1, 0};
+  out.write(reinterpret_cast<const char *>(ver), 2);
+  out.write(reinterpret_cast<const char *>(&hlen), 2);
+  out.write(header.data(), static_cast<std::streamsize>(header.size()));
+  out.write(reinterpret_cast<const char *>(data.data()),
+            static_cast<std::streamsize>(data.size() * sizeof(double)));
+}
+
 inline std::uint64_t read_u16(std::istream &in) {
   std::uint16_t v = 0;
   in.read(reinterpret_cast<char *>(&v), 2);
