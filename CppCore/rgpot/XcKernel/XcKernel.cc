@@ -153,163 +153,23 @@ namespace {
 
 using Ld = long double;
 
-void promote(const double *src, std::size_t n, std::vector<Ld> *dst) {
-  dst->assign(n, 0.0L);
-  if (src == nullptr) {
-    return;
-  }
-  for (std::size_t i = 0; i < n; ++i) {
-    (*dst)[i] = src[i];
-  }
-}
-
-void transition_dm_ld(const XcMo &mo, const double *z, Ld occ, Ld *dm) {
-  const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nocc = static_cast<std::size_t>(mo.nocc);
-  const auto nvir = static_cast<std::size_t>(mo.nvir);
-  const std::size_t n2 = nao * nao;
-  for (std::size_t k = 0; k < n2; ++k) {
-    dm[k] = 0.0L;
-  }
-  if (z == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
-    return;
-  }
-  std::vector<Ld> tmp(nao * nocc, 0.0L);
-  for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t i = 0; i < nocc; ++i) {
-      Ld acc = 0.0L;
-      for (std::size_t a = 0; a < nvir; ++a) {
-        acc += static_cast<Ld>(mo.Cv[p * nvir + a]) * z[i * nvir + a];
-      }
-      tmp[p * nocc + i] = acc;
-    }
-  }
-  for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t q = 0; q < nao; ++q) {
-      Ld acc = 0.0L;
-      for (std::size_t i = 0; i < nocc; ++i) {
-        acc += tmp[p * nocc + i] * mo.Co[q * nocc + i];
-      }
-      dm[p * nao + q] = occ * acc;
-    }
-  }
-}
-
-void rpa_transition_dm_ld(const XcMo &mo, const double *x, const double *y,
-                          Ld occ, Ld *dm) {
-  transition_dm_ld(mo, x, occ, dm);
-  const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nocc = static_cast<std::size_t>(mo.nocc);
-  const auto nvir = static_cast<std::size_t>(mo.nvir);
-  if (y == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
-    return;
-  }
-  std::vector<Ld> tmp(nao * nvir, 0.0L);
-  for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t i = 0; i < nocc; ++i) {
-        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * y[i * nvir + a];
-      }
-      tmp[p * nvir + a] = acc;
-    }
-  }
-  for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t q = 0; q < nao; ++q) {
-      Ld acc = 0.0L;
-      for (std::size_t a = 0; a < nvir; ++a) {
-        acc += tmp[p * nvir + a] * mo.Cv[q * nvir + a];
-      }
-      dm[p * nao + q] += occ * acc;
-    }
-  }
-}
-
-void project_ov_ld(const XcMo &mo, const Ld *Vao, Ld *ov) {
-  const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nocc = static_cast<std::size_t>(mo.nocc);
-  const auto nvir = static_cast<std::size_t>(mo.nvir);
-  const std::size_t nov = nocc * nvir;
-  for (std::size_t k = 0; k < nov; ++k) {
-    ov[k] = 0.0L;
-  }
-  if (Vao == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
-    return;
-  }
-  std::vector<Ld> tmp(nao * nvir, 0.0L);
-  for (std::size_t q = 0; q < nao; ++q) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t p = 0; p < nao; ++p) {
-        acc += Vao[p * nao + q] * mo.Cv[p * nvir + a];
-      }
-      tmp[q * nvir + a] = acc;
-    }
-  }
-  for (std::size_t i = 0; i < nocc; ++i) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t q = 0; q < nao; ++q) {
-        acc += static_cast<Ld>(mo.Co[q * nocc + i]) * tmp[q * nvir + a];
-      }
-      ov[i * nvir + a] = acc;
-    }
-  }
-}
-
-void project_ov_noT_ld(const XcMo &mo, const Ld *Vao, Ld *ov) {
-  const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nocc = static_cast<std::size_t>(mo.nocc);
-  const auto nvir = static_cast<std::size_t>(mo.nvir);
-  const std::size_t nov = nocc * nvir;
-  for (std::size_t k = 0; k < nov; ++k) {
-    ov[k] = 0.0L;
-  }
-  if (Vao == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
-    return;
-  }
-  std::vector<Ld> tmp(nao * nvir, 0.0L);
-  for (std::size_t p = 0; p < nao; ++p) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t q = 0; q < nao; ++q) {
-        acc += Vao[p * nao + q] * mo.Cv[q * nvir + a];
-      }
-      tmp[p * nvir + a] = acc;
-    }
-  }
-  for (std::size_t i = 0; i < nocc; ++i) {
-    for (std::size_t a = 0; a < nvir; ++a) {
-      Ld acc = 0.0L;
-      for (std::size_t p = 0; p < nao; ++p) {
-        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * tmp[p * nvir + a];
-      }
-      ov[i * nvir + a] = acc;
-    }
-  }
-}
-
 #ifdef RGPOT_HAS_XCKERNEL
-int apply_fxc_ld(const XcKernel &k, const XcGrid &grid,
-                 const std::map<std::string, const double *> &ground,
-                 const Ld *dm, Ld *vxc) {
+int apply_fxc_d(const XcKernel &k, const XcGrid &grid,
+                const std::map<std::string, const double *> &ground,
+                const double *dm, double *vxc) {
   if (dm == nullptr || vxc == nullptr) {
     return 4;
   }
   const auto ng = static_cast<std::size_t>(grid.npts);
   const auto nbf = static_cast<std::size_t>(grid.nbf);
-  const std::size_t n2 = nbf * nbf;
-  for (std::size_t i = 0; i < n2; ++i) {
-    vxc[i] = 0.0L;
-  }
   if (grid.chi == nullptr || grid.npts <= 0 || grid.nbf <= 0) {
     return 2;
   }
 
-  std::vector<double> rho_p1(ng, 0.0);
-  std::vector<double> gx(ng, 0.0);
-  std::vector<double> gy(ng, 0.0);
-  std::vector<double> gz(ng, 0.0);
+  std::vector<Ld> rho_ld(ng, 0.0L);
+  std::vector<Ld> gx(ng, 0.0L);
+  std::vector<Ld> gy(ng, 0.0L);
+  std::vector<Ld> gz(ng, 0.0L);
   const double *chi = grid.chi;
   const double *dchi = grid.dchi;
   for (std::size_t u = 0; u < nbf; ++u) {
@@ -318,8 +178,7 @@ int apply_fxc_ld(const XcKernel &k, const XcGrid &grid,
       const double *chi_u = chi + u * ng;
       const double *chi_v = chi + v * ng;
       for (std::size_t g = 0; g < ng; ++g) {
-        rho_p1[g] = static_cast<double>(
-            static_cast<Ld>(rho_p1[g]) + Puv * chi_u[g] * chi_v[g]);
+        rho_ld[g] += Puv * chi_u[g] * chi_v[g];
       }
       if (dchi != nullptr) {
         const double *dx_u = dchi + (0 * nbf + u) * ng;
@@ -329,18 +188,22 @@ int apply_fxc_ld(const XcKernel &k, const XcGrid &grid,
         const double *dy_v = dchi + (1 * nbf + v) * ng;
         const double *dz_v = dchi + (2 * nbf + v) * ng;
         for (std::size_t g = 0; g < ng; ++g) {
-          gx[g] = static_cast<double>(
-              static_cast<Ld>(gx[g]) +
-              Puv * (dx_u[g] * chi_v[g] + chi_u[g] * dx_v[g]));
-          gy[g] = static_cast<double>(
-              static_cast<Ld>(gy[g]) +
-              Puv * (dy_u[g] * chi_v[g] + chi_u[g] * dy_v[g]));
-          gz[g] = static_cast<double>(
-              static_cast<Ld>(gz[g]) +
-              Puv * (dz_u[g] * chi_v[g] + chi_u[g] * dz_v[g]));
+          gx[g] += Puv * (dx_u[g] * chi_v[g] + chi_u[g] * dx_v[g]);
+          gy[g] += Puv * (dy_u[g] * chi_v[g] + chi_u[g] * dy_v[g]);
+          gz[g] += Puv * (dz_u[g] * chi_v[g] + chi_u[g] * dz_v[g]);
         }
       }
     }
+  }
+  std::vector<double> rho_p1(ng, 0.0);
+  std::vector<double> gxd(ng, 0.0);
+  std::vector<double> gyd(ng, 0.0);
+  std::vector<double> gzd(ng, 0.0);
+  for (std::size_t g = 0; g < ng; ++g) {
+    rho_p1[g] = static_cast<double>(rho_ld[g]);
+    gxd[g] = static_cast<double>(gx[g]);
+    gyd[g] = static_cast<double>(gy[g]);
+    gzd[g] = static_cast<double>(gz[g]);
   }
 
   std::map<std::string, const double *> scal = ground;
@@ -348,22 +211,14 @@ int apply_fxc_ld(const XcKernel &k, const XcGrid &grid,
     if (name == "rho_a_p1" || name == "rho_p1") {
       scal[name] = rho_p1.data();
     } else if (name == "grad_rho_a_p1_x" || name == "grad_rho_p1_x") {
-      scal[name] = gx.data();
+      scal[name] = gxd.data();
     } else if (name == "grad_rho_a_p1_y" || name == "grad_rho_p1_y") {
-      scal[name] = gy.data();
+      scal[name] = gyd.data();
     } else if (name == "grad_rho_a_p1_z" || name == "grad_rho_p1_z") {
-      scal[name] = gz.data();
+      scal[name] = gzd.data();
     }
   }
-  std::vector<double> out(n2, 0.0);
-  const int rc = k.contract(grid, scal, out.data());
-  if (rc != 0) {
-    return rc;
-  }
-  for (std::size_t i = 0; i < n2; ++i) {
-    vxc[i] = out[i];
-  }
-  return 0;
+  return k.contract(grid, scal, vxc);
 }
 #endif
 
@@ -372,38 +227,100 @@ int apply_fxc_ld(const XcKernel &k, const XcGrid &grid,
 void XcKernel::transitionDm(const XcMo &mo, const double *z, double occ,
                             double *dm) {
   const auto nao = static_cast<std::size_t>(mo.nao);
-  std::vector<Ld> tmp(nao * nao, 0.0L);
-  transition_dm_ld(mo, z, occ, tmp.data());
-  if (dm != nullptr) {
-    for (std::size_t k = 0; k < nao * nao; ++k) {
-      dm[k] = static_cast<double>(tmp[k]);
+  const auto nocc = static_cast<std::size_t>(mo.nocc);
+  const auto nvir = static_cast<std::size_t>(mo.nvir);
+  const std::size_t n2 = nao * nao;
+  if (dm == nullptr) {
+    return;
+  }
+  for (std::size_t k = 0; k < n2; ++k) {
+    dm[k] = 0.0;
+  }
+  if (z == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
+    return;
+  }
+  std::vector<double> tmp(nao * nocc, 0.0);
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t i = 0; i < nocc; ++i) {
+      Ld acc = 0.0L;
+      for (std::size_t a = 0; a < nvir; ++a) {
+        acc += static_cast<Ld>(mo.Cv[p * nvir + a]) * z[i * nvir + a];
+      }
+      tmp[p * nocc + i] = static_cast<double>(acc);
+    }
+  }
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t q = 0; q < nao; ++q) {
+      Ld acc = 0.0L;
+      for (std::size_t i = 0; i < nocc; ++i) {
+        acc += static_cast<Ld>(tmp[p * nocc + i]) * mo.Co[q * nocc + i];
+      }
+      dm[p * nao + q] = static_cast<double>(occ * acc);
     }
   }
 }
 
 void XcKernel::rpaTransitionDm(const XcMo &mo, const double *x, const double *y,
                                double occ, double *dm) {
+  transitionDm(mo, x, occ, dm);
   const auto nao = static_cast<std::size_t>(mo.nao);
-  std::vector<Ld> tmp(nao * nao, 0.0L);
-  rpa_transition_dm_ld(mo, x, y, occ, tmp.data());
-  if (dm != nullptr) {
-    for (std::size_t k = 0; k < nao * nao; ++k) {
-      dm[k] = static_cast<double>(tmp[k]);
+  const auto nocc = static_cast<std::size_t>(mo.nocc);
+  const auto nvir = static_cast<std::size_t>(mo.nvir);
+  if (y == nullptr || mo.Co == nullptr || mo.Cv == nullptr || dm == nullptr) {
+    return;
+  }
+  std::vector<double> tmp(nao * nvir, 0.0);
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t a = 0; a < nvir; ++a) {
+      Ld acc = 0.0L;
+      for (std::size_t i = 0; i < nocc; ++i) {
+        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * y[i * nvir + a];
+      }
+      tmp[p * nvir + a] = static_cast<double>(acc);
+    }
+  }
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t q = 0; q < nao; ++q) {
+      Ld acc = 0.0L;
+      for (std::size_t a = 0; a < nvir; ++a) {
+        acc += static_cast<Ld>(tmp[p * nvir + a]) * mo.Cv[q * nvir + a];
+      }
+      dm[p * nao + q] += static_cast<double>(occ * acc);
     }
   }
 }
 
 void XcKernel::projectOv(const XcMo &mo, const double *Vao, double *ov) {
   const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nov =
-      static_cast<std::size_t>(mo.nocc) * static_cast<std::size_t>(mo.nvir);
-  std::vector<Ld> Vld;
-  promote(Vao, nao * nao, &Vld);
-  std::vector<Ld> ovld(nov, 0.0L);
-  project_ov_ld(mo, Vld.data(), ovld.data());
-  if (ov != nullptr) {
-    for (std::size_t k = 0; k < nov; ++k) {
-      ov[k] = static_cast<double>(ovld[k]);
+  const auto nocc = static_cast<std::size_t>(mo.nocc);
+  const auto nvir = static_cast<std::size_t>(mo.nvir);
+  const std::size_t nov = nocc * nvir;
+  if (ov == nullptr) {
+    return;
+  }
+  for (std::size_t k = 0; k < nov; ++k) {
+    ov[k] = 0.0;
+  }
+  if (Vao == nullptr || mo.Co == nullptr || mo.Cv == nullptr) {
+    return;
+  }
+  std::vector<double> tmp(nao * nvir, 0.0);
+  for (std::size_t q = 0; q < nao; ++q) {
+    for (std::size_t a = 0; a < nvir; ++a) {
+      Ld acc = 0.0L;
+      for (std::size_t p = 0; p < nao; ++p) {
+        acc += static_cast<Ld>(Vao[p * nao + q]) * mo.Cv[p * nvir + a];
+      }
+      tmp[q * nvir + a] = static_cast<double>(acc);
+    }
+  }
+  for (std::size_t i = 0; i < nocc; ++i) {
+    for (std::size_t a = 0; a < nvir; ++a) {
+      Ld acc = 0.0L;
+      for (std::size_t q = 0; q < nao; ++q) {
+        acc += static_cast<Ld>(mo.Co[q * nocc + i]) * tmp[q * nvir + a];
+      }
+      ov[i * nvir + a] = static_cast<double>(acc);
     }
   }
 }
@@ -433,45 +350,43 @@ void XcKernel::rpaSigma(const XcMo &mo, const double *xy, const double *v1,
   const std::size_t nov = nocc * nvir;
   tdaSigma(mo, xy, v1, sigma);
   if (xy == nullptr || v1 == nullptr || sigma == nullptr ||
-      mo.e_ia == nullptr) {
+      mo.Co == nullptr || mo.Cv == nullptr || mo.e_ia == nullptr) {
     return;
   }
   const double *y = xy + nov;
   double *bot = sigma + nov;
-  std::vector<Ld> Vld;
-  promote(v1, nao * nao, &Vld);
-  std::vector<Ld> ovld(nov, 0.0L);
-  project_ov_noT_ld(mo, Vld.data(), ovld.data());
-  for (std::size_t ia = 0; ia < nov; ++ia) {
-    bot[ia] = -static_cast<double>(static_cast<Ld>(mo.e_ia[ia]) * y[ia] +
-                                   ovld[ia]);
+  std::vector<double> tmp(nao * nvir, 0.0);
+  for (std::size_t p = 0; p < nao; ++p) {
+    for (std::size_t a = 0; a < nvir; ++a) {
+      Ld acc = 0.0L;
+      for (std::size_t q = 0; q < nao; ++q) {
+        acc += static_cast<Ld>(v1[p * nao + q]) * mo.Cv[q * nvir + a];
+      }
+      tmp[p * nvir + a] = static_cast<double>(acc);
+    }
+  }
+  for (std::size_t i = 0; i < nocc; ++i) {
+    for (std::size_t a = 0; a < nvir; ++a) {
+      Ld acc = 0.0L;
+      for (std::size_t p = 0; p < nao; ++p) {
+        acc += static_cast<Ld>(mo.Co[p * nocc + i]) * tmp[p * nvir + a];
+      }
+      const std::size_t ia = i * nvir + a;
+      bot[ia] = -static_cast<double>(static_cast<Ld>(mo.e_ia[ia]) * y[ia] + acc);
+    }
   }
 }
 
 int XcKernel::applyFxc(const XcGrid &grid,
                        const std::map<std::string, const double *> &ground,
                        const double *dm, double *vxc) const {
-  if (dm == nullptr || vxc == nullptr) {
-    return 4;
-  }
-  const auto n2 =
-      static_cast<std::size_t>(grid.nbf) * static_cast<std::size_t>(grid.nbf);
 #ifdef RGPOT_HAS_XCKERNEL
-  std::vector<Ld> dm_ld;
-  promote(dm, n2, &dm_ld);
-  std::vector<Ld> vxc_ld(n2, 0.0L);
-  const int rc = apply_fxc_ld(*this, grid, ground, dm_ld.data(), vxc_ld.data());
-  if (rc != 0) {
-    return rc;
-  }
-  for (std::size_t k = 0; k < n2; ++k) {
-    vxc[k] += static_cast<double>(vxc_ld[k]);
-  }
-  return 0;
+  return apply_fxc_d(*this, grid, ground, dm, vxc);
 #else
   (void)grid;
   (void)ground;
-  (void)n2;
+  (void)dm;
+  (void)vxc;
   return 1;
 #endif
 }
@@ -485,24 +400,18 @@ int XcKernel::tdaSigma(const XcGrid &grid,
   }
 #ifdef RGPOT_HAS_XCKERNEL
   const auto nao = static_cast<std::size_t>(mo.nao);
-  const auto nov =
-      static_cast<std::size_t>(mo.nocc) * static_cast<std::size_t>(mo.nvir);
-  std::vector<Ld> dm(nao * nao, 0.0L);
-  std::vector<Ld> vxc(nao * nao, 0.0L);
-  std::vector<Ld> v1(nao * nao, 0.0L);
-  transition_dm_ld(mo, z, 2.0L, dm.data());
-  const int rc = apply_fxc_ld(*this, grid, ground, dm.data(), vxc.data());
+  std::vector<double> dm(nao * nao, 0.0);
+  std::vector<double> vxc(nao * nao, 0.0);
+  std::vector<double> v1(nao * nao, 0.0);
+  transitionDm(mo, z, 2.0, dm.data());
+  const int rc = apply_fxc_d(*this, grid, ground, dm.data(), vxc.data());
   if (rc != 0) {
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = static_cast<Ld>(vj[k]) + 0.5L * vxc[k];
+    v1[k] = static_cast<double>(static_cast<Ld>(vj[k]) + 0.5L * vxc[k]);
   }
-  std::vector<Ld> ov(nov, 0.0L);
-  project_ov_ld(mo, v1.data(), ov.data());
-  for (std::size_t ia = 0; ia < nov; ++ia) {
-    sigma[ia] = static_cast<double>(ov[ia] + static_cast<Ld>(mo.e_ia[ia]) * z[ia]);
-  }
+  tdaSigma(mo, z, v1.data(), sigma);
   return 0;
 #else
   (void)grid;
@@ -522,28 +431,18 @@ int XcKernel::rpaSigma(const XcGrid &grid,
   const auto nao = static_cast<std::size_t>(mo.nao);
   const auto nov =
       static_cast<std::size_t>(mo.nocc) * static_cast<std::size_t>(mo.nvir);
-  std::vector<Ld> dm(nao * nao, 0.0L);
-  std::vector<Ld> vxc(nao * nao, 0.0L);
-  std::vector<Ld> v1(nao * nao, 0.0L);
-  rpa_transition_dm_ld(mo, xy, xy + nov, 2.0L, dm.data());
-  const int rc = apply_fxc_ld(*this, grid, ground, dm.data(), vxc.data());
+  std::vector<double> dm(nao * nao, 0.0);
+  std::vector<double> vxc(nao * nao, 0.0);
+  std::vector<double> v1(nao * nao, 0.0);
+  rpaTransitionDm(mo, xy, xy + nov, 2.0, dm.data());
+  const int rc = apply_fxc_d(*this, grid, ground, dm.data(), vxc.data());
   if (rc != 0) {
     return rc;
   }
   for (std::size_t k = 0; k < nao * nao; ++k) {
-    v1[k] = static_cast<Ld>(vj[k]) + 0.5L * vxc[k];
+    v1[k] = static_cast<double>(static_cast<Ld>(vj[k]) + 0.5L * vxc[k]);
   }
-  std::vector<Ld> top(nov, 0.0L);
-  std::vector<Ld> bot(nov, 0.0L);
-  project_ov_ld(mo, v1.data(), top.data());
-  project_ov_noT_ld(mo, v1.data(), bot.data());
-  const double *y = xy + nov;
-  for (std::size_t ia = 0; ia < nov; ++ia) {
-    sigma[ia] =
-        static_cast<double>(top[ia] + static_cast<Ld>(mo.e_ia[ia]) * xy[ia]);
-    sigma[nov + ia] =
-        -static_cast<double>(bot[ia] + static_cast<Ld>(mo.e_ia[ia]) * y[ia]);
-  }
+  rpaSigma(mo, xy, v1.data(), sigma);
   return 0;
 #else
   (void)grid;
