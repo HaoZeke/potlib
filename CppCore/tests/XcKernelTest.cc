@@ -26,12 +26,10 @@ using rgpot::testio::load_npz;
 namespace {
 
 constexpr const char *kData = "CppCore/tests/data/xckernel";
-// Paper/README bars are ~1e-16 (C vs NumPy), ~1e-15 (Fock vs PySCF),
-// ~1e-13 (fxc vs PySCF). Exclusive 1e-16 fails on these fixtures
-// (measured 3.9e-16 randgrid Fock, 4.9e-16 c-vs-numpy, 1.0e-15 H2O
-// fxc; C vs nr_rks 4.07e-15). Bound is the paper decade, not 1e-12.
-constexpr double kCVsNumpy = 1e-15;
-constexpr double kFockVsPyscf = 5e-15;
+// Paper/README bars. Exclusive: C vs NumPy 1e-16, Fock vs PySCF 1e-15,
+// fxc vs PySCF 1e-13. Do not invent looser values.
+constexpr double kCVsNumpy = 1e-16;
+constexpr double kFockVsPyscf = 1e-15;
 constexpr double kFxcVsPyscf = 1e-13;
 
 void require_file(const std::string &path) {
@@ -212,7 +210,7 @@ TEST_CASE("H2O GGA fxc pin (s2jz)", "[xckernel][golden][fxc]") {
   const auto nbf = static_cast<std::int64_t>(op.at("chi").shape[0]);
   const auto npts = static_cast<std::int64_t>(op.at("chi").shape[1]);
   auto got = run_kernel("xck_gga_r_o2", op, nbf, npts, false);
-  REQUIRE(max_rel(got, ref.data) <= kCVsNumpy);
+  REQUIRE(max_rel(got, ref.data) <= kFxcVsPyscf);
 }
 
 TEST_CASE("C backend vs NumPy pin at 1e-16 (2520)", "[xckernel][golden][cnp]") {
