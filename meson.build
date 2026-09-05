@@ -256,7 +256,16 @@ endif
 
 has_dftd3 = false
 if get_option('with_dftd3')
-    dftd3_dep = dependency('s-dftd3', required: true)
+    dftd3_dep = dependency(
+        's-dftd3',
+        required: true,
+        fallback: ['s-dftd3', 'sdftd3_dep'],
+        default_options: [
+            'default_library=static',
+            'python=false',
+            'openmp=false',
+        ],
+    )
     _deps += dftd3_dep
     _args += ['-DRGPOT_HAS_DFTD3=TRUE']
     has_dftd3 = true
@@ -264,7 +273,16 @@ endif
 
 has_dftd4 = false
 if get_option('with_dftd4')
-    dftd4_dep = dependency('dftd4', required: true)
+    dftd4_dep = dependency(
+        'dftd4',
+        required: true,
+        fallback: ['dftd4', 'dftd4_dep'],
+        default_options: [
+            'default_library=static',
+            'python=false',
+            'openmp=false',
+        ],
+    )
     _deps += dftd4_dep
     _args += ['-DRGPOT_HAS_DFTD4=TRUE']
     has_dftd4 = true

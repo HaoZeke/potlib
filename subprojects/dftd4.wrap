@@ -1,0 +1,8 @@
+[wrap-git]
+directory = dftd4
+url = https://github.com/dftd4/dftd4
+revision = v4.2.0
+depth = 1
+
+[provide]
+dftd4 = dftd4_dep

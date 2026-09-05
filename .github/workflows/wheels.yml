@@ -30,7 +30,7 @@ on:
       - "meson.build"
       - "CppCore/**"
       - "python/**"
-      - "scripts/rgpot_wheel_dftd_prefix.sh"
+      - "subprojects/*.wrap"
       - "third_party/lepton/**"
       - "third_party/libxckernel/**"
       - ".github/workflows/wheels.yml"

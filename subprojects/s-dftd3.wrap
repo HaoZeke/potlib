@@ -1,0 +1,8 @@
+[wrap-git]
+directory = s-dftd3
+url = https://github.com/dftd3/simple-dftd3
+revision = v1.5.0
+depth = 1
+
+[provide]
+s-dftd3 = sdftd3_dep
