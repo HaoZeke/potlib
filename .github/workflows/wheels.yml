@@ -30,7 +30,7 @@ on:
       - "meson.build"
       - "CppCore/**"
       - "python/**"
-      - "scripts/rgpot_wheel_dftd_prefix.sh"
+      - "subprojects/*.wrap"
       - "third_party/lepton/**"
       - "third_party/libxckernel/**"
       - ".github/workflows/wheels.yml"
@@ -58,18 +58,20 @@ jobs:
               echo "wheel carries ${n}/8 Fortran kernels; -Dwith_fortran_pots lost" >&2
               exit 1
             fi
-            demangled=$(nm -C "${lib}" 2>/dev/null || nm "${lib}")
-            echo "$demangled" | grep -q 'rgpot::ExprPot' \
+            # File, not echo|grep -q: wrap symbols make nm -C huge and
+            # pipefail treats grep -q's early close as a missing symbol.
+            nm -C "${lib}" > _syms 2>/dev/null || nm "${lib}" > _syms
+            grep -q 'rgpot::ExprPot' _syms \
               || { echo "wheel missing ExprPot; -Dwith_expr lost" >&2; exit 1; }
-            echo "$demangled" | grep -q 'rgpot::D3Pot' \
+            grep -q 'rgpot::D3Pot' _syms \
               || { echo "wheel missing D3Pot; -Dwith_dftd3 lost" >&2; exit 1; }
-            echo "$demangled" | grep -q 'rgpot::D4Pot' \
+            grep -q 'rgpot::D4Pot' _syms \
               || { echo "wheel missing D4Pot; -Dwith_dftd4 lost" >&2; exit 1; }
-            echo "$demangled" | grep -q 'rgpot::XcKernel' \
+            grep -q 'rgpot::XcKernel' _syms \
               || { echo "wheel missing XcKernel; -Dwith_xckernel lost" >&2; exit 1; }
             core=$(find _whlx -name '_core*.so' | head -1)
             test -n "${core}" || { echo "no _core in wheel" >&2; exit 1; }
-            if readelf -d "${core}" | grep -q 'libtorch'; then
+            if grep -q 'libtorch' < <(readelf -d "${core}"); then
               echo "_core NEEDs libtorch; pip import would require torch" >&2
               readelf -d "${core}"
               exit 1
@@ -97,6 +99,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # meson-python runs setup for the sdist; -Dwith_dftd4 pulls the
+      # wrap, which needs gfortran and OpenBLAS (lapack=openblas).
+      - name: OpenBLAS for the dftd4 wrap
+        run: sudo apt-get update && sudo apt-get install -y gfortran libopenblas-dev pkg-config
       - name: Build sdist
         run: pipx run build --sdist
       - name: Check

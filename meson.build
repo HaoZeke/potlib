@@ -254,9 +254,31 @@ if get_option('with_xckernel')
     has_xckernel = true
 endif
 
+# Static wrap fallbacks are Fortran archives; they need the language
+# and libgfortran even when the in-tree Fortran pots are off.
+if get_option('with_dftd3') or get_option('with_dftd4')
+    if not add_languages('fortran', required: true, native: false)
+        error('with_dftd3/with_dftd4 need a Fortran compiler')
+    endif
+    _dftd_fc = meson.get_compiler('fortran')
+    _dftd_gfrt = _dftd_fc.find_library('gfortran', required: false)
+    if _dftd_gfrt.found()
+        _deps += _dftd_gfrt
+    endif
+endif
+
 has_dftd3 = false
 if get_option('with_dftd3')
-    dftd3_dep = dependency('s-dftd3', required: true)
+    dftd3_dep = dependency(
+        's-dftd3',
+        required: true,
+        fallback: ['s-dftd3', 'sdftd3_dep'],
+        default_options: [
+            'default_library=static',
+            'python=false',
+            'openmp=false',
+        ],
+    )
     _deps += dftd3_dep
     _args += ['-DRGPOT_HAS_DFTD3=TRUE']
     has_dftd3 = true
@@ -264,7 +286,19 @@ endif
 
 has_dftd4 = false
 if get_option('with_dftd4')
-    dftd4_dep = dependency('dftd4', required: true)
+    dftd4_dep = dependency(
+        'dftd4',
+        required: true,
+        fallback: ['dftd4', 'dftd4_dep'],
+        default_options: [
+            'default_library=static',
+            'python=false',
+            'openmp=false',
+            # auto looks for liblapack; manylinux/brew/apt ship OpenBLAS
+            # as libopenblas, not a separate lapack soname.
+            'lapack=openblas',
+        ],
+    )
     _deps += dftd4_dep
     _args += ['-DRGPOT_HAS_DFTD4=TRUE']
     has_dftd4 = true

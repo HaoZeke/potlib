@@ -77,54 +77,6 @@ if [[ -n "$LIBS" ]]; then
     cp -f "$real" "$LIBS/librgpot.so"
     echo "soname copies $(basename "$real") -> librgpot.so.3 + librgpot.so"
   fi
-  # Vendor s-dftd3 / dftd4 and every NEEDED they pull from the micromamba
-  # prefix (mctc-lib, toml-f, blas, …) next to librgpot.
-  _dftd_root=/tmp/rgpot-dftd
-  _copy_dftd() {
-    local src="$1"
-    local dest="$LIBS/$(basename "$src")"
-    [[ -e "$dest" ]] && return 0
-    cp -a "$src" "$dest"
-    echo "vendor $(basename "$src") -> $(basename "$LIBS")"
-    if command -v patchelf >/dev/null; then
-      patchelf --set-rpath '$ORIGIN' "$dest" 2>/dev/null || true
-    fi
-  }
-  if [[ -d "$_dftd_root/lib" || -d "$_dftd_root/lib64" ]]; then
-    while IFS= read -r -d '' src; do
-      _copy_dftd "$src"
-    done < <(find "$_dftd_root/lib" "$_dftd_root/lib64" -maxdepth 1 \( -type f -o -type l \) \( \
-      -name 'libs-dftd3.so*' -o -name 'libdftd4.so*' -o \
-      -name 'libmctc-lib.so*' -o -name 'libtoml-f.so*' -o \
-      -name 'libmulticharge.so*' \
-    \) -print0 2>/dev/null)
-    # Walk NEEDED of what we just copied and pull matching files from the prefix.
-    _again=1
-    while [[ "$_again" -eq 1 ]]; do
-      _again=0
-      for so in "$LIBS"/libs-dftd3.so* "$LIBS"/libdftd4.so* "$LIBS"/libmctc-lib.so* \
-                "$LIBS"/libtoml-f.so* "$LIBS"/libmulticharge.so* "$LIBS"/libblas.so* \
-                "$LIBS"/liblapack.so* "$LIBS"/libopenblas.so* "$LIBS"/libflexiblas.so*; do
-        [[ -e "$so" ]] || continue
-        command -v patchelf >/dev/null || continue
-        while read -r need; do
-          [[ -n "$need" ]] || continue
-          [[ -e "$LIBS/$need" ]] && continue
-          case "$need" in
-            libc.so*|libm.so*|libpthread*|libdl.so*|librt.so*| \
-            libgcc_s.so*|ld-linux*|libstdc++.so*|libgfortran.so*| \
-            libquadmath.so*|libgomp.so*) continue ;;
-          esac
-          for d in "$_dftd_root/lib" "$_dftd_root/lib64"; do
-            if [[ -e "$d/$need" ]]; then
-              _copy_dftd "$d/$need"
-              _again=1
-            fi
-          done
-        done < <(patchelf --print-needed "$so" 2>/dev/null || true)
-      done
-    done
-  fi
 fi
 
 bad=0
