@@ -254,6 +254,19 @@ if get_option('with_xckernel')
     has_xckernel = true
 endif
 
+# Static wrap fallbacks are Fortran archives; they need the language
+# and libgfortran even when the in-tree Fortran pots are off.
+if get_option('with_dftd3') or get_option('with_dftd4')
+    if not add_languages('fortran', required: true, native: false)
+        error('with_dftd3/with_dftd4 need a Fortran compiler')
+    endif
+    _dftd_fc = meson.get_compiler('fortran')
+    _dftd_gfrt = _dftd_fc.find_library('gfortran', required: false)
+    if _dftd_gfrt.found()
+        _deps += _dftd_gfrt
+    endif
+endif
+
 has_dftd3 = false
 if get_option('with_dftd3')
     dftd3_dep = dependency(
