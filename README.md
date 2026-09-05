@@ -57,7 +57,10 @@ ABI extension; requires-python is >= 3.10 for pure metadata):
     pip install 'rgpot[metatomic]'
     # or: pip install torch metatomic-torch metatensor-torch metatensor-core vesin
 
-Lennard-Jones needs only `numpy`. Metatomic uses **dlopen** of a bundled
+The PyPI wheel compiles ExprPot (vendored Lepton), D3Pot, D4Pot, and
+XcKernel. `s-dftd3` / `dftd4` are linked and vendored; no conda install
+is required at `pip install` time. Lennard-Jones needs only `numpy`.
+Metatomic uses **dlopen** of a bundled
 engine:
 
 -   layout: `rgpot/lib/torch-X.Y/libmetatomic_engine.so`
@@ -70,7 +73,13 @@ import numpy as np
 import rgpot
 
 print(rgpot.__version__)
+print(rgpot.has_expr, rgpot.has_dftd3, rgpot.has_dftd4, rgpot.has_xckernel)
 print(rgpot.available_metatomic_engine_abis())  # e.g. 2.7 .. 2.13
+# energy, forces, variance = rgpot.LJPot()(positions, atom_types, box)
+# energy, forces, variance = rgpot.D3Pot()(positions, atom_types, box)
+# energy, forces, variance = rgpot.ExprPot(
+#     "0.5*lj + d3", {"lj": "lj", "d3": "d3"})(positions, atom_types, box)
+# print(rgpot.XcKernel.catalog())
 # energy, forces, variance = rgpot.evaluate_metatomic(
 #     positions, atom_types, box, model_path="model.pt")
 ```

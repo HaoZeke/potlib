@@ -291,6 +291,7 @@ if get_option('with_tblite')
 endif
 
 has_metatomic = false
+_mta_engine_deps = []
 if get_option('with_metatomic')
     # Discover torch without importing it (import can load NumPy C extensions
     # during meson configure). Supports multi-ABI builds via:
@@ -387,7 +388,8 @@ print(api_inc)
         ],
         link_args: _torch_link_args,
     )
-    _deps += torch_dep
+    # Torch stays off the umbrella _deps list. Putting it there makes
+    # librgpot NEEDED libtorch_cpu and `import rgpot` requires torch.
 
     # metatensor-torch / metatomic-torch headers live in the
     # python interpreter's site-packages under
@@ -444,7 +446,6 @@ print(api_inc)
         ],
         compile_args: _mts_inc_args,
     )
-    _deps += mts_dep
 
     mta_dep = cppc.find_library(
         'metatomic_torch',
@@ -452,15 +453,20 @@ print(api_inc)
             _mta_torch_root / 'lib',
         ],
     )
-    _deps += mta_dep
-    # Link search paths only (-L); portable RUNPATH is install_rpath / repair.
-    _deps += declare_dependency(
-        link_args: [
-            '-L' + (_mts_torch_root / 'lib'),
-            '-L' + (_mta_torch_root / 'lib'),
-            '-L' + (_py_purelib / 'metatensor' / 'lib'),
-        ],
-    )
+    # Engine plugin only. Do not add these to _deps: the umbrella
+    # librgpot is the pip import path and must stay torch-free.
+    _mta_engine_deps = [
+        torch_dep,
+        mts_dep,
+        mta_dep,
+        declare_dependency(
+            link_args: [
+                '-L' + (_mts_torch_root / 'lib'),
+                '-L' + (_mta_torch_root / 'lib'),
+                '-L' + (_py_purelib / 'metatensor' / 'lib'),
+            ],
+        ),
+    ]
 
     # vesin comes from the top-level dependency (vendored static fallback):
     # compile-time and runtime layouts always match, so the purelib lookup

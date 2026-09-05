@@ -263,6 +263,9 @@ endif
 
 if get_option('with_tests')
     test_deps = _deps + [vesin_dep] + fortran_rt_deps
+    if has_metatomic
+        test_deps += _mta_engine_deps
+    endif
     test_deps += dependency(
         'Catch2',
         method: 'cmake',

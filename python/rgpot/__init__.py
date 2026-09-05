@@ -1,7 +1,8 @@
 """rgpot — potential energy surfaces for atomistic simulation.
 
-Core: Lennard-Jones. Metatomic path uses **dlopen** of a portable
-``libmetatomic_engine.so`` (stable C ABI). Engines are multi-ABI:
+Core: Lennard-Jones, ExprPot, D3Pot, D4Pot, and XcKernel (when the
+wheel/meson build compiled them). Metatomic path uses **dlopen** of a
+portable ``libmetatomic_engine.so`` (stable C ABI). Engines are multi-ABI:
 
   ``rgpot/lib/torch-X.Y/libmetatomic_engine.so``
 
@@ -21,8 +22,32 @@ from rgpot._core import (
     __version__,
     evaluate_lj,
     evaluate_metatomic_dlopen,
+    has_dftd3,
+    has_dftd4,
+    has_expr,
     has_metatomic_dlopen,
+    has_xckernel,
 )
+
+try:
+    from rgpot._core import D3Pot
+except ImportError:  # compiled without -Dwith_dftd3
+    D3Pot = None  # type: ignore[misc, assignment]
+
+try:
+    from rgpot._core import D4Pot
+except ImportError:
+    D4Pot = None  # type: ignore[misc, assignment]
+
+try:
+    from rgpot._core import ExprPot
+except ImportError:
+    ExprPot = None  # type: ignore[misc, assignment]
+
+try:
+    from rgpot._core import XcKernel
+except ImportError:
+    XcKernel = None  # type: ignore[misc, assignment]
 
 
 def _torch_major() -> str | None:
@@ -109,11 +134,19 @@ def evaluate_metatomic(
 
 __all__ = [
     "LJPot",
+    "D3Pot",
+    "D4Pot",
+    "ExprPot",
+    "XcKernel",
     "evaluate_lj",
     "evaluate_metatomic",
     "evaluate_metatomic_dlopen",
     "default_metatomic_engine_path",
     "available_metatomic_engine_abis",
     "has_metatomic_dlopen",
+    "has_expr",
+    "has_dftd3",
+    "has_dftd4",
+    "has_xckernel",
     "__version__",
 ]

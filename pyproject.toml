@@ -86,10 +86,12 @@ setup = [
   "-Dwith_fortran_pots=enabled",
   "-Dwith_metatomic=true",
   "-Dwith_xtb=false",
-  "-Dwith_xckernel=false",
+  "-Dwith_xckernel=true",
+  # s-dftd3 / dftd4 are not on the sdist runner. cibuildwheel turns
+  # these on after the prefix script installs the conda-forge C libs.
   "-Dwith_dftd3=false",
   "-Dwith_dftd4=false",
-  "-Dwith_expr=false",
+  "-Dwith_expr=true",
   "-Dwith_tblite=false",
   "-Dwith_rust_core=false",
   "-Dwith_cache=false",
@@ -115,16 +117,25 @@ build = "cp310-* cp311-* cp312-*"
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 # Prove the kernels are in the artifact rather than trusting the flag: a
 # wheel whose librgpot has no bind(c) entry points is the bug 3.0.1 fixed.
-test-command = "python -c \"import rgpot; print(rgpot.__file__)\""
+# D3/D4 flags are extra setup-args so `python -m build --sdist` does not
+# require pkg-config s-dftd3. Expr + XcKernel stay in meson-python.args.
+config-settings = "setup-args=-Dwith_dftd3=true setup-args=-Dwith_dftd4=true"
+test-command = "python -c \"import rgpot; assert rgpot.has_expr and rgpot.has_dftd3 and rgpot.has_dftd4 and rgpot.has_xckernel, (rgpot.has_expr, rgpot.has_dftd3, rgpot.has_dftd4, rgpot.has_xckernel); print(rgpot.__file__, len(rgpot.XcKernel.catalog()))\""
 
 # meson skips the limited_api kwarg under these interpreters anyway; the
 # explicit -D flag makes meson-python drop the abi3 tag to match.
 [[tool.cibuildwheel.overrides]]
 select = "cp310-* cp311-*"
-config-settings = "setup-args=-Dpython.allow_limited_api=false"
+config-settings = "setup-args=-Dpython.allow_limited_api=false setup-args=-Dwith_dftd3=true setup-args=-Dwith_dftd4=true"
 
 [tool.cibuildwheel.linux]
-before-all = "yum install -y gcc-gfortran || dnf install -y gcc-gfortran"
+before-all = """
+yum install -y gcc-gfortran || dnf install -y gcc-gfortran
+bash scripts/rgpot_wheel_dftd_prefix.sh /tmp/rgpot-dftd
+"""
+# PKG_CONFIG_PATH only. Do not set CMAKE_PREFIX_PATH to the micromamba
+# prefix: that made meson pull unrelated dylibs into librgpot.
+environment = { PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig:/tmp/rgpot-dftd/lib64/pkgconfig" }
 # meson-python vendors librgpot into .rgpot.mesonpy.libs and rewrites RPATHs,
 # but auditwheel still resolves NEEDED against the filesystem. Unpack the
 # wheel and put that directory on LD_LIBRARY_PATH.
@@ -140,7 +151,7 @@ repair-wheel-command = """
   unzip -q "{wheel}" -d "$tmp"
   libdir=$(dirname "$(find "$tmp" -name 'librgpot.so.3' | head -1)")
   test -n "$libdir"
-  LD_LIBRARY_PATH="$libdir:${LD_LIBRARY_PATH:-}" \
+  LD_LIBRARY_PATH="$libdir:/tmp/rgpot-dftd/lib:/tmp/rgpot-dftd/lib64:${LD_LIBRARY_PATH:-}" \
     auditwheel repair -w {dest_dir} "{wheel}" \
       --exclude libtorch.so \
       --exclude libtorch_cpu.so \
@@ -156,8 +167,11 @@ repair-wheel-command = """
 [tool.cibuildwheel.macos]
 # The brew gcc gfortran runtime (libgfortran/libquadmath) is built for
 # macOS 14; delocate refuses to stamp an 11.0 wheel around it.
-environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
-before-all = "brew list gcc >/dev/null 2>&1 || brew install gcc"
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0", PKG_CONFIG_PATH = "/tmp/rgpot-dftd/lib/pkgconfig" }
+before-all = """
+brew list gcc >/dev/null 2>&1 || brew install gcc
+bash scripts/rgpot_wheel_dftd_prefix.sh /tmp/rgpot-dftd
+"""
 # Same librgpot search-path story as Linux. Exclude torch/metatomic dylibs:
 # they ship with the pip torch / metatomic-torch wheels, not inside rgpot.
 repair-wheel-command = """
@@ -165,7 +179,7 @@ repair-wheel-command = """
   tmp=$(mktemp -d)
   unzip -q "{wheel}" -d "$tmp"
   libdir=$(dirname "$(find "$tmp" -name 'librgpot*.dylib' | head -1)")
-  DYLD_LIBRARY_PATH="$libdir:${DYLD_LIBRARY_PATH:-}" \
+  DYLD_LIBRARY_PATH="$libdir:/tmp/rgpot-dftd/lib:${DYLD_LIBRARY_PATH:-}" \
     delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v "{wheel}" \
       --ignore-missing-dependencies \
       --exclude libtorch \

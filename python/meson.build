@@ -79,6 +79,22 @@ _py_rpath = '$ORIGIN:$ORIGIN/../.rgpot.mesonpy.libs:$ORIGIN/lib'
 # linking the static convenience libs again would just duplicate symbols
 # into the extension.
 _py_link = [rgpot]
+# Header/compile flags only. Do not iterate _deps: that list includes
+# torch when with_metatomic=true, and even a partial_dependency walk
+# can leak link_args onto _core (NEEDED libtorch_cpu).
+_py_hdr_deps = []
+if has_dftd3
+    _py_hdr_deps += dftd3_dep.partial_dependency(
+        includes: true,
+        compile_args: true,
+    )
+endif
+if has_dftd4
+    _py_hdr_deps += dftd4_dep.partial_dependency(
+        includes: true,
+        compile_args: true,
+    )
+endif
 # Do not link cuh2 into the pip extension: the umbrella already carries the
 # slab helpers, and LJ + metatomic dlopen are the product.
 
@@ -90,6 +106,7 @@ endif
 _nb_cpp_args = _args + [
     '-DNB_DOMAIN=rgpot',
     '-Wno-unused-parameter',
+    '-DRGPOT_PY_VERSION="@0@"'.format(meson.project_version()),
 ]
 
 _core_sources = files('bind/bind_module.cpp') + [_nb_combined]
@@ -100,7 +117,7 @@ if _nb_free_threaded
     py.extension_module(
         '_core',
         sources: _core_sources,
-        dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+        dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
         include_directories: _py_incs,
         link_with: _py_link,
         cpp_args: _nb_cpp_args,
@@ -117,7 +134,7 @@ else
         py.extension_module(
             '_core',
             sources: _core_sources,
-            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
             include_directories: _py_incs,
             link_with: _py_link,
             cpp_args: _nb_cpp_args,
@@ -135,7 +152,7 @@ else
         py.extension_module(
             '_core',
             sources: _core_sources,
-            dependencies: [py_dep, nanobind_dep, dl_dep] + _deps,
+            dependencies: [py_dep, nanobind_dep, dl_dep] + _py_hdr_deps,
             include_directories: _py_incs,
             link_with: _py_link,
             cpp_args: _nb_cpp_args,
