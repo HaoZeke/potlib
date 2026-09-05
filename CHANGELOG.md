@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.1.1](https://github.com/OmniPotentRPC/rgpot/tree/3.1.1) - 2026-09-04
+
+### Added
+
+- The PyPI wheel compiles ExprPot, D3Pot, D4Pot, and XcKernel and vendors ``s-dftd3`` / ``dftd4``. ``import rgpot`` exposes those classes (``has_expr`` / ``has_dftd3`` / ``has_dftd4`` / ``has_xckernel``).
+
+
 ## [3.1.0](https://github.com/OmniPotentRPC/rgpot/tree/3.1.0) - 2026-09-04
 
 ### Added
