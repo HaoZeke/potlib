@@ -294,6 +294,9 @@ if get_option('with_dftd4')
             'default_library=static',
             'python=false',
             'openmp=false',
+            # auto looks for liblapack; manylinux/brew/apt ship OpenBLAS
+            # as libopenblas, not a separate lapack soname.
+            'lapack=openblas',
         ],
     )
     _deps += dftd4_dep

@@ -97,6 +97,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # meson-python runs setup for the sdist; -Dwith_dftd4 pulls the
+      # wrap, which needs gfortran and OpenBLAS (lapack=openblas).
+      - name: OpenBLAS for the dftd4 wrap
+        run: sudo apt-get update && sudo apt-get install -y gfortran libopenblas-dev pkg-config
       - name: Build sdist
         run: pipx run build --sdist
       - name: Check

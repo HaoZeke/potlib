@@ -124,6 +124,7 @@ select = "cp310-* cp311-*"
 config-settings = "setup-args=-Dpython.allow_limited_api=false"
 
 [tool.cibuildwheel.linux]
+# openblas-devel is libopenblas; dftd4 is configured with lapack=openblas.
 before-all = "yum install -y gcc-gfortran openblas-devel || dnf install -y gcc-gfortran openblas-devel"
 # meson-python vendors librgpot into .rgpot.mesonpy.libs and rewrites RPATHs,
 # but auditwheel still resolves NEEDED against the filesystem. Unpack the
