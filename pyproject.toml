@@ -89,6 +89,7 @@ setup = [
   "-Dwith_xckernel=true",
   "-Dwith_dftd3=true",
   "-Dwith_dftd4=true",
+  "-Dlapack=openblas",
   "-Dwith_expr=true",
   "-Dwith_tblite=false",
   "-Dwith_rust_core=false",
