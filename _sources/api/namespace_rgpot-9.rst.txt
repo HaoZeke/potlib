@@ -1,0 +1,11 @@
+.. index:: pair: namespace; rgpot
+.. _doxid-namespacergpot_1_1_0d001026066302245075326165043057056171113301022163:
+
+namespace rgpot
+===============
+
+.. toctree::
+	:hidden:
+
+
+

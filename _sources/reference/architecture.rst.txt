@@ -30,7 +30,8 @@ Layer Diagram
             | FFI callbacks
     +---------------------------------------------+
     |  C++ Potentials                              |
-    |  LJ, CuH2, XTBPot, TBLitePot, MetatomicPot |
+    |  LJ, CuH2, XTBPot, TBLitePot, D3Pot, D4Pot,|
+    |  ExprPot, MetatomicPot                       |
     +---------------------------------------------+
 
 Layers in Detail
@@ -43,7 +44,8 @@ The Rust crate is the single source of truth for the public API.
 It defines:
 
 ``rgpot_force_input_t`` and ``rgpot_force_out_t``
-    ``#[repr(C)]`` structs mirroring
+    ``#[repr(C)]`` structs
+    mirroring
 
 the legacy C++ ``ForceInput`` / ``ForceOut`` from ``ForceStructs.hpp``.
 These are the canonical data exchange types across the FFI boundary.
@@ -93,7 +95,8 @@ The RPC module reuses the existing ``Potentials.capnp`` schema shared with the C
 ``gen-header``
     Enables C header generation via ``cbindgen``.
 
-Used only during development; run ``pixi r gen-header`` to regenerate ``include/ rgpot.h``.
+Used only during development; run ``pixi r gen-header`` to regenerate
+``include/ rgpot.h``.
 
 Cap'n Proto Schema Sharing
 ::::::::::::::::::::::::::
@@ -162,13 +165,15 @@ Key methods:
 Throws ``rgpot::Error`` on failure.
 
 ``from_impl<Impl>(impl)``
-    Template factory that wraps any C++ potential object
+    Template factory that wraps any C++ potential
+    object
 
 with a compatible ``forceImpl`` method.
 Generates a type-safe trampoline function automatically.
 
 ``from_callback(fn, user_data, free_fn)``
-    Low-level factory taking an explicit
+    Low-level factory taking an
+    explicit
 
 C function pointer.
 
@@ -241,16 +246,58 @@ IPEA1) via the `tblite <https://github.com/tblite/tblite>`_ C API.
 Same config pattern as ``XTBPot``.
 Lighter weight than xtb but fewer methods.
 
+``D3Pot`` (``-Dwith_dftd3=true``)
+    Grimme DFT-D3 via the
+
+`s-dftd3 <https://github.com/dftd3/simple-dftd3>`_ ISO C API.
+``D3Config`` selects BJ or zero damping, the functional key for C6 parameters, and
+an explicit ``atm`` flag for the Axilrod-Teller-Muto E(3) term (default on).
+In-process ``Potential`` summand: construct it and evaluate ``ForceInput`` to
+energy+forces.
+Not an XC kernel and not a ``PotentialConfig`` arm.
+There is no ``PotentialConfig.d3``.
+A DFT host adds this as the Edisp summand next to XcKernel and VV10; do not fold
+D3 into the kernel.
+
+``D4Pot`` (``-Dwith_dftd4=true``)
+    Grimme DFT-D4 via the
+
+`dftd4 <https://github.com/dftd4/dftd4>`_ ISO C API.
+``D4Config`` selects the functional key, the total charge forwarded to
+``dftd4_new_structure``, and an explicit ``atm`` flag for the many-body (``mdb``) term
+(default on).
+Charge scaling stays inside dftd4.
+In-process ``Potential`` summand: construct it and evaluate ``ForceInput`` to
+energy+forces.
+Not an XC kernel and not a ``PotentialConfig`` arm.
+There is no ``PotentialConfig.d4``.
+A DFT host adds this as the Edisp summand next to XcKernel and VV10; do not fold
+D4 into the kernel.
+
+``ExprPot`` (``-Dwith_expr=true``)
+    Named-child PES algebra compiled with
+
+vendored OpenMM Lepton (no pixi muparser).
+The constructor takes an energy string and ``unique_ptr<PotentialBase>`` children.
+Names must be Lepton identifiers; unknown, duplicate, unused, empty, or
+non-identifier names fail at construct.
+Forces are analytic chain-rule weights from
+``ParsedExpression::differentiate(name)``.
+``D3Pot`` / ``D4Pot`` are ordinary children.
+``XcKernel`` is not a term.
+There is no ``PotentialConfig.expr`` arm.
+The C++ constructor is the first-slice API; RPC/config names the same tree as
+recursive ``ExprParams`` / ``PotSpec``.
+``PotentialHandle::from_impl`` / ``rgpot_potential_new_eindir`` wraps one ``ExprPot``
+as one eindir objective.
+
 ``MetatomicPot`` (``-Dwith_metatomic=true``)
     Pre-trained ML atomistic models
 
-via `metatomic <https://github.com/metatensor/metatomic>`_/PyTorch, loaded
-**directly** as TorchScript (``.pt``) in C++ with no Python at evaluation time.
-Uses `vesin <https://github.com/Luthaf/vesin>`_ **0.5+** for neighbor lists and
-PyTorch autograd for forces. Pass CPU as ``VesinDevice{VesinCPU, 0}`` (``struct { VesinDeviceKind type; int device_id; }``; ``VesinCPU`` alone is only the kind
-enum). Thread-safe via internal mutex; caches the atomic-types tensor across
-geometry steps. Configurable device (CPU/CUDA), dtype override, length unit,
-consistency checks, and ``torch_determinism`` via ``MetatomicConfig``.
+via
+`metatomic <https://github.com/metatensor/metatomic>`_/PyTorch, loaded **directly** as TorchScript (``.pt``) in C++ with no Python at evaluation time. Uses `vesin <https://github.com/Luthaf/vesin>`_ **0.5+** for neighbor lists and PyTorch autograd for forces. Pass CPU as ``VesinDevice{VesinCPU, 0}`` (``struct { VesinDeviceKind type; int device_id; }``; ``VesinCPU`` alone is only the kind enum). Thread-safe via internal mutex; caches the atomic-types tensor across geometry steps. Configurable device (CPU/CUDA),
+dtype override, length unit, consistency checks, and ``torch_determinism`` via
+``MetatomicConfig``.
 ``TorchDeterminismPolicy::Fast`` (default) does not touch process-global LibTorch
 state.
 ``Strict`` calls ``apply_torch_determinism_policy``, which sets
@@ -262,16 +309,18 @@ uninitialized memory deterministically.
 Those flags are process-global: they affect every Torch user in the process, and
 Fast does not restore a previous Strict setting.
 CUDA host processes that need bit-stable cuBLAS must also export
-``CUBLAS_WORKSPACE_CONFIG``:4096:8= (or ``:16:8``) **before** the first cuBLAS call
-— that is process environment, not ``at::globalContext()`` (see NVIDIA cuBLAS
-reproducibility and ``alertCuBLASConfigNotDeterministic``). On the RPC server pass
-``Metatomic:/path/to/model.pt``. Build with the ``metatomicbld`` pixi env (linux-64;
-pulls torch, metatomic-torch, and vesin ``>=0.5.2,<0.6`` from PyPI).
+``CUBLAS_WORKSPACE_CONFIG``:4096:8= (or ``:16:8``) **before** the first cuBLAS call —
+that is process environment, not ``at::globalContext()`` (see NVIDIA cuBLAS
+reproducibility and ``alertCuBLASConfigNotDeterministic``).
+On the RPC server pass ``Metatomic:/path/to/model.pt``.
+Build with the ``metatomicbld`` pixi env (linux-64; pulls torch, metatomic-torch,
+and vesin ``>=0.5.2,<0.6`` from PyPI).
 CI job ``potentials_metatomic`` in ``ci- orchestrator.yml``.
 
 The **pip** product (``rgpot`` on PyPI) does not link Metatomic into the Python
 extension.
-It ``dlopen=s a portable =libmetatomic_engine.so`` chosen from ``rgpot/lib/torch- X.Y/`` for the installed torch major.
+It ``dlopen=s a portable =libmetatomic_engine.so`` chosen from
+``rgpot/lib/torch- X.Y/`` for the installed torch major.
 Supported torch majors for bundled engines start at **2.7** (wheels ship 2.7–
 2.13).
 See:
@@ -287,10 +336,11 @@ NWChemPot (``rgpot/NWChemPot/``)
 
 Always-built frontend (``NWChemPot.cc``) that serializes ``NWChemParams`` and
 ``dlopen=s =libnwchemc`` (via ``DynLib.hpp``).
-Stable consumer C-ABI contract in ``nwchem_c_abi.h`` uses ``nwchemc_*`` symbols and
-flat Cap'n Proto message bytes; ``nwchem_c_abi_stub.c`` is a no-op ABI linked by
-the conformance test only. rgpot is a pure consumer: the engine implementation
-(NWChem embed + Fortran) lives in the split ``https://github.com/OmniPotentRPC/ nwchemc`` project, not in rgpot.
+Stable consumer C-ABI contract in ``nwchem_c_abi.h`` uses
+``nwchemc_*`` symbols and flat Cap'n Proto message bytes; ``nwchem_c_abi_stub.c`` is
+a no-op ABI linked by the conformance test only. rgpot is a pure consumer: the
+engine implementation (NWChem embed + Fortran) lives in the split
+``https://github.com/OmniPotentRPC/ nwchemc`` project, not in rgpot.
 RPC schema adds ``NWChemParams``, ``PotentialConfig``, and ``configure @1`` on
 ``Potential``; ``potserv <port> NWChem``.
 Runtime: ``NWCHEMC_LIBRARY``, ``RGPOT_NWCHEMC_ENGINE``, ``NWCHEM_TOP``.
@@ -299,7 +349,8 @@ Details: ``CppCore/rgpot/NWChemPot/README.md``.
 Units (``rgpot/units.hpp``)
 :::::::::::::::::::::::::::
 
-rgpot's internal unit system is **energy = eV**, **length = Angstrom**, **force = eV/Angstrom**.
+rgpot's internal unit system is **energy = eV**, **length = Angstrom**,
+**force = eV/Angstrom**.
 
 - **Compile-time constants** (CODATA 2018): ``BOHR_TO_ANGSTROM``, ``HARTREE_TO_EV``,
 
@@ -307,7 +358,8 @@ rgpot's internal unit system is **energy = eV**, **length = Angstrom**, **force 
 Used by XTBPot/TBLitePot (Bohr/Hartree backends) and any caller that wants zero-
 overhead conversion.
 
-- **Runtime expression parser** (``unit_conversion_factor(from, to)``): Shunting-Yard
+- **Runtime expression parser** (``unit_conversion_factor(from, to)``):
+  Shunting-Yard
 
 algorithm with SI dimensional analysis, derived from metatomic-torch (PR #173).
 Accepts compound expressions such as ``"kJ/mol"``, ``"eV/angstrom^3"``, or
@@ -328,19 +380,22 @@ Error Handling Conventions
 
 The project uses a two-tier error strategy:
 
-1. **Across the FFI boundary** \:\: Status codes (``rgpot_status_t``) plus a thread-local
+1. **Across the FFI boundary** \:\: Status codes (``rgpot_status_t``) plus a
+   thread-local
 
 error message (``rgpot_last_error()``).
 No exceptions cross FFI.
-Every Rust ``extern "C"`` function wraps its body in ``catch_unwind`` to convert
-panics to ``RGPOT_INTERNAL_ERROR``.
+Every Rust ``extern "C"`` function wraps its body in
+``catch_unwind`` to convert panics to ``RGPOT_INTERNAL_ERROR``.
 
-1. **Within C++** \:\: The RAII wrappers call ``details::check_status()`` which maps non-
+1. **Within C++** \:\: The RAII wrappers call ``details::check_status()`` which maps
+   non-
 
 success codes to ``rgpot::Error`` exceptions.
 C++ consumers work with exceptions as usual.
 
-1. **Within Rust** \:\: Standard ``Result`` types internally, converted to status codes
+1. **Within Rust** \:\: Standard ``Result`` types internally, converted to status
+   codes
 
 at the ``extern "C"`` boundary.
 
@@ -385,8 +440,8 @@ Build System Integration
 Meson
 ^^^^^
 
-The Rust crate is built via a ``custom_target`` in ``meson.build``, gated behind the
-``with_rust_core`` option:
+The Rust crate is built via a
+``custom_target`` in ``meson.build``, gated behind the ``with_rust_core`` option:
 
 .. code:: bash
 
