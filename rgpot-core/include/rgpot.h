@@ -21,9 +21,9 @@
 typedef struct DLManagedTensorVersioned DLManagedTensorVersioned;
 #endif
 
-#define RGPOT_VERSION "3.2.0"
+#define RGPOT_VERSION "3.3.0"
 #define RGPOT_VERSION_MAJOR 3
-#define RGPOT_VERSION_MINOR 2
+#define RGPOT_VERSION_MINOR 3
 #define RGPOT_VERSION_PATCH 0
 
 /**

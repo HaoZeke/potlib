@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.3.0](https://github.com/OmniPotentRPC/rgpot/tree/3.3.0) - 2026-09-28
+
+### Added
+
+- CPMD ranks can be split into one calculator group per image.
+- The new `rgpot_eindir_abi_stamp()` returns the eindir-core ABI stamp of the objective base in `rgpot_potential_t`. The generated `rgpot.h` stays valid C, with the fused evaluation cache behind an opaque pointer.
+
+### Changed
+
+- Always compile the xTB dlopen frontend (`XTBDlopen`) without `-Dwith_xtb`, matching Metatomic/NWChem: hosts ship without NEEDED `libxtb` and load `libxtb_engine.so` via `RGPOT_XTB_ENGINE` at runtime. Linked `XTBPot` and the engine plugin still require `with_xtb`. Config types moved to `XTBConfig.hpp` (no `xtb.h`). ([#53](https://github.com/OmniPotentRPC/rgpot/issues/53))
+
+### Fixed
+
+- `CPMDPot` copies `PotentialResult.stress` into `ForceOut` when the engine returns nine components.
+- RocksDB 11 builds of the cache work: `PotentialCache` opens the database through the `std::unique_ptr` `DB::Open` overload on RocksDB 10.4 and later. ([#54](https://github.com/OmniPotentRPC/rgpot/issues/54))
+- A `-Dwith_cache=true` build lists `-DRGPOT_HAS_CACHE=TRUE` and `rocksdb` in `rgpot.pc`, so consumers of the cache API find its flags and headers through pkg-config. ([#55](https://github.com/OmniPotentRPC/rgpot/issues/55))
+- Configuring rgpot, on its own or as a Meson subproject, no longer warns that `add_languages` is missing `native:`.
+- Linux wheels import without a system OpenBLAS. auditwheel repaired the real librgpot library but not the librgpot.so.3 and librgpot.so copies that _core loads, so those still named libopenblas.so.0.
+- Linux wheels vendor the OpenMP runtime: `import rgpot` no longer needs a system `libgomp.so.1`.
+- rgpot configures offline: the `potentials-schema` subproject is optional, and the two schema-sync tests run only when it is available, so `--wrap-mode=nodownload` builds no longer fail at `meson setup`.
+
+### Miscellaneous
+
+- OIDC trusted publishing on tag v* and workflow_dispatch. ([#76](https://github.com/OmniPotentRPC/rgpot/issues/76))
+
+
 ## [3.2.0](https://github.com/OmniPotentRPC/rgpot/tree/3.2.0) - 2026-09-13
 
 ### Added
