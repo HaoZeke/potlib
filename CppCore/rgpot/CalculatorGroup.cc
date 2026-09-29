@@ -4,6 +4,7 @@
 #include "rgpot/CalculatorGroup.hpp"
 
 #include <climits>
+#include <cstdlib>
 #include <cstdint>
 #include <mutex>
 #include <vector>
@@ -132,6 +133,22 @@ int shareFromCalculator(int owner, void *data, std::size_t bytes) {
   (void)data;
   (void)bytes;
   return 0;
+#endif
+}
+
+void finalizeMpiAtExit() {
+#ifdef RGPOT_HAS_MPI
+  static std::once_flag once;
+  std::call_once(once, [] {
+    std::atexit([] {
+      int inited = 0;
+      int finalized = 0;
+      MPI_Initialized(&inited);
+      MPI_Finalized(&finalized);
+      if (inited && !finalized)
+        MPI_Finalize();
+    });
+  });
 #endif
 }
 

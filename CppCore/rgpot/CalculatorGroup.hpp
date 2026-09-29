@@ -46,4 +46,13 @@ int calculatorCount();
 // split, 1 once the bytes are in place.
 int shareFromCalculator(int owner, void *data, std::size_t bytes);
 
+// Registers, once per process, an exit handler that calls MPI_Finalize
+// when MPI was initialized and is not yet finalized. An engine that
+// initializes MPI inside a host program without finalizing it (CPMD)
+// otherwise leaves each rank to exit on its own, and mpirun kills the
+// ranks still working as an abnormal termination. MPI_Finalize is
+// collective, so ranks that finish first wait for the rest. No-op
+// without MPI.
+void finalizeMpiAtExit();
+
 } // namespace rgpot

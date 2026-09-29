@@ -458,6 +458,9 @@ void CPMDPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     throw std::runtime_error(
         "CPMDPot: null positions/atmnrs/box/forces buffer");
 
+  // CPMD initializes MPI on the first calculation and never finalizes it.
+  ::rgpot::finalizeMpiAtExit();
+
   if (has_session_result_abi(impl_->bundle) && impl_->session) {
     impl_->forceSession(in, out);
     return;
