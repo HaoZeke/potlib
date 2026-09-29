@@ -36,4 +36,14 @@ const CalculatorGroup &thisCalculator();
 // Returns 0 when there is no communicator to give.
 int calculatorComm(void *comm_out, std::size_t comm_bytes);
 
+// Number of calculators the world is split into. 1 before a split and
+// when the world could not be divided.
+int calculatorCount();
+
+// Broadcasts bytes from the first rank of calculator `owner` to every
+// rank of MPI_COMM_WORLD, so all ranks hold that calculator's result.
+// Collective on MPI_COMM_WORLD. Returns 0 without MPI or before a
+// split, 1 once the bytes are in place.
+int shareFromCalculator(int owner, void *data, std::size_t bytes);
+
 } // namespace rgpot
