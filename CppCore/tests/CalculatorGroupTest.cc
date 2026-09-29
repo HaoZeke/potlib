@@ -15,6 +15,12 @@ TEST_CASE("One process is one calculator", "[CalculatorGroup]") {
   REQUIRE(g.ranks == 1);
   REQUIRE(g.world_size == 1);
   REQUIRE(rgpot::calculatorCount() == 1);
+  REQUIRE(rgpot::calculatorWorldSize() == 1);
+#ifdef RGPOT_HAS_MPI
+  REQUIRE(rgpot::calculatorsUseMpi() == 1);
+#else
+  REQUIRE(rgpot::calculatorsUseMpi() == 0);
+#endif
   REQUIRE(rgpot::thisCalculator().index == 0);
 
   std::array<double, 4> buf{1.0, -2.0, 3.5, 0.25};

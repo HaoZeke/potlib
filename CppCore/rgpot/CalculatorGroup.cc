@@ -106,6 +106,20 @@ int calculatorComm(void *comm_out, std::size_t comm_bytes) {
 #endif
 }
 
+int calculatorsUseMpi() {
+#ifdef RGPOT_HAS_MPI
+  return 1;
+#else
+  return 0;
+#endif
+}
+
+int calculatorWorldSize() {
+  if (!g_bound || g_group.index < 0)
+    return 1;
+  return g_group.world_size;
+}
+
 int calculatorCount() {
   if (!g_bound || g_group.index < 0 || g_group.ranks <= 0)
     return 1;
