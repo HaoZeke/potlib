@@ -103,6 +103,8 @@ int runShareBad() {
 
 int runShareOk() {
   const rgpot::CalculatorGroup group = rgpot::bindCalculators(1);
+  // mpirun treats an initialized process that skips MPI_Finalize as a failed job.
+  rgpot::finalizeMpiAtExit();
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   redirectRankLog(rank);
