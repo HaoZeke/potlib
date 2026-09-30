@@ -89,6 +89,10 @@ CPMDCResult ok_result(const char *message) {
   return r;
 }
 
+// Sessions created through cpmdc_session_create, read back by tests
+// through cpmdc_fake_session_create_count.
+int g_session_create_count = 0;
+
 } // namespace
 
 extern "C" {
@@ -139,6 +143,7 @@ CPMDCSession *cpmdc_session_create(const void *params_capnp,
                                    size_t params_capnp_size_bytes) {
   if (!has_flat_message(params_capnp, params_capnp_size_bytes))
     return nullptr;
+  ++g_session_create_count;
   auto *session = new CPMDCSession;
   session->params.resize(params_capnp_size_bytes);
   std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
@@ -328,6 +333,13 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
 #endif
 
 RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
+
+// Test-only: number of cpmdc_session_create calls that returned a
+// session. Lets a test assert that a CPMDPot kept or recreated its
+// session.
+RGPOT_FAKE_ONLY int cpmdc_fake_session_create_count(void) {
+  return g_session_create_count;
+}
 
 RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
 

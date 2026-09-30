@@ -400,6 +400,22 @@ void copy_params_to_builder(const ::CPMDParams::Reader &params,
   throw std::runtime_error(message);
 }
 
+// capnp::word forbids copying, so the params a live session was created
+// from are kept as bytes and compared bytewise.
+std::vector<unsigned char> words_bytes(const std::vector<::capnp::word> &w) {
+  const ParamsView view = params_view(w);
+  const auto *p = static_cast<const unsigned char *>(view.data);
+  return std::vector<unsigned char>(p, p + view.size);
+}
+
+bool same_words(const std::vector<::capnp::word> &w,
+                const std::vector<unsigned char> &bytes) {
+  const ParamsView view = params_view(w);
+  return view.size == bytes.size() &&
+         (view.size == 0 ||
+          std::memcmp(view.data, bytes.data(), view.size) == 0);
+}
+
 std::mutex g_probe_mu;
 bool g_probe_done = false;
 bool g_probe_ok = false;
@@ -414,6 +430,9 @@ struct CPMDPot::Impl {
   std::string engine_path;
   std::string cpmd_root;
   CPMDCSession *session = nullptr;
+  // Params and engine path the live session was created from.
+  std::vector<unsigned char> session_params;
+  std::string session_engine_path;
   mutable std::vector<double> grad_scratch;
 
   void destroySession();
@@ -425,15 +444,28 @@ void CPMDPot::Impl::destroySession() {
   if (session && bundle.session_destroy)
     bundle.session_destroy(session);
   session = nullptr;
+  session_params.clear();
+  session_engine_path.clear();
 }
 
 bool CPMDPot::Impl::configure() {
-  destroySession();
   if (has_session_result_abi(bundle)) {
+    // A session holds the engine's converged wavefunction; recreating
+    // it for identical params costs a cold SCF on the next force. Keep
+    // the live session when nothing the engine sees has changed.
+    if (session && engine_path == session_engine_path &&
+        same_words(params_words, session_params))
+      return true;
+    destroySession();
     const ParamsView view = params_view(params_words);
     session = bundle.session_create(view.data, view.size);
-    return session != nullptr;
+    if (!session)
+      return false;
+    session_params = words_bytes(params_words);
+    session_engine_path = engine_path;
+    return true;
   }
+  destroySession();
   return push_params_to_engine(bundle, params_words);
 }
 
