@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.4.0](https://github.com/OmniPotentRPC/rgpot/tree/3.4.0) - 2026-09-30
+
+### Added
+
+- Calculator groups report how many there are and broadcast a result from one group to every rank; the meson build takes MPI through `-Dwith_mpi=enabled`.
+
+### Developer
+
+- The twelve-rank refused calculator split calls finalizeMpiAtExit, so mpirun can exit 0 after MPI_Init.
+- The two-rank calculator share that matches calls finalizeMpiAtExit, so mpirun can exit 0 after MPI_Init.
+- mpirun -n 4 calculator_group_test checks that rank 3 holds the buffer rank 0 filled. An out-of-range calculator owner aborts every rank.
+
+### Changed
+
+- Read the engine documentation at https://cpmdc.rgoswami.me.
+
+### Fixed
+
+- A failed CPMD engine call sets an abort flag, and the exit handler calls `MPI_Abort` instead of a collective `MPI_Finalize` that peers stuck in a broadcast would never reach.
+- A force that throws on one rank is printed on every rank in that call, then MPI_Abort runs on MPI_COMM_WORLD. MPI_Finalize at exit runs only when this library called MPI_Init.
+- A release tag no longer fails when `publish.yml` has already uploaded `rgpot-core` to crates.io: `release.yml` skips `cargo publish` for a version that exists, so its GitHub release job still runs.
+- A shareFromCalculator call that cannot enter the broadcast aborts every bound rank after those ranks print the error.
+- The HTML sitemap lists each page at the site root.
+- The Morse cutoff-shift test compares `energyShift()` with an absolute tolerance at the operands' rounding scale instead of a 1e-14 relative pin on a cancelled difference, so the suite passes on aarch64 (EESSI 2026.06, Neoverse-N2), where `exp` and multiply-add contraction differ from x86 by an ulp.
+- The calculator namespace page names the rank that fills ForceOut and the first rank of a share broadcast.
+- The one-shot CPMD gradient path keeps a nine-component stress tensor when the engine computed one.
+- `CPMDPot::setParams` with byte-identical parameters keeps the engine session and its stored wavefunction; the engine loaded by `bindCalculators` stays loaded for the process; `paramsKey` fingerprints the CPMD parameters for the result cache.
+- calculatorsUseMpi follows MPI_Initialized. A refused calculator split reports the MPI_COMM_WORLD size and a negative group index.
+
+
 ## [3.3.0](https://github.com/OmniPotentRPC/rgpot/tree/3.3.0) - 2026-09-28
 
 ### Added
