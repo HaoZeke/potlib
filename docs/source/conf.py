@@ -102,6 +102,9 @@ html_sidebars = {
 }
 
 html_baseurl = "https://rgpot.rgoswami.me/"
+# Sphinx sets language to "en". The default sitemap scheme is
+# {lang}{version}{link}, so every page would be published under /en/.
+sitemap_url_scheme = "{link}"
 
 html_css_files = [
     "custom.css",
