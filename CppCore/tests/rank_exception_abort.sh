@@ -28,6 +28,13 @@ run_bounded() {
 }
 
 help=$("$launcher" --help 2>&1 || true)
+ver=$("$launcher" --version 2>&1 || true)
+# Open MPI 5 --help does not list --oversubscribe. The branches below
+# read that word from $help.
+if printf '%s\n' "$help" "$ver" | grep -q 'Open MPI'; then
+  help="$help
+--oversubscribe"
+fi
 
 if [ "$mode" = "abort" ]; then
   out=$(mktemp -d)

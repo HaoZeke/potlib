@@ -15,8 +15,14 @@ else
   echo "mpirun or mpiexec is required" >&2
   exit 1
 fi
+help=$("$LAUNCH" --help 2>&1 || true)
+ver=$("$LAUNCH" --version 2>&1 || true)
 OVER=
-if "$LAUNCH" --help 2>&1 | grep -q oversubscribe; then
+# Open MPI 5 --help is a short usage line. --oversubscribe is documented
+# in the man page and is what a 12-rank run needs on a smaller allocation.
+if printf '%s\n' "$help" "$ver" | grep -q 'Open MPI'; then
+  OVER=--oversubscribe
+elif printf '%s\n' "$help" | grep -q oversubscribe; then
   OVER=--oversubscribe
 fi
 # shellcheck disable=SC2086
