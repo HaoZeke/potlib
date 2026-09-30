@@ -568,6 +568,94 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'cpmd',
         )
+        mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _mpi_dep.found() and mpiexec.found()
+            rank_exception = executable(
+                'rank_exception_abort',
+                sources: ['tests/RankExceptionAbort.cc'],
+                dependencies: test_deps + [ptlrpc_dep, _mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            rank_exception_sh = find_program(
+                meson.current_source_dir() / 'tests/rank_exception_abort.sh',
+            )
+            test(
+                'RankExceptionAbort',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'abort'],
+                env: cpmdc_fake_env,
+                depends: [cpmdc_fake_engine, rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeOwner',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-owner'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeGuest',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-guest'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'ShareBroadcastMismatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-bad'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'ShareBroadcastMatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-ok'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            refused_split = executable(
+                'refused_split',
+                sources: ['tests/RefusedSplit.cc'],
+                dependencies: test_deps + [ptlrpc_dep, _mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            refused_split_sh = find_program(
+                meson.current_source_dir() / 'tests/refused_split.sh',
+            )
+            test(
+                'RefusedSplit',
+                refused_split_sh,
+                args: [refused_split.full_path()],
+                depends: [refused_split],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+        endif
         test(
             'ProfileLoaderTest',
             executable(
@@ -683,22 +771,53 @@ if get_option('with_tests')
         )
     endif
 
+    calculator_group_test_exe = disabler()
     foreach test : test_array
+        _test_exe = executable(
+            test.get(1),
+            sources: ['tests/' + test.get(2)],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            build_rpath: _metatomic_build_rpath,
+        )
         test(
             test.get(0),
-            executable(
-                test.get(1),
-                sources: ['tests/' + test.get(2)],
-                dependencies: test_deps,
-                include_directories: _incdirs + ['.'],
-                cpp_args: test_args,
-                link_with: _linkto,
-                link_language: 'cpp',
-                build_rpath: _metatomic_build_rpath,
-            ),
+            _test_exe,
             workdir: meson.source_root() + test.get(3),
         )
+        if test.get(1) == 'calculator_group_test'
+            calculator_group_test_exe = _test_exe
+        endif
     endforeach
+    if _mpi_dep.found() and not is_disabler(calculator_group_test_exe)
+        _calc_mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _calc_mpiexec.found()
+            calculator_group_mpi_sh = find_program(
+                meson.current_source_dir() / 'tests/calculator_group_mpi.sh',
+            )
+            test(
+                'CalculatorGroupShare',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'share'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'CalculatorGroupBadOwner',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'bad-owner'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+        endif
+    endif
 
     if has_dftd3 or has_dftd4
         test(

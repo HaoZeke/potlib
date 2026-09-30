@@ -66,6 +66,7 @@ meson compile -C bbdir && meson test -C bbdir
    :caption: Tutorials
 
    tutorials/quickstart
+   tutorials/cpmd
    tutorials/molecular-global-optimization
 
 .. toctree::
@@ -84,6 +85,7 @@ meson compile -C bbdir && meson test -C bbdir
    :caption: Reference
 
    reference/architecture
+   reference/mpi
    api/index
    changelog
 

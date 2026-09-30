@@ -36,10 +36,12 @@ const CalculatorGroup &thisCalculator();
 // Returns 0 when there is no communicator to give.
 int calculatorComm(void *comm_out, std::size_t comm_bytes);
 
-// 1 when this build links MPI and bindCalculators can split and share.
+// 1 when MPI_Initialized reports that MPI is up. 0 when this build has
+// no MPI, and 0 when MPI is not initialized.
 int calculatorsUseMpi();
 
-// Ranks in MPI_COMM_WORLD after bindCalculators, 1 before.
+// MPI_COMM_WORLD size recorded by bindCalculators, including a refused
+// split. 1 while calculators are unbound.
 int calculatorWorldSize();
 
 // Number of calculators the world is split into. 1 before a split and
@@ -48,17 +50,17 @@ int calculatorCount();
 
 // Broadcasts bytes from the first rank of calculator `owner` to every
 // rank of MPI_COMM_WORLD, so all ranks hold that calculator's result.
-// Collective on MPI_COMM_WORLD. Returns 0 without MPI or before a
-// split, 1 once the bytes are in place.
+// Collective on MPI_COMM_WORLD. When more than one rank is bound, a
+// rank that cannot enter the broadcast aborts the world after every
+// rank prints the error. Returns 0 without MPI, before a split, or
+// for a bad owner in a single process. Returns 1 once the bytes are
+// in place.
 int shareFromCalculator(int owner, void *data, std::size_t bytes);
 
 // Registers, once per process, an exit handler that calls MPI_Finalize
-// when MPI was initialized and is not yet finalized. An engine that
-// initializes MPI inside a host program without finalizing it (CPMD)
-// otherwise leaves each rank to exit on its own, and mpirun kills the
-// ranks still working as an abnormal termination. MPI_Finalize is
-// collective, so ranks that finish first wait for the rest. No-op
-// without MPI.
+// when bindCalculators called MPI_Init and MPI is not yet finalized.
+// A host that called MPI_Init keeps that call and finalizes itself.
+// No-op without MPI.
 void finalizeMpiAtExit();
 
 } // namespace rgpot

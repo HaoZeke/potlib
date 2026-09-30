@@ -4,6 +4,7 @@
 #include "rgpot/CalculatorGroup.hpp"
 
 #include <climits>
+#include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <mutex>
@@ -22,6 +23,21 @@ int g_bound_rpc = 0;
 bool g_bound = false;
 #ifdef RGPOT_HAS_MPI
 MPI_Comm g_comm = MPI_COMM_NULL;
+bool g_mpi_owner = false;
+
+int broadcastFromOwner(int owner, void *data, std::size_t bytes) {
+  const int root = owner * g_group.ranks;
+  auto *p = static_cast<std::uint8_t *>(data);
+  while (bytes > 0) {
+    const std::size_t chunk =
+        bytes > static_cast<std::size_t>(INT_MAX) ? static_cast<std::size_t>(INT_MAX)
+                                                   : bytes;
+    MPI_Bcast(p, static_cast<int>(chunk), MPI_BYTE, root, MPI_COMM_WORLD);
+    p += chunk;
+    bytes -= chunk;
+  }
+  return 1;
+}
 #endif
 } // namespace
 
@@ -51,8 +67,10 @@ CalculatorGroup bindCalculators(int ranks_per_calculator) {
 #ifdef RGPOT_HAS_MPI
   int inited = 0;
   MPI_Initialized(&inited);
-  if (!inited)
+  if (!inited) {
     MPI_Init(nullptr, nullptr);
+    g_mpi_owner = true;
+  }
   int rank = 0;
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -61,6 +79,7 @@ CalculatorGroup bindCalculators(int ranks_per_calculator) {
     rpc = size;
   if (rpc > size || size % rpc != 0) {
     g_group.index = -1;
+    g_group.world_size = size;
   } else {
     MPI_Comm sub = MPI_COMM_NULL;
     MPI_Comm_split(MPI_COMM_WORLD, rank / rpc, rank % rpc, &sub);
@@ -108,14 +127,16 @@ int calculatorComm(void *comm_out, std::size_t comm_bytes) {
 
 int calculatorsUseMpi() {
 #ifdef RGPOT_HAS_MPI
-  return 1;
+  int inited = 0;
+  MPI_Initialized(&inited);
+  return inited ? 1 : 0;
 #else
   return 0;
 #endif
 }
 
 int calculatorWorldSize() {
-  if (!g_bound || g_group.index < 0)
+  if (!g_bound)
     return 1;
   return g_group.world_size;
 }
@@ -128,20 +149,78 @@ int calculatorCount() {
 
 int shareFromCalculator(int owner, void *data, std::size_t bytes) {
 #ifdef RGPOT_HAS_MPI
-  if (!g_bound || g_group.index < 0 || (bytes > 0 && !data))
-    return 0;
-  if (owner < 0 || owner >= calculatorCount())
-    return 0;
-  const int root = owner * g_group.ranks;
-  auto *p = static_cast<std::uint8_t *>(data);
-  while (bytes > 0) {
-    const std::size_t chunk =
-        bytes > static_cast<std::size_t>(INT_MAX) ? INT_MAX : bytes;
-    MPI_Bcast(p, static_cast<int>(chunk), MPI_BYTE, root, MPI_COMM_WORLD);
-    p += chunk;
-    bytes -= chunk;
+  int inited = 0;
+  MPI_Initialized(&inited);
+  int size = 1;
+  int rank = 0;
+  if (inited) {
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   }
-  return 1;
+  const bool collective = inited && size > 1 && g_bound && g_group.index >= 0 &&
+                          g_group.world_size > 1;
+  if (!collective) {
+    if (!g_bound || g_group.index < 0 || (bytes > 0 && !data))
+      return 0;
+    if (owner < 0 || owner >= calculatorCount())
+      return 0;
+    return broadcastFromOwner(owner, data, bytes);
+  }
+
+  int reason = 0;
+  if (!g_bound || g_group.index < 0 || (bytes > 0 && !data))
+    reason = 1;
+  else if (owner < 0 || owner >= calculatorCount())
+    reason = 2;
+  if (bytes > static_cast<std::size_t>(LLONG_MAX))
+    reason = 1;
+  const long long local[3] = {
+      reason,
+      static_cast<long long>(owner),
+      static_cast<long long>(bytes > static_cast<std::size_t>(LLONG_MAX)
+                                 ? LLONG_MAX
+                                 : bytes),
+  };
+  std::vector<long long> all(static_cast<std::size_t>(size) * 3, 0);
+  if (MPI_Allgather(local, 3, MPI_LONG_LONG, all.data(), 3, MPI_LONG_LONG,
+                    MPI_COMM_WORLD) != MPI_SUCCESS) {
+    std::fprintf(stderr, "rgpot rank %d: shareFromCalculator allgather failed\n",
+                 rank);
+    std::fflush(stderr);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+    return 0;
+  }
+
+  bool bad = false;
+  for (int src = 0; src < size; ++src) {
+    const std::size_t base = static_cast<std::size_t>(src) * 3;
+    if (all[base] != 0 || all[base + 1] != all[1] || all[base + 2] != all[2])
+      bad = true;
+  }
+  if (!bad)
+    return broadcastFromOwner(owner, data, bytes);
+
+  for (int src = 0; src < size; ++src) {
+    const std::size_t base = static_cast<std::size_t>(src) * 3;
+    const long long src_reason = all[base];
+    const long long src_owner = all[base + 1];
+    const long long src_bytes = all[base + 2];
+    if (src_reason == 0 && src_owner == all[1] && src_bytes == all[2])
+      continue;
+    const char *why = "shareFromCalculator rejected";
+    if (src_reason == 2)
+      why = "shareFromCalculator owner out of range";
+    else if (src_reason == 1)
+      why = "shareFromCalculator missing buffer or group";
+    else if (src_owner != all[1])
+      why = "shareFromCalculator owner disagrees";
+    else
+      why = "shareFromCalculator byte count disagrees";
+    std::fprintf(stderr, "rgpot rank %d: %s\n", src, why);
+  }
+  std::fflush(stderr);
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  return 0;
 #else
   (void)owner;
   (void)data;
@@ -159,8 +238,15 @@ void finalizeMpiAtExit() {
       int finalized = 0;
       MPI_Initialized(&inited);
       MPI_Finalized(&finalized);
-      if (inited && !finalized)
-        MPI_Finalize();
+      if (!g_mpi_owner || !inited || finalized)
+        return;
+      if (const char *trace = std::getenv("RGPOT_MPI_FINALIZE_TRACE")) {
+        if (trace[0] == '1' && trace[1] == '\0') {
+          std::fprintf(stderr, "rgpot MPI_Finalize\n");
+          std::fflush(stderr);
+        }
+      }
+      MPI_Finalize();
     });
   });
 #endif

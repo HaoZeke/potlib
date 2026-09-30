@@ -86,3 +86,7 @@ rgpot-core and anneal-core never depend on each other; eindir-core is the only
 shared vocabulary.
 Pin all three to the same eindir-core (and =dlpk=) revision so the one shared
 compilation lines up.
+
+#+begin_export rst
+See :doc:`../reference/mpi` for the ``with_mpi`` values ``auto``, ``enabled``, and ``disabled``.
+#+end_export
