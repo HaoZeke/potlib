@@ -771,22 +771,53 @@ if get_option('with_tests')
         )
     endif
 
+    calculator_group_test_exe = disabler()
     foreach test : test_array
+        _test_exe = executable(
+            test.get(1),
+            sources: ['tests/' + test.get(2)],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            build_rpath: _metatomic_build_rpath,
+        )
         test(
             test.get(0),
-            executable(
-                test.get(1),
-                sources: ['tests/' + test.get(2)],
-                dependencies: test_deps,
-                include_directories: _incdirs + ['.'],
-                cpp_args: test_args,
-                link_with: _linkto,
-                link_language: 'cpp',
-                build_rpath: _metatomic_build_rpath,
-            ),
+            _test_exe,
             workdir: meson.source_root() + test.get(3),
         )
+        if test.get(1) == 'calculator_group_test'
+            calculator_group_test_exe = _test_exe
+        endif
     endforeach
+    if _mpi_dep.found() and not is_disabler(calculator_group_test_exe)
+        _calc_mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _calc_mpiexec.found()
+            calculator_group_mpi_sh = find_program(
+                meson.current_source_dir() / 'tests/calculator_group_mpi.sh',
+            )
+            test(
+                'CalculatorGroupShare',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'share'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'CalculatorGroupBadOwner',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'bad-owner'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+        endif
+    endif
 
     if has_dftd3 or has_dftd4
         test(
