@@ -140,3 +140,7 @@ support the =-o= flag)
 - Generated =.c++= files are renamed to =.cpp= (MSVC does not recognize the =.c+
 += extension)
 - =ws2_32= is linked for Cap'n Proto's async networking layer
+
+#+begin_export rst
+See :doc:`../reference/mpi` for the ``with_mpi`` values ``auto``, ``enabled``, and ``disabled``.
+#+end_export
