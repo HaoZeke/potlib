@@ -1,1 +1,0 @@
-The Morse cutoff-shift test compares `energyShift()` with an absolute tolerance at the operands' rounding scale instead of a 1e-14 relative pin on a cancelled difference, so the suite passes on aarch64 (EESSI 2026.06, Neoverse-N2), where `exp` and multiply-add contraction differ from x86 by an ulp.
