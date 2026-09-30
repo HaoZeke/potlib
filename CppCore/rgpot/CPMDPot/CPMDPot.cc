@@ -225,7 +225,7 @@ void publishForceError(const std::string &message) {
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if (calculatorWorldSize() < 2 || size < 2) {
+  if (calculatorWorldSize() < 2 || size < 2 || thisCalculator().index < 0) {
     if (!message.empty())
       abortWithLocal(rank, message);
     return;

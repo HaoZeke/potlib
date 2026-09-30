@@ -79,6 +79,7 @@ CalculatorGroup bindCalculators(int ranks_per_calculator) {
     rpc = size;
   if (rpc > size || size % rpc != 0) {
     g_group.index = -1;
+    g_group.world_size = size;
   } else {
     MPI_Comm sub = MPI_COMM_NULL;
     MPI_Comm_split(MPI_COMM_WORLD, rank / rpc, rank % rpc, &sub);
@@ -126,14 +127,16 @@ int calculatorComm(void *comm_out, std::size_t comm_bytes) {
 
 int calculatorsUseMpi() {
 #ifdef RGPOT_HAS_MPI
-  return 1;
+  int inited = 0;
+  MPI_Initialized(&inited);
+  return inited ? 1 : 0;
 #else
   return 0;
 #endif
 }
 
 int calculatorWorldSize() {
-  if (!g_bound || g_group.index < 0)
+  if (!g_bound)
     return 1;
   return g_group.world_size;
 }
@@ -154,7 +157,8 @@ int shareFromCalculator(int owner, void *data, std::size_t bytes) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   }
-  const bool collective = inited && size > 1 && calculatorWorldSize() > 1;
+  const bool collective = inited && size > 1 && g_bound && g_group.index >= 0 &&
+                          g_group.world_size > 1;
   if (!collective) {
     if (!g_bound || g_group.index < 0 || (bytes > 0 && !data))
       return 0;

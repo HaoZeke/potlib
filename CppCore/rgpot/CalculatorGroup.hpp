@@ -36,10 +36,12 @@ const CalculatorGroup &thisCalculator();
 // Returns 0 when there is no communicator to give.
 int calculatorComm(void *comm_out, std::size_t comm_bytes);
 
-// 1 when this build links MPI and bindCalculators can split and share.
+// 1 when MPI_Initialized reports that MPI is up. 0 when this build has
+// no MPI, and 0 when MPI is not initialized.
 int calculatorsUseMpi();
 
-// Ranks in MPI_COMM_WORLD after bindCalculators, 1 before.
+// MPI_COMM_WORLD size recorded by bindCalculators, including a refused
+// split. 1 while calculators are unbound.
 int calculatorWorldSize();
 
 // Number of calculators the world is split into. 1 before a split and

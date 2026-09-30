@@ -633,6 +633,28 @@ if get_option('with_tests')
                 is_parallel: false,
                 suite: 'cpmd',
             )
+            refused_split = executable(
+                'refused_split',
+                sources: ['tests/RefusedSplit.cc'],
+                dependencies: test_deps + [ptlrpc_dep, _mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            refused_split_sh = find_program(
+                meson.current_source_dir() / 'tests/refused_split.sh',
+            )
+            test(
+                'RefusedSplit',
+                refused_split_sh,
+                args: [refused_split.full_path()],
+                depends: [refused_split],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
         endif
         test(
             'ProfileLoaderTest',
