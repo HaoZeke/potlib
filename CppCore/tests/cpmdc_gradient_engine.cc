@@ -11,6 +11,8 @@ struct CPMDCStressTensor {
   int valid;
   double values[9];
 };
+static_assert(offsetof(CPMDCStressTensor, values) == 8,
+              "CPMDCStressTensor values follow the valid flag");
 
 namespace {
 
@@ -60,7 +62,15 @@ CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
   return result;
 }
 
-int cpmdc_last_stress(CPMDCStressTensor *out) {
+// Not declared in cpmd_c_abi.h, so RGPOT_CPMDC_API does not export it.
+// MSVC GetProcAddress only sees dllexport symbols.
+#if defined(_WIN32) || defined(_WIN64)
+#define RGPOT_LAST_STRESS_API __declspec(dllexport)
+#else
+#define RGPOT_LAST_STRESS_API
+#endif
+
+RGPOT_LAST_STRESS_API int cpmdc_last_stress(CPMDCStressTensor *out) {
   if (out == nullptr || !g_stress.valid)
     return -1;
   *out = g_stress;
