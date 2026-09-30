@@ -10,9 +10,11 @@
 
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/NWChemPot/DynLib.hpp"
+#include "rgpot/ParamHash.hpp"
 #include "rgpot/units.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +30,7 @@
 
 namespace rgpot {
 
+using units::HARTREE_PER_BOHR3_TO_EV_PER_ANGSTROM3;
 using units::HARTREE_TO_EV;
 using units::NEG_GRAD_TO_FORCE;
 
@@ -47,6 +50,15 @@ using FeatureCountFn = size_t (*)(void);
 using FeatureTableFn = const CPMDCFeatureEntry *(*)(void);
 using FeatureFindFn = const CPMDCFeatureEntry *(*)(const char *);
 using BindCalculatorsFn = int (*)(int);
+
+// Layout matches cpmdc CPMDCStressTensor: int valid, then nine doubles.
+struct CPMDCStressTensor {
+  int valid;
+  double values[9];
+};
+using LastStressFn = int (*)(CPMDCStressTensor *);
+static_assert(offsetof(CPMDCStressTensor, values) == 8,
+              "CPMDCStressTensor values follow the valid flag");
 
 BindCalculatorsFn g_cpmd_bind = nullptr;
 
@@ -100,6 +112,7 @@ struct EngineBundle {
   FeatureCountFn feature_count = nullptr;
   FeatureTableFn feature_table = nullptr;
   FeatureFindFn feature_find = nullptr;
+  LastStressFn last_stress = nullptr;
   std::string load_error;
   bool loaded = false;
 };
@@ -118,6 +131,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.feature_count = nullptr;
   b.feature_table = nullptr;
   b.feature_find = nullptr;
+  b.last_stress = nullptr;
 
   bool eng_ok = false;
   std::string eng_err;
@@ -160,6 +174,8 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
       b.engine_lib.sym_optional<FeatureTableFn>("cpmdc_feature_table");
   b.feature_find =
       b.engine_lib.sym_optional<FeatureFindFn>("cpmdc_feature_find");
+  b.last_stress =
+      b.engine_lib.sym_optional<LastStressFn>("cpmdc_last_stress");
 
   const bool has_one_shot = b.energy_gradient && b.set_params;
   const bool has_session_result =
@@ -391,6 +407,31 @@ void copy_params_to_builder(const ::CPMDParams::Reader &params,
   return reader.getRoot<::CPMDParams>();
 }
 
+// Every failure out of a force call goes through here. The engine runs
+// one calculator across several ranks, and a host that catches the
+// exception and exits leaves the peers inside a collective. Marking
+// the process turns the exit handler's MPI_Finalize into MPI_Abort.
+[[noreturn]] void fail_force(const std::string &message) {
+  ::rgpot::abortMpiAtExit();
+  throw std::runtime_error(message);
+}
+
+// capnp::word forbids copying, so the params a live session was created
+// from are kept as bytes and compared bytewise.
+std::vector<unsigned char> words_bytes(const std::vector<::capnp::word> &w) {
+  const ParamsView view = params_view(w);
+  const auto *p = static_cast<const unsigned char *>(view.data);
+  return std::vector<unsigned char>(p, p + view.size);
+}
+
+bool same_words(const std::vector<::capnp::word> &w,
+                const std::vector<unsigned char> &bytes) {
+  const ParamsView view = params_view(w);
+  return view.size == bytes.size() &&
+         (view.size == 0 ||
+          std::memcmp(view.data, bytes.data(), view.size) == 0);
+}
+
 std::mutex g_probe_mu;
 bool g_probe_done = false;
 bool g_probe_ok = false;
@@ -405,31 +446,61 @@ struct CPMDPot::Impl {
   std::string engine_path;
   std::string cpmd_root;
   CPMDCSession *session = nullptr;
+  // Params and engine path the live session was created from.
+  std::vector<unsigned char> session_params;
+  std::string session_engine_path;
+  uint64_t params_key = 0;
   mutable std::vector<double> grad_scratch;
 
   void destroySession();
   bool configure();
+  void recomputeParamsKey();
   void forceSession(const ForceInput &in, ForceOut *out);
 };
+
+void CPMDPot::Impl::recomputeParamsKey() {
+  // The serialized message already carries enginePath and cpmdRoot, so
+  // hashing its bytes covers every field the engine sees.
+  Fnv1a fp;
+  fp.u64(CPMDPot::kKernelVersion);
+  const ParamsView view = params_view(params_words);
+  fp.u64(view.size);
+  fp.bytes(view.data, view.size);
+  params_key = fp.h;
+}
 
 void CPMDPot::Impl::destroySession() {
   if (session && bundle.session_destroy)
     bundle.session_destroy(session);
   session = nullptr;
+  session_params.clear();
+  session_engine_path.clear();
 }
 
 bool CPMDPot::Impl::configure() {
-  destroySession();
   if (has_session_result_abi(bundle)) {
+    // A session holds the engine's converged wavefunction; recreating
+    // it for identical params costs a cold SCF on the next force. Keep
+    // the live session when nothing the engine sees has changed.
+    if (session && engine_path == session_engine_path &&
+        same_words(params_words, session_params))
+      return true;
+    destroySession();
     const ParamsView view = params_view(params_words);
     session = bundle.session_create(view.data, view.size);
-    return session != nullptr;
+    if (!session)
+      return false;
+    session_params = words_bytes(params_words);
+    session_engine_path = engine_path;
+    return true;
   }
+  destroySession();
   return push_params_to_engine(bundle, params_words);
 }
 
 CPMDPot::CPMDPot() : Potential(PotType::CPMD), impl_(new Impl) {
   impl_->params_words = default_params();
+  impl_->recomputeParamsKey();
   apply_env_hints(impl_->cpmd_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
     (void)impl_->configure();
@@ -438,11 +509,16 @@ CPMDPot::CPMDPot() : Potential(PotType::CPMD), impl_(new Impl) {
 CPMDPot::CPMDPot(const ::CPMDParams::Reader &params)
     : Potential(PotType::CPMD), impl_(new Impl) {
   impl_->params_words = serialize_params(params);
+  impl_->recomputeParamsKey();
   impl_->engine_path = params.getEnginePath().cStr();
   impl_->cpmd_root = params.getCpmdRoot().cStr();
   apply_env_hints(impl_->cpmd_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
     (void)impl_->configure();
+}
+
+uint64_t CPMDPot::paramsKey() const noexcept {
+  return impl_ ? impl_->params_key : 0;
 }
 
 CPMDPot::~CPMDPot() {
@@ -462,6 +538,7 @@ bool CPMDPot::setParams(const ::CPMDParams::Reader &params) {
       !impl_->bundle.loaded || next_engine_path != impl_->engine_path;
 
   impl_->params_words = serialize_params(params);
+  impl_->recomputeParamsKey();
   impl_->engine_path = next_engine_path;
   impl_->cpmd_root = next_cpmd_root;
   apply_env_hints(impl_->cpmd_root);
@@ -534,8 +611,16 @@ bool CPMDPot::available() const {
 }
 
 int CPMDPot::bindCalculators(int ranks_per_calc) {
-  EngineBundle bundle;
-  try_load_engine(bundle, "");
+  // cpmdc_bind_calculator stores the split communicator inside the
+  // engine, and the hook list runs once per process. The bundle that
+  // loaded the engine for the bind therefore lives as long as the
+  // process: a dlclose here, with no CPMDPot alive to hold another
+  // reference, would drop the engine and its communicator. Heap
+  // allocated and never freed so no static destructor unloads it
+  // behind the MPI exit handler.
+  static EngineBundle *bundle = new EngineBundle;
+  if (!bundle->loaded)
+    try_load_engine(*bundle, "");
   return ::rgpot::bindCalculators(ranks_per_calc).index;
 }
 
@@ -581,17 +666,15 @@ void CPMDPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
 void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   if (!available()) {
-    throw std::runtime_error(
-        std::string("CPMD engine (libcpmdc) not loaded: ") +
-        (impl_ ? impl_->bundle.load_error : "no impl"));
+    fail_force(std::string("CPMD engine (libcpmdc) not loaded: ") +
+               (impl_ ? impl_->bundle.load_error : "no impl"));
   }
 
   const int n = static_cast<int>(in.nAtoms);
   if (n <= 0)
-    throw std::runtime_error("CPMDPot: nAtoms must be positive");
+    fail_force("CPMDPot: nAtoms must be positive");
   if (!in.pos || !in.atmnrs || !in.box || !out || !out->F)
-    throw std::runtime_error(
-        "CPMDPot: null positions/atmnrs/box/forces buffer");
+    fail_force("CPMDPot: null positions/atmnrs/box/forces buffer");
 
   // CPMD initializes MPI on the first calculation and never finalizes it.
   ::rgpot::finalizeMpiAtExit();
@@ -607,9 +690,8 @@ void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   CPMDCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
 
-  if (!res.ok) {
-    throw std::runtime_error(std::string("CPMD engine failed: ") + res.message);
-  }
+  if (!res.ok)
+    fail_force(std::string("CPMD engine failed: ") + res.message);
 
   out->energy = res.energy_h * HARTREE_TO_EV;
   out->variance = 0.0;
@@ -617,6 +699,15 @@ void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   for (int i = 0; i < n * 3; ++i)
     out->F[static_cast<size_t>(i)] =
         grad[static_cast<size_t>(i)] * NEG_GRAD_TO_FORCE;
+  if (impl_->bundle.last_stress) {
+    CPMDCStressTensor tensor{};
+    if (impl_->bundle.last_stress(&tensor) == 0 && tensor.valid) {
+      for (int i = 0; i < 9; ++i)
+        out->stress[i] =
+            tensor.values[i] * HARTREE_PER_BOHR3_TO_EV_PER_ANGSTROM3;
+      out->has_stress = 1;
+    }
+  }
 }
 
 void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
@@ -626,7 +717,7 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
       bundle.potential_result_size_for_force_input(force_view.data,
                                                    force_view.size);
   if (required == 0)
-    throw std::runtime_error("CPMD engine rejected ForceInput sizing");
+    fail_force("CPMD engine rejected ForceInput sizing");
 
   std::vector<::capnp::word> result_words(
       (required + sizeof(::capnp::word) - 1u) / sizeof(::capnp::word));
@@ -635,10 +726,10 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
       session, force_view.data, force_view.size, result_words.data(),
       result_words.size() * sizeof(::capnp::word), &written);
   if (!res.ok)
-    throw std::runtime_error(std::string("CPMD engine failed: ") + res.message);
+    fail_force(std::string("CPMD engine failed: ") + res.message);
   if (written == 0 || written > result_words.size() * sizeof(::capnp::word) ||
       (written % sizeof(::capnp::word)) != 0)
-    throw std::runtime_error("CPMD engine returned invalid PotentialResult");
+    fail_force("CPMD engine returned invalid PotentialResult");
 
   auto words = kj::arrayPtr<const ::capnp::word>(
       result_words.data(), written / sizeof(::capnp::word));
@@ -647,7 +738,7 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
   const auto forces = result.getForces();
   const size_t expected_force_count = in.nAtoms * 3u;
   if (forces.size() != expected_force_count)
-    throw std::runtime_error("CPMD engine returned wrong force count");
+    fail_force("CPMD engine returned wrong force count");
   out->energy = result.getEnergy();
   out->variance = 0.0;
   for (unsigned int i = 0; i < forces.size(); ++i)

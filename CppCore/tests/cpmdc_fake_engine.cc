@@ -4,6 +4,8 @@
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/rpc/Potentials.capnp.h"
 
+#include "cpmd_stress_oracle.hpp"
+
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 #include <kj/array.h>
@@ -64,10 +66,14 @@ bool force_input_ok(const ::ForceInput::Reader &input, size_t *force_count,
 std::vector<unsigned char> make_result(size_t force_count, double cell_zz) {
   ::capnp::MallocMessageBuilder msg;
   auto result = msg.initRoot<::PotentialResult>();
-  result.setEnergy(0.75 + 0.001 * cell_zz);
+  const double hartree = cpmd_stress_oracle::sessionHartree(cell_zz);
+  result.setEnergy(hartree * rgpot::units::HARTREE_TO_EV);
   auto forces = result.initForces(static_cast<unsigned int>(force_count));
   for (unsigned int i = 0; i < forces.size(); ++i)
     forces.set(i, 0.011 + 0.001 * static_cast<double>(i));
+  auto stress = result.initStress(9);
+  for (unsigned int i = 0; i < 9; ++i)
+    stress.set(i, cpmd_stress_oracle::stressEvPerAngstrom3(static_cast<int>(i)));
   auto words = ::capnp::messageToFlatArray(msg);
   const auto bytes = words.asBytes();
   return std::vector<unsigned char>(bytes.begin(), bytes.end());
@@ -88,6 +94,10 @@ CPMDCResult ok_result(const char *message) {
   std::snprintf(r.message, sizeof(r.message), "%s", message);
   return r;
 }
+
+// Sessions created through cpmdc_session_create, read back by tests
+// through cpmdc_fake_session_create_count.
+int g_session_create_count = 0;
 
 } // namespace
 
@@ -139,6 +149,7 @@ CPMDCSession *cpmdc_session_create(const void *params_capnp,
                                    size_t params_capnp_size_bytes) {
   if (!has_flat_message(params_capnp, params_capnp_size_bytes))
     return nullptr;
+  ++g_session_create_count;
   auto *session = new CPMDCSession;
   session->params.resize(params_capnp_size_bytes);
   std::memcpy(session->params.data(), params_capnp, params_capnp_size_bytes);
@@ -328,6 +339,13 @@ const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
 #endif
 
 RGPOT_FAKE_ONLY int cpmdc_abi_version(void) { return 0; }
+
+// Test-only: number of cpmdc_session_create calls that returned a
+// session. Lets a test assert that a CPMDPot kept or recreated its
+// session.
+RGPOT_FAKE_ONLY int cpmdc_fake_session_create_count(void) {
+  return g_session_create_count;
+}
 
 RGPOT_FAKE_ONLY const char *cpmdc_last_error(void) { return ""; }
 

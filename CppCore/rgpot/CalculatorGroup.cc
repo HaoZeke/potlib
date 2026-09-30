@@ -3,6 +3,7 @@
 
 #include "rgpot/CalculatorGroup.hpp"
 
+#include <atomic>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -21,6 +22,7 @@ std::vector<CalculatorHook> g_hooks;
 CalculatorGroup g_group;
 int g_bound_rpc = 0;
 bool g_bound = false;
+std::atomic<bool> g_abort_at_exit{false};
 #ifdef RGPOT_HAS_MPI
 MPI_Comm g_comm = MPI_COMM_NULL;
 bool g_mpi_owner = false;
@@ -238,7 +240,17 @@ void finalizeMpiAtExit() {
       int finalized = 0;
       MPI_Initialized(&inited);
       MPI_Finalized(&finalized);
-      if (!g_mpi_owner || !inited || finalized)
+      if (!inited || finalized)
+        return;
+      // MPI_Finalize is collective. A rank that leaves after a failed
+      // engine call must not wait there for peers blocked in a
+      // collective of their own; it takes the whole world down instead,
+      // whether or not this library owns the MPI_Init.
+      if (g_abort_at_exit.load(std::memory_order_acquire)) {
+        MPI_Abort(MPI_COMM_WORLD, 1);
+        return;
+      }
+      if (!g_mpi_owner)
         return;
       if (const char *trace = std::getenv("RGPOT_MPI_FINALIZE_TRACE")) {
         if (trace[0] == '1' && trace[1] == '\0') {
@@ -250,6 +262,14 @@ void finalizeMpiAtExit() {
     });
   });
 #endif
+}
+
+void abortMpiAtExit() {
+  g_abort_at_exit.store(true, std::memory_order_release);
+}
+
+bool mpiAbortRequested() {
+  return g_abort_at_exit.load(std::memory_order_acquire);
 }
 
 } // namespace rgpot
