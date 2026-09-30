@@ -9,6 +9,7 @@
 #include "rgpot/Potential.hpp"
 #include "rgpot/rpc/Potentials.capnp.h"
 
+#include <cstdint>
 #include <string>
 
 namespace rgpot {
@@ -34,6 +35,13 @@ public:
     return {.reentrancy = Reentrancy::ProcessSerial};
   }
 
+  /// FNV-1a over the serialized CPMDParams bytes plus kKernelVersion, so
+  /// two CPMDPot instances with different params never share result-cache
+  /// entries. Recomputed by the constructors and setParams.
+  [[nodiscard]] uint64_t paramsKey() const noexcept override;
+
+  /// Bump whenever the engine-facing numerics change.
+  static constexpr uint64_t kKernelVersion = 1;
 
   bool setParams(const ::CPMDParams::Reader &params);
 

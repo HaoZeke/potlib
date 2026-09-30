@@ -10,6 +10,7 @@
 
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 #include "rgpot/NWChemPot/DynLib.hpp"
+#include "rgpot/ParamHash.hpp"
 #include "rgpot/units.hpp"
 
 #include <algorithm>
@@ -433,12 +434,25 @@ struct CPMDPot::Impl {
   // Params and engine path the live session was created from.
   std::vector<unsigned char> session_params;
   std::string session_engine_path;
+  uint64_t params_key = 0;
   mutable std::vector<double> grad_scratch;
 
   void destroySession();
   bool configure();
+  void recomputeParamsKey();
   void forceSession(const ForceInput &in, ForceOut *out);
 };
+
+void CPMDPot::Impl::recomputeParamsKey() {
+  // The serialized message already carries enginePath and cpmdRoot, so
+  // hashing its bytes covers every field the engine sees.
+  Fnv1a fp;
+  fp.u64(CPMDPot::kKernelVersion);
+  const ParamsView view = params_view(params_words);
+  fp.u64(view.size);
+  fp.bytes(view.data, view.size);
+  params_key = fp.h;
+}
 
 void CPMDPot::Impl::destroySession() {
   if (session && bundle.session_destroy)
@@ -471,6 +485,7 @@ bool CPMDPot::Impl::configure() {
 
 CPMDPot::CPMDPot() : Potential(PotType::CPMD), impl_(new Impl) {
   impl_->params_words = default_params();
+  impl_->recomputeParamsKey();
   apply_env_hints(impl_->cpmd_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
     (void)impl_->configure();
@@ -479,11 +494,16 @@ CPMDPot::CPMDPot() : Potential(PotType::CPMD), impl_(new Impl) {
 CPMDPot::CPMDPot(const ::CPMDParams::Reader &params)
     : Potential(PotType::CPMD), impl_(new Impl) {
   impl_->params_words = serialize_params(params);
+  impl_->recomputeParamsKey();
   impl_->engine_path = params.getEnginePath().cStr();
   impl_->cpmd_root = params.getCpmdRoot().cStr();
   apply_env_hints(impl_->cpmd_root);
   if (try_load_engine(impl_->bundle, impl_->engine_path))
     (void)impl_->configure();
+}
+
+uint64_t CPMDPot::paramsKey() const noexcept {
+  return impl_ ? impl_->params_key : 0;
 }
 
 CPMDPot::~CPMDPot() {
@@ -503,6 +523,7 @@ bool CPMDPot::setParams(const ::CPMDParams::Reader &params) {
       !impl_->bundle.loaded || next_engine_path != impl_->engine_path;
 
   impl_->params_words = serialize_params(params);
+  impl_->recomputeParamsKey();
   impl_->engine_path = next_engine_path;
   impl_->cpmd_root = next_cpmd_root;
   apply_env_hints(impl_->cpmd_root);

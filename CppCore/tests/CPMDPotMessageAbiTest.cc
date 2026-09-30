@@ -106,3 +106,34 @@ TEST_CASE("CPMDPot keeps its engine session across identical setParams",
   REQUIRE(pot.available());
   REQUIRE(counter.sessions() == before + 2);
 }
+
+// paramsKey feeds the result-cache key: equal params hash equal, any
+// field change hashes different, and the salt keeps it off the
+// parameter-free default of 0.
+TEST_CASE("CPMDPot paramsKey follows the serialized params", "[cpmd][abi]") {
+  ::capnp::MallocMessageBuilder msg;
+  auto p = msg.initRoot<::CPMDParams>();
+  p.setFunctional("BLYP");
+  p.setCutOffRy(70.0);
+  p.setCharge(0);
+  p.setMultiplicity(1);
+
+  rgpot::CPMDPot a(p.asReader());
+  rgpot::CPMDPot b(p.asReader());
+  REQUIRE(a.paramsKey() != 0);
+  REQUIRE(a.paramsKey() == b.paramsKey());
+
+  const auto key_before = a.paramsKey();
+  p.setCutOffRy(80.0);
+  REQUIRE(a.setParams(p.asReader()));
+  REQUIRE(a.paramsKey() != key_before);
+  REQUIRE(a.paramsKey() != b.paramsKey());
+
+  p.setCutOffRy(70.0);
+  REQUIRE(a.setParams(p.asReader()));
+  REQUIRE(a.paramsKey() == key_before);
+
+  rgpot::CPMDPot defaults;
+  REQUIRE(defaults.paramsKey() != 0);
+  REQUIRE(defaults.paramsKey() != b.paramsKey());
+}
