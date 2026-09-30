@@ -1,1 +1,1 @@
-The CPMD engine documentation is at https://cpmdc.rgoswami.me.
+Read the engine documentation at https://cpmdc.rgoswami.me.
