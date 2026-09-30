@@ -3,6 +3,9 @@
 
 #include "rgpot/CalculatorGroup.hpp"
 
+#include <climits>
+#include <cstdlib>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -100,6 +103,66 @@ int calculatorComm(void *comm_out, std::size_t comm_bytes) {
   (void)comm_out;
   (void)comm_bytes;
   return 0;
+#endif
+}
+
+int calculatorsUseMpi() {
+#ifdef RGPOT_HAS_MPI
+  return 1;
+#else
+  return 0;
+#endif
+}
+
+int calculatorWorldSize() {
+  if (!g_bound || g_group.index < 0)
+    return 1;
+  return g_group.world_size;
+}
+
+int calculatorCount() {
+  if (!g_bound || g_group.index < 0 || g_group.ranks <= 0)
+    return 1;
+  return g_group.world_size / g_group.ranks;
+}
+
+int shareFromCalculator(int owner, void *data, std::size_t bytes) {
+#ifdef RGPOT_HAS_MPI
+  if (!g_bound || g_group.index < 0 || (bytes > 0 && !data))
+    return 0;
+  if (owner < 0 || owner >= calculatorCount())
+    return 0;
+  const int root = owner * g_group.ranks;
+  auto *p = static_cast<std::uint8_t *>(data);
+  while (bytes > 0) {
+    const std::size_t chunk =
+        bytes > static_cast<std::size_t>(INT_MAX) ? INT_MAX : bytes;
+    MPI_Bcast(p, static_cast<int>(chunk), MPI_BYTE, root, MPI_COMM_WORLD);
+    p += chunk;
+    bytes -= chunk;
+  }
+  return 1;
+#else
+  (void)owner;
+  (void)data;
+  (void)bytes;
+  return 0;
+#endif
+}
+
+void finalizeMpiAtExit() {
+#ifdef RGPOT_HAS_MPI
+  static std::once_flag once;
+  std::call_once(once, [] {
+    std::atexit([] {
+      int inited = 0;
+      int finalized = 0;
+      MPI_Initialized(&inited);
+      MPI_Finalized(&finalized);
+      if (inited && !finalized)
+        MPI_Finalize();
+    });
+  });
 #endif
 }
 

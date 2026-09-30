@@ -7,6 +7,15 @@ if get_option('with_cache') and not get_option('with_rpc_client_only')
     _rgpot_srcs += files('rgpot/PotentialCache.cc')
 endif
 
+# Calculator groups split MPI_COMM_WORLD and broadcast results between
+# groups. Without MPI a process is one group of one rank.
+_mpi_dep = dependency('mpi', language: 'cpp', required: get_option('with_mpi'))
+if _mpi_dep.found()
+    _deps += declare_dependency(
+        dependencies: _mpi_dep,
+        compile_args: ['-DRGPOT_HAS_MPI'],
+    )
+endif
 _rgpot_srcs += files('rgpot/CalculatorGroup.cc')
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
@@ -322,6 +331,12 @@ if get_option('with_tests')
     if not get_option('with_rpc_client_only')
         test_array += [
             ['MorsePotTest', 'morse_pot_test', 'MorsePotTest.cc', ''],
+            [
+                'CalculatorGroupTest',
+                'calculator_group_test',
+                'CalculatorGroupTest.cc',
+                '',
+            ],
             [
                 'LJClusterPotTest',
                 'ljcluster_pot_test',
