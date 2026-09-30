@@ -22,6 +22,9 @@ public:
   CPMDPot(const CPMDPot &) = delete;
   CPMDPot &operator=(const CPMDPot &) = delete;
 
+  // When calculatorWorldSize() is greater than 1, every rank enters this
+  // call. A failure is printed on every rank in the call, then MPI_Abort
+  // runs on MPI_COMM_WORLD, and then the exception leaves the call.
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /// The dlopen'd engine keeps global session state: serialize
@@ -52,6 +55,8 @@ public:
 private:
   struct Impl;
   Impl *impl_;
+
+  void forceImplOrThrow(const ForceInput &in, ForceOut *out) const;
 };
 
 } // namespace rgpot

@@ -568,6 +568,52 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'cpmd',
         )
+        mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _mpi_dep.found() and mpiexec.found()
+            rank_exception = executable(
+                'rank_exception_abort',
+                sources: ['tests/RankExceptionAbort.cc'],
+                dependencies: test_deps + [ptlrpc_dep, _mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            rank_exception_sh = find_program(
+                meson.current_source_dir() / 'tests/rank_exception_abort.sh',
+            )
+            test(
+                'RankExceptionAbort',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'abort'],
+                env: cpmdc_fake_env,
+                depends: [cpmdc_fake_engine, rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeOwner',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-owner'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeGuest',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-guest'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+        endif
         test(
             'ProfileLoaderTest',
             executable(

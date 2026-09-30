@@ -12,12 +12,19 @@
 #include "rgpot/NWChemPot/DynLib.hpp"
 #include "rgpot/units.hpp"
 
+#include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <time.h>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#ifdef RGPOT_HAS_MPI
+#include <mpi.h>
+#endif
 
 namespace rgpot {
 
@@ -176,6 +183,120 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
 bool has_session_result_abi(const EngineBundle &b) {
   return b.session_create && b.session_destroy &&
          b.potential_result_size_for_force_input && b.session_calculate_result;
+}
+
+#ifdef RGPOT_HAS_MPI
+constexpr int kForceErrorCap = 512;
+constexpr double kForceErrorWaitS = 10.0;
+
+bool waitRequest(MPI_Request *req, double budget_s) {
+  const double start = MPI_Wtime();
+  for (;;) {
+    int flag = 0;
+    MPI_Test(req, &flag, MPI_STATUS_IGNORE);
+    if (flag)
+      return true;
+    if (MPI_Wtime() - start >= budget_s)
+      return false;
+    struct timespec pause = {0, 1000000};
+    nanosleep(&pause, nullptr);
+  }
+}
+
+void abortWithLocal(int rank, const std::string &message) {
+  if (!message.empty()) {
+    std::fprintf(stderr, "rgpot rank %d: %s\n", rank, message.c_str());
+    std::fflush(stderr);
+  }
+  MPI_Abort(MPI_COMM_WORLD, 1);
+}
+#endif
+
+// When more than one calculator rank is bound, every rank enters this
+// call from forceImpl. A non-empty message is printed on every rank,
+// then MPI_Abort runs on MPI_COMM_WORLD.
+void publishForceError(const std::string &message) {
+#ifdef RGPOT_HAS_MPI
+  int inited = 0;
+  MPI_Initialized(&inited);
+  if (!inited)
+    return;
+  int rank = 0;
+  int size = 1;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (calculatorWorldSize() < 2 || size < 2) {
+    if (!message.empty())
+      abortWithLocal(rank, message);
+    return;
+  }
+
+  const int local_n = static_cast<int>(
+      std::min(message.size(), static_cast<std::size_t>(kForceErrorCap)));
+  std::vector<int> counts(static_cast<std::size_t>(size), 0);
+  MPI_Request req = MPI_REQUEST_NULL;
+  if (MPI_Iallgather(&local_n, 1, MPI_INT, counts.data(), 1, MPI_INT,
+                     MPI_COMM_WORLD, &req) != MPI_SUCCESS) {
+    abortWithLocal(rank, message);
+    return;
+  }
+  if (message.empty()) {
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+  } else if (!waitRequest(&req, kForceErrorWaitS)) {
+    abortWithLocal(rank, message);
+    return;
+  }
+
+  int max_n = 0;
+  bool any = false;
+  for (int &count : counts) {
+    if (count < 0)
+      count = 0;
+    if (count > kForceErrorCap)
+      count = kForceErrorCap;
+    if (count > 0)
+      any = true;
+    if (count > max_n)
+      max_n = count;
+  }
+  if (!any || max_n <= 0)
+    return;
+
+  std::vector<char> send(static_cast<std::size_t>(max_n), '\0');
+  std::vector<char> recv(
+      static_cast<std::size_t>(max_n) * static_cast<std::size_t>(size), '\0');
+  if (local_n > 0) {
+    const int copy_n = local_n < max_n ? local_n : max_n;
+    std::memcpy(send.data(), message.data(), static_cast<std::size_t>(copy_n));
+  }
+  req = MPI_REQUEST_NULL;
+  if (MPI_Iallgather(send.data(), max_n, MPI_CHAR, recv.data(), max_n, MPI_CHAR,
+                     MPI_COMM_WORLD, &req) != MPI_SUCCESS) {
+    abortWithLocal(rank, message);
+    return;
+  }
+  if (message.empty()) {
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+  } else if (!waitRequest(&req, kForceErrorWaitS)) {
+    abortWithLocal(rank, message);
+    return;
+  }
+
+  for (int src = 0; src < size; ++src) {
+    const int count = counts[static_cast<std::size_t>(src)];
+    if (count <= 0)
+      continue;
+    const int show = count < max_n ? count : max_n;
+    const std::size_t offset =
+        static_cast<std::size_t>(src) * static_cast<std::size_t>(max_n);
+    std::fprintf(stderr, "rgpot rank %d: %.*s\n", src, show,
+                 recv.data() + offset);
+  }
+  std::fflush(stderr);
+  MPI_Abort(MPI_COMM_WORLD, 1);
+#else
+  (void)message;
+#endif
 }
 
 std::vector<::capnp::word> serialize_params(const ::CPMDParams::Reader &params) {
@@ -445,6 +566,20 @@ bool CPMDPot::abi_available() {
 }
 
 void CPMDPot::forceImpl(const ForceInput &in, ForceOut *out) const {
+  std::string error;
+  try {
+    forceImplOrThrow(in, out);
+  } catch (const std::exception &ex) {
+    error = ex.what();
+  } catch (...) {
+    error = "CPMDPot: unknown exception";
+  }
+  publishForceError(error);
+  if (!error.empty())
+    throw std::runtime_error(error);
+}
+
+void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   if (!available()) {
     throw std::runtime_error(
         std::string("CPMD engine (libcpmdc) not loaded: ") +

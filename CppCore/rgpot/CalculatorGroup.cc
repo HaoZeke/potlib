@@ -4,6 +4,7 @@
 #include "rgpot/CalculatorGroup.hpp"
 
 #include <climits>
+#include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <mutex>
@@ -22,6 +23,7 @@ int g_bound_rpc = 0;
 bool g_bound = false;
 #ifdef RGPOT_HAS_MPI
 MPI_Comm g_comm = MPI_COMM_NULL;
+bool g_mpi_owner = false;
 #endif
 } // namespace
 
@@ -51,8 +53,10 @@ CalculatorGroup bindCalculators(int ranks_per_calculator) {
 #ifdef RGPOT_HAS_MPI
   int inited = 0;
   MPI_Initialized(&inited);
-  if (!inited)
+  if (!inited) {
     MPI_Init(nullptr, nullptr);
+    g_mpi_owner = true;
+  }
   int rank = 0;
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -159,8 +163,15 @@ void finalizeMpiAtExit() {
       int finalized = 0;
       MPI_Initialized(&inited);
       MPI_Finalized(&finalized);
-      if (inited && !finalized)
-        MPI_Finalize();
+      if (!g_mpi_owner || !inited || finalized)
+        return;
+      if (const char *trace = std::getenv("RGPOT_MPI_FINALIZE_TRACE")) {
+        if (trace[0] == '1' && trace[1] == '\0') {
+          std::fprintf(stderr, "rgpot MPI_Finalize\n");
+          std::fflush(stderr);
+        }
+      }
+      MPI_Finalize();
     });
   });
 #endif
