@@ -6,6 +6,7 @@
 
 #include <mpi.h>
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -82,6 +83,49 @@ int runAbort() {
   return 4;
 }
 
+int runShareBad() {
+  const rgpot::CalculatorGroup group = rgpot::bindCalculators(1);
+  int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  redirectRankLog(rank);
+  if (group.index < 0 || group.ranks != 1) {
+    std::fprintf(stderr, "bind failed index=%d ranks=%d\n", group.index,
+                 group.ranks);
+    MPI_Abort(MPI_COMM_WORLD, 2);
+  }
+  std::array<double, 4> buf{1.0, -2.0, 3.5, 0.25};
+  const int owner = rank == 0 ? 0 : 5;
+  const int shared =
+      rgpot::shareFromCalculator(owner, buf.data(), sizeof(buf));
+  std::fprintf(stderr, "share returned %d\n", shared);
+  return 4;
+}
+
+int runShareOk() {
+  const rgpot::CalculatorGroup group = rgpot::bindCalculators(1);
+  int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  redirectRankLog(rank);
+  if (group.index < 0 || group.ranks != 1) {
+    std::fprintf(stderr, "bind failed index=%d ranks=%d\n", group.index,
+                 group.ranks);
+    MPI_Abort(MPI_COMM_WORLD, 2);
+  }
+  std::array<double, 4> buf{0.0, 0.0, 0.0, 0.0};
+  if (rank == 0)
+    buf = {1.0, -2.0, 3.5, 0.25};
+  const int shared = rgpot::shareFromCalculator(0, buf.data(), sizeof(buf));
+  if (shared != 1 || buf != std::array<double, 4>{1.0, -2.0, 3.5, 0.25}) {
+    std::fprintf(stderr, "share-ok failed shared=%d\n", shared);
+    return 4;
+  }
+  if (rank == 1) {
+    std::fprintf(stderr, "share-ok %.6f %.6f %.6f %.6f\n", buf[0], buf[1],
+                 buf[2], buf[3]);
+  }
+  return 0;
+}
+
 int runOwner() {
   rgpot::bindCalculators(1);
   rgpot::finalizeMpiAtExit();
@@ -104,5 +148,9 @@ int main(int argc, char **argv) {
     return runOwner();
   if (std::strcmp(mode, "finalize-guest") == 0)
     return runGuest();
+  if (std::strcmp(mode, "share-bad") == 0)
+    return runShareBad();
+  if (std::strcmp(mode, "share-ok") == 0)
+    return runShareOk();
   return runAbort();
 }

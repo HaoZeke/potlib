@@ -62,6 +62,49 @@ if [ "$mode" = "abort" ]; then
   exit 0
 fi
 
+if [ "$mode" = "share-bad" ] || [ "$mode" = "share-ok" ]; then
+  out=$(mktemp -d)
+  trap 'rm -rf "$out"' EXIT
+  export RGPOT_RANK_LOG_DIR="$out"
+  rc=0
+  set +e
+  if printf '%s\n' "$help" | grep -q -- '--oversubscribe'; then
+    run_bounded "$launcher" -n 2 --oversubscribe \
+      -x RGPOT_RANK_LOG_DIR -x RGPOT_CPMD_ENGINE \
+      "$exe" "$mode"
+  else
+    run_bounded "$launcher" -n 2 "$exe" "$mode"
+  fi
+  rc=$?
+  set -e
+  if [ "$mode" = "share-ok" ]; then
+    if [ "$rc" -ne 0 ]; then
+      echo "share-ok status $rc" >&2
+      cat "$out"/rank-*.log >&2 || true
+      exit 1
+    fi
+    if ! grep -q 'share-ok 1.000000 -2.000000 3.500000 0.250000' "$out/rank-1.log"; then
+      echo "rank 1 buffer does not match rank 0" >&2
+      cat "$out"/rank-*.log >&2 || true
+      exit 1
+    fi
+    exit 0
+  fi
+  if [ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]; then
+    echo "share-bad status $rc" >&2
+    exit 1
+  fi
+  for ranklog in "$out/rank-0.log" "$out/rank-1.log"; do
+    if [ ! -f "$ranklog" ] || ! grep -q 'shareFromCalculator owner out of range' "$ranklog"; then
+      echo "missing shared error in $ranklog" >&2
+      ls -la "$out" >&2
+      cat "$out"/rank-*.log >&2 || true
+      exit 1
+    fi
+  done
+  exit 0
+fi
+
 if [ "$mode" = "finalize-owner" ]; then
   log=$(mktemp)
   trap 'rm -f "$log"' EXIT

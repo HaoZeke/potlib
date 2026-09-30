@@ -48,8 +48,11 @@ int calculatorCount();
 
 // Broadcasts bytes from the first rank of calculator `owner` to every
 // rank of MPI_COMM_WORLD, so all ranks hold that calculator's result.
-// Collective on MPI_COMM_WORLD. Returns 0 without MPI or before a
-// split, 1 once the bytes are in place.
+// Collective on MPI_COMM_WORLD. When more than one rank is bound, a
+// rank that cannot enter the broadcast aborts the world after every
+// rank prints the error. Returns 0 without MPI, before a split, or
+// for a bad owner in a single process. Returns 1 once the bytes are
+// in place.
 int shareFromCalculator(int owner, void *data, std::size_t bytes);
 
 // Registers, once per process, an exit handler that calls MPI_Finalize

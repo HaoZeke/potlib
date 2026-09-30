@@ -613,6 +613,26 @@ if get_option('with_tests')
                 is_parallel: false,
                 suite: 'cpmd',
             )
+            test(
+                'ShareBroadcastMismatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-bad'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'ShareBroadcastMatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-ok'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
         endif
         test(
             'ProfileLoaderTest',
