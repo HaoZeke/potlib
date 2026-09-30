@@ -1,0 +1,1 @@
+`CPMDPot::setParams` with byte-identical parameters keeps the engine session and its stored wavefunction; the engine loaded by `bindCalculators` stays loaded for the process; `paramsKey` fingerprints the CPMD parameters for the result cache.
