@@ -575,8 +575,16 @@ bool CPMDPot::available() const {
 }
 
 int CPMDPot::bindCalculators(int ranks_per_calc) {
-  EngineBundle bundle;
-  try_load_engine(bundle, "");
+  // cpmdc_bind_calculator stores the split communicator inside the
+  // engine, and the hook list runs once per process. The bundle that
+  // loaded the engine for the bind therefore lives as long as the
+  // process: a dlclose here, with no CPMDPot alive to hold another
+  // reference, would drop the engine and its communicator. Heap
+  // allocated and never freed so no static destructor unloads it
+  // behind the MPI exit handler.
+  static EngineBundle *bundle = new EngineBundle;
+  if (!bundle->loaded)
+    try_load_engine(*bundle, "");
   return ::rgpot::bindCalculators(ranks_per_calc).index;
 }
 

@@ -51,6 +51,13 @@ public:
   // is one calculator. A second band calls this on its own world.
   // Every rank must call it before the first force. Returns the
   // group index, or -1 when the engine has no bind symbol.
+  //
+  // Ordering: the engine is loaded here and stays loaded for the rest
+  // of the process, whether or not a CPMDPot exists yet. The split
+  // communicator lives inside the engine and the calculator hooks run
+  // once, so an engine unloaded between this call and the first
+  // CPMDPot would lose the split with no way to redo it. Construct
+  // CPMDPot instances after this call; they share the loaded engine.
   static int bindCalculators(int ranks_per_calc);
 
 private:
