@@ -338,6 +338,12 @@ if get_option('with_tests')
                 '',
             ],
             [
+                'CalculatorAbortFlagTest',
+                'calculator_abort_flag_test',
+                'CalculatorAbortFlagTest.cc',
+                '',
+            ],
+            [
                 'LJClusterPotTest',
                 'ljcluster_pot_test',
                 'LJClusterPotTest.cc',

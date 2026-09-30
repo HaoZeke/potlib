@@ -391,6 +391,15 @@ void copy_params_to_builder(const ::CPMDParams::Reader &params,
   return reader.getRoot<::CPMDParams>();
 }
 
+// Every failure out of a force call goes through here. The engine runs
+// one calculator across several ranks, and a host that catches the
+// exception and exits leaves the peers inside a collective. Marking
+// the process turns the exit handler's MPI_Finalize into MPI_Abort.
+[[noreturn]] void fail_force(const std::string &message) {
+  ::rgpot::abortMpiAtExit();
+  throw std::runtime_error(message);
+}
+
 std::mutex g_probe_mu;
 bool g_probe_done = false;
 bool g_probe_ok = false;
@@ -581,17 +590,15 @@ void CPMDPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
 void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   if (!available()) {
-    throw std::runtime_error(
-        std::string("CPMD engine (libcpmdc) not loaded: ") +
-        (impl_ ? impl_->bundle.load_error : "no impl"));
+    fail_force(std::string("CPMD engine (libcpmdc) not loaded: ") +
+               (impl_ ? impl_->bundle.load_error : "no impl"));
   }
 
   const int n = static_cast<int>(in.nAtoms);
   if (n <= 0)
-    throw std::runtime_error("CPMDPot: nAtoms must be positive");
+    fail_force("CPMDPot: nAtoms must be positive");
   if (!in.pos || !in.atmnrs || !in.box || !out || !out->F)
-    throw std::runtime_error(
-        "CPMDPot: null positions/atmnrs/box/forces buffer");
+    fail_force("CPMDPot: null positions/atmnrs/box/forces buffer");
 
   // CPMD initializes MPI on the first calculation and never finalizes it.
   ::rgpot::finalizeMpiAtExit();
@@ -607,9 +614,8 @@ void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
   CPMDCResult res = impl_->bundle.energy_gradient(
       n, in.pos, in.atmnrs, params.data, params.size, grad.data());
 
-  if (!res.ok) {
-    throw std::runtime_error(std::string("CPMD engine failed: ") + res.message);
-  }
+  if (!res.ok)
+    fail_force(std::string("CPMD engine failed: ") + res.message);
 
   out->energy = res.energy_h * HARTREE_TO_EV;
   out->variance = 0.0;
@@ -626,7 +632,7 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
       bundle.potential_result_size_for_force_input(force_view.data,
                                                    force_view.size);
   if (required == 0)
-    throw std::runtime_error("CPMD engine rejected ForceInput sizing");
+    fail_force("CPMD engine rejected ForceInput sizing");
 
   std::vector<::capnp::word> result_words(
       (required + sizeof(::capnp::word) - 1u) / sizeof(::capnp::word));
@@ -635,10 +641,10 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
       session, force_view.data, force_view.size, result_words.data(),
       result_words.size() * sizeof(::capnp::word), &written);
   if (!res.ok)
-    throw std::runtime_error(std::string("CPMD engine failed: ") + res.message);
+    fail_force(std::string("CPMD engine failed: ") + res.message);
   if (written == 0 || written > result_words.size() * sizeof(::capnp::word) ||
       (written % sizeof(::capnp::word)) != 0)
-    throw std::runtime_error("CPMD engine returned invalid PotentialResult");
+    fail_force("CPMD engine returned invalid PotentialResult");
 
   auto words = kj::arrayPtr<const ::capnp::word>(
       result_words.data(), written / sizeof(::capnp::word));
@@ -647,7 +653,7 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
   const auto forces = result.getForces();
   const size_t expected_force_count = in.nAtoms * 3u;
   if (forces.size() != expected_force_count)
-    throw std::runtime_error("CPMD engine returned wrong force count");
+    fail_force("CPMD engine returned wrong force count");
   out->energy = result.getEnergy();
   out->variance = 0.0;
   for (unsigned int i = 0; i < forces.size(); ++i)

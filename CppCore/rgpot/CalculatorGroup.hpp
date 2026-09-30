@@ -60,7 +60,21 @@ int shareFromCalculator(int owner, void *data, std::size_t bytes);
 // Registers, once per process, an exit handler that calls MPI_Finalize
 // when bindCalculators called MPI_Init and MPI is not yet finalized.
 // A host that called MPI_Init keeps that call and finalizes itself.
+// When abortMpiAtExit was called, the handler calls
+// MPI_Abort(MPI_COMM_WORLD, 1) instead, whoever owns the MPI_Init.
 // No-op without MPI.
 void finalizeMpiAtExit();
+
+// Marks this process as failed for the exit handler registered by
+// finalizeMpiAtExit. An engine call that fails on one rank leaves the
+// other ranks inside a collective (MPI_Bcast in shareFromCalculator, or
+// the engine's own); the failed rank would then block in MPI_Finalize
+// until the walltime kill. A backend calls this before throwing out of
+// an engine call, so the exit handler aborts the world instead. Sets a
+// process-wide flag; harmless without MPI and before finalizeMpiAtExit.
+void abortMpiAtExit();
+
+// True once abortMpiAtExit was called in this process.
+bool mpiAbortRequested();
 
 } // namespace rgpot
