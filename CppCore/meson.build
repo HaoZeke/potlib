@@ -285,6 +285,16 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
         link_with: _linkto,
         cpp_args: _args,
     )
+    if _mpi_dep.found()
+        # Not a meson test: run under mpirun (see the file header).
+        executable(
+            'time_calculator_share',
+            sources: ['examples/time_calculator_share.cc'],
+            dependencies: _deps + [vesin_dep, _mpi_dep] + fortran_rt_deps,
+            link_with: _linkto,
+            cpp_args: _args,
+        )
+    endif
     foreach example : example_array
         test(
             example.get(0),
