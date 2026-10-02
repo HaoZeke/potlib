@@ -31,9 +31,10 @@ public:
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /// The dlopen'd engine keeps global session state: serialize
-  /// process-wide.
+  /// process-wide. Every bound rank enters forceImpl, whose error
+  /// exchange is a collective on MPI_COMM_WORLD.
   [[nodiscard]] PotCaps caps() const noexcept override {
-    return {.reentrancy = Reentrancy::ProcessSerial};
+    return {.reentrancy = Reentrancy::ProcessSerial, .worldCollective = true};
   }
 
   /// FNV-1a over the serialized CPMDParams bytes plus kKernelVersion, so

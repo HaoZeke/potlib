@@ -700,6 +700,29 @@ if get_option('with_tests')
                 is_parallel: false,
                 suite: 'cpmd',
             )
+            if get_option('with_cache')
+                collective_cache = executable(
+                    'collective_cache_test',
+                    sources: ['tests/CollectiveCacheTest.cc'],
+                    dependencies: test_deps + [_mpi_dep],
+                    include_directories: _incdirs + ['.'],
+                    cpp_args: test_args,
+                    link_with: _linkto,
+                    link_language: 'cpp',
+                    build_rpath: _metatomic_build_rpath,
+                )
+                test(
+                    'CollectiveCache',
+                    find_program(
+                        meson.current_source_dir() / 'tests/collective_cache.sh',
+                    ),
+                    args: [collective_cache.full_path()],
+                    depends: [collective_cache],
+                    timeout: 60,
+                    is_parallel: false,
+                    suite: 'cpmd',
+                )
+            endif
         endif
         test(
             'ProfileLoaderTest',

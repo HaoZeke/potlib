@@ -272,4 +272,33 @@ bool mpiAbortRequested() {
   return g_abort_at_exit.load(std::memory_order_acquire);
 }
 
+int calculatorsAgree(unsigned char *flags, std::size_t n) {
+#ifdef RGPOT_HAS_MPI
+  int inited = 0;
+  int finalized = 0;
+  MPI_Initialized(&inited);
+  MPI_Finalized(&finalized);
+  if (!inited || finalized)
+    return 0;
+  int size = 1;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (!g_bound || g_group.index < 0 || g_group.world_size < 2 || size < 2)
+    return 0;
+  while (n > 0) {
+    const std::size_t chunk = n > static_cast<std::size_t>(INT_MAX)
+                                  ? static_cast<std::size_t>(INT_MAX)
+                                  : n;
+    MPI_Allreduce(MPI_IN_PLACE, flags, static_cast<int>(chunk),
+                  MPI_UNSIGNED_CHAR, MPI_LAND, MPI_COMM_WORLD);
+    flags += chunk;
+    n -= chunk;
+  }
+  return 1;
+#else
+  (void)flags;
+  (void)n;
+  return 0;
+#endif
+}
+
 } // namespace rgpot

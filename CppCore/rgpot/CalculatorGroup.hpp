@@ -84,4 +84,12 @@ void abortMpiAtExit();
 // True once abortMpiAtExit was called in this process.
 bool mpiAbortRequested();
 
+// Logical AND of flags[0..n) over every rank of MPI_COMM_WORLD, in place,
+// once calculators are bound across more than one rank: the condition
+// under which a worldCollective potential's force call is a collective.
+// Collective on MPI_COMM_WORLD in that case, and every rank must pass the
+// same n. Returns 1 when the flags were combined, 0 (flags untouched)
+// without MPI, before a split, or with a world of one rank.
+int calculatorsAgree(unsigned char *flags, std::size_t n);
+
 } // namespace rgpot
