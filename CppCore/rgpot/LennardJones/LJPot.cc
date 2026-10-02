@@ -55,31 +55,19 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   opt.cutoff = cuttOffR;
 
   const double psi2 = psi * psi;
-  double energyAcc = 0.0;
-  nlist::PairListCache::global().evaluate(
-      R, static_cast<std::size_t>(N), box, opt,
-      [&](int32_t i, int32_t j, double dx, double dy, double dz, double r2) {
+  const double fourU0 = 4.0 * u0;
+  const double shiftU = cuttOffU;
+  *U = nlist::PairListCache::global().accumulate(
+      R, static_cast<std::size_t>(N), box, opt, F,
+      [=](int32_t, int32_t, double r2) noexcept {
         const double invR2 = 1.0 / r2;
         const double sr2 = psi2 * invR2;
         const double a = sr2 * sr2 * sr2; // (psi/r)^6 without pow()
-        const double b = 4.0 * u0 * a;
-        energyAcc += b * (a - 1.0) - cuttOffU;
-
-        // -dU/dr / r along d = r_i - r_j, matching the historical loop's
-        // sign convention.
-        const double fscale = 6.0 * b * invR2 * (2.0 * a - 1.0);
-        const double fx = fscale * dx;
-        const double fy = fscale * dy;
-        const double fz = fscale * dz;
-
-        F[3 * i] += fx;
-        F[3 * i + 1] += fy;
-        F[3 * i + 2] += fz;
-        F[3 * j] -= fx;
-        F[3 * j + 1] -= fy;
-        F[3 * j + 2] -= fz;
+        const double b = fourU0 * a;
+        // -dU/dr / r: the force on i is fscale * (r_i - r_j).
+        return nlist::PairTerm{b * (a - 1.0) - shiftU,
+                               6.0 * b * invR2 * (2.0 * a - 1.0)};
       });
-  *U = energyAcc;
   return;
 }
 
