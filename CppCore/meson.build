@@ -285,6 +285,16 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
         link_with: _linkto,
         cpp_args: _args,
     )
+    if rpc_enabled
+        # Not a meson test: needs a running potserv (see the file header).
+        executable(
+            'time_rpc_call',
+            sources: ['examples/time_rpc_call.cc'],
+            link_with: [pot_bridge],
+            include_directories: _incdirs,
+            cpp_args: _args,
+        )
+    endif
     if _mpi_dep.found()
         # Not a meson test: run under mpirun (see the file header).
         executable(
