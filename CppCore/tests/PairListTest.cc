@@ -11,7 +11,9 @@
 #include <cmath>
 #include <cstdint>
 #include <random>
+#include <stdexcept>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <catch2/catch_all.hpp>
@@ -383,5 +385,80 @@ TEST_CASE("Pair forces equal minus the energy gradient", "[PairList]") {
     }
     const rgpot::ZBLPot pot;
     requireForcesAreMinusGradient(pot, R, types, box, 1e-6);
+  }
+}
+
+TEST_CASE("Quintic switch takes the pair term smoothly to zero",
+          "[PairList][switch]") {
+  const double rc = 8.5;
+  const double width = 2.0;
+  const rgpot::LJConfig base{.u0 = 0.0104, .cutoff = rc, .psi = 3.4};
+  rgpot::LJConfig swc = base;
+  swc.switch_width = width;
+  const rgpot::LJPot plain{base};
+  const rgpot::LJPot switched{swc};
+  const std::array<double, 9> box{40, 0, 0, 0, 40, 0, 0, 0, 40};
+  const std::vector<int> types{18, 18};
+
+  auto pair = [&](const rgpot::LJPot &pot, double r) {
+    const std::vector<double> R{10.0, 10.0, 10.0, 10.0 + r, 10.0, 10.0};
+    std::vector<double> F(6, 0.0);
+    rgpot::ForceInput fi{.nAtoms = 2,
+                         .pos = R.data(),
+                         .atmnrs = types.data(),
+                         .box = box.data()};
+    rgpot::ForceOut fo{.F = F.data(),
+                       .energy = 0.0,
+                       .variance = 0.0,
+                       .stress = {},
+                       .has_stress = 0};
+    pot.forceImpl(fi, &fo);
+    return std::pair<double, double>{fo.energy, F[3]};
+  };
+
+  // Below the switch the term is the unshifted LJ.
+  for (double r : {3.5, 4.0, 6.0, rc - width}) {
+    const double a = std::pow(3.4 / r, 6.0);
+    const double v = 4.0 * 0.0104 * a * (a - 1.0);
+    REQUIRE_THAT(pair(switched, r).first, WithinRel(v, 1e-13));
+  }
+  // Energy and force fall to zero at the cutoff, to the first order the
+  // C^2 switch promises: |E| and |F| shrink like (rc - r)^3 and (rc - r)^2.
+  const auto near = pair(switched, rc - 1e-3);
+  REQUIRE(std::abs(near.first) < 1e-9 * 0.0104 * 1e3);
+  REQUIRE(std::abs(near.second) < 1e-6 * 0.0104 * 1e3);
+  REQUIRE(pair(switched, rc + 1e-9).first == 0.0);
+  // The shifted truncation keeps a force jump at the cutoff.
+  REQUIRE(std::abs(pair(plain, rc - 1e-9).second) > 1e-5);
+
+  SECTION("forces equal minus the gradient inside the switch region") {
+    const double side = 22.0;
+    const std::array<double, 9> cell{side, 0, 0, 0, side, 0, 0, 0, side};
+    const auto R = randomPositions(24, 0.0, side, 3.2, 51);
+    requireForcesAreMinusGradient(switched, R, std::vector<int>(24, 18), cell,
+                                  1e-6);
+    rgpot::MorseConfig mc;
+    mc.switch_width = 2.5;
+    const rgpot::MorsePot morse{mc};
+    REQUIRE(morse.energyShift() == 0.0);
+    requireForcesAreMinusGradient(morse, randomPositions(24, 0.0, side, 2.4, 52),
+                                  std::vector<int>(24, 78), cell, 1e-6);
+    rgpot::LJClusterConfig cc{.u0 = 0.0104, .cutoff = 8.5, .psi = 3.4};
+    cc.switch_width = 1.5;
+    const rgpot::LJClusterPot cluster{cc};
+    requireForcesAreMinusGradient(cluster, randomPositions(24, 0.0, 12.0, 3.2, 53),
+                                  std::vector<int>(24, 18), cell, 1e-6);
+  }
+
+  SECTION("configuration") {
+    REQUIRE(rgpot::LJPot{base}.paramsKey() != switched.paramsKey());
+    rgpot::LJConfig zero = base;
+    zero.switch_width = 0.0;
+    REQUIRE(rgpot::LJPot{zero}.paramsKey() == rgpot::LJPot{base}.paramsKey());
+    rgpot::LJConfig bad = base;
+    bad.switch_width = -1.0;
+    REQUIRE_THROWS_AS(rgpot::LJPot{bad}, std::invalid_argument);
+    bad.switch_width = rc + 1.0;
+    REQUIRE_THROWS_AS(rgpot::LJPot{bad}, std::invalid_argument);
   }
 }

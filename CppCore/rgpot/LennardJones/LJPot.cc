@@ -32,6 +32,11 @@ namespace rgpot {
  * list, and one-shot evaluations run a single fused scan identical in pair
  * content to the historical per-call double loop.
  *
+ * With ``LJConfig::switch_width`` set, each pair term is the unshifted
+ * 12-6 energy times the C^2 quintic switch of PairSwitch.hpp, so energy,
+ * force and curvature reach zero at the cutoff; otherwise the energy is
+ * shifted to zero there and the force jumps.
+ *
  * @warning The box is assumed to be orthogonal.
  *
  */
@@ -57,7 +62,26 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   const double psi2 = psi * psi;
   const double fourU0 = 4.0 * u0;
   const double shiftU = cuttOffU;
-  *U = nlist::PairListCache::global().accumulate(
+  auto &pool = nlist::PairListCache::global();
+  if (m_config.switch_width != 0.0) {
+    // Unshifted pair term times the C^2 switch S; fscale = -(V S)' / r.
+    const QuinticSwitch sw = m_switch;
+    *U = pool.accumulate(
+        R, static_cast<std::size_t>(N), box, opt, F,
+        [=](int32_t, int32_t, double r2) noexcept {
+          const double invR2 = 1.0 / r2;
+          const double sr2 = psi2 * invR2;
+          const double a = sr2 * sr2 * sr2;
+          const double b = fourU0 * a;
+          const double v = b * (a - 1.0);
+          const double r = std::sqrt(r2);
+          const auto s = sw(r);
+          return nlist::PairTerm{
+              v * s.s, 6.0 * b * invR2 * (2.0 * a - 1.0) * s.s - v * s.dsdr / r};
+        });
+    return;
+  }
+  *U = pool.accumulate(
       R, static_cast<std::size_t>(N), box, opt, F,
       [=](int32_t, int32_t, double r2) noexcept {
         const double invR2 = 1.0 / r2;

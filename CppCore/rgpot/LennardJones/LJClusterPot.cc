@@ -28,7 +28,8 @@ namespace rgpot {
  * so the pair scan never folds a separation into the cell. A degenerate
  * input cell (any non-positive diagonal entry) is replaced by a 1e6
  * Angstrom cube, which keeps the pair list cacheable for callers that hand
- * over a cluster without a box.
+ * over a cluster without a box. ``LJClusterConfig::switch_width`` selects
+ * the C^2 quintic switch as for LJPot.
  */
 void LJClusterPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   const auto N = static_cast<long>(in.nAtoms);
@@ -58,7 +59,26 @@ void LJClusterPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   const double psi2 = psi * psi;
   const double fourU0 = 4.0 * u0;
   const double shiftU = cuttOffU;
-  *U = nlist::PairListCache::global().accumulate(
+  auto &pool = nlist::PairListCache::global();
+  if (m_config.switch_width != 0.0) {
+    // Unshifted pair term times the C^2 switch S; fscale = -(V S)' / r.
+    const QuinticSwitch sw = m_switch;
+    *U = pool.accumulate(
+        R, static_cast<std::size_t>(N), box_use, opt, F,
+        [=](int32_t, int32_t, double r2) noexcept {
+          const double invR2 = 1.0 / r2;
+          const double sr2 = psi2 * invR2;
+          const double a = sr2 * sr2 * sr2;
+          const double b = fourU0 * a;
+          const double v = b * (a - 1.0);
+          const double r = std::sqrt(r2);
+          const auto s = sw(r);
+          return nlist::PairTerm{
+              v * s.s, 6.0 * b * invR2 * (2.0 * a - 1.0) * s.s - v * s.dsdr / r};
+        });
+    return;
+  }
+  *U = pool.accumulate(
       R, static_cast<std::size_t>(N), box_use, opt, F,
       [=](int32_t, int32_t, double r2) noexcept {
         const double invR2 = 1.0 / r2;
