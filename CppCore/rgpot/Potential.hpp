@@ -192,10 +192,10 @@ public:
     // Cache Read
     if (_cache) {
       auto hit = _cache->find(key);
-      if (caps().worldCollective) {
+      if (caps().groupCollective) {
         // Every rank must agree before any skips the collective call.
         unsigned char have = hit ? 1 : 0;
-        calculatorsAgree(&have, 1);
+        calculatorAgree(&have, 1);
         if (!have) {
           hit.reset();
         }
@@ -277,14 +277,14 @@ public:
         keys.push_back(cacheKey(batch.in[i]));
         hits.push_back(_cache->find(keys[i]));
       }
-      if (caps().worldCollective) {
+      if (caps().groupCollective) {
         // One joint decision per system, so a system any rank misses is
         // computed on every rank.
         std::vector<unsigned char> have(batch.nSystems);
         for (size_t i = 0; i < batch.nSystems; ++i) {
           have[i] = hits[i] ? 1 : 0;
         }
-        calculatorsAgree(have.data(), have.size());
+        calculatorAgree(have.data(), have.size());
         for (size_t i = 0; i < batch.nSystems; ++i) {
           if (!have[i]) {
             hits[i].reset();

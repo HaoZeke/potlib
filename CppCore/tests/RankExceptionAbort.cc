@@ -43,12 +43,14 @@ void redirectRankLog(int rank) {
   std::setvbuf(stderr, nullptr, _IONBF, 0);
 }
 
+// Both ranks form one calculator; each fails its force call, and the
+// calculator's error exchange prints rank 0's message on rank 1 too.
 int runAbort() {
-  const rgpot::CalculatorGroup group = rgpot::bindCalculators(1);
+  const rgpot::CalculatorGroup group = rgpot::bindCalculators(2);
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   redirectRankLog(rank);
-  if (group.ranks != 1 || group.index < 0) {
+  if (group.ranks != 2 || group.index != 0) {
     std::fprintf(stderr, "bind failed index=%d ranks=%d\n", group.index,
                  group.ranks);
     MPI_Abort(MPI_COMM_WORLD, 2);
@@ -128,6 +130,51 @@ int runShareOk() {
   return 0;
 }
 
+// Four ranks as two calculators of two. Only calculator 0 gets a system
+// (an uneven batch), then every rank takes calculator 0's result from
+// shareFromCalculator. The force call's collectives stay inside
+// calculator 0, so calculator 1 waits in the share and nothing hangs.
+int runUneven() {
+  const rgpot::CalculatorGroup group = rgpot::bindCalculators(2);
+  rgpot::finalizeMpiAtExit();
+  int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  redirectRankLog(rank);
+  if (group.ranks != 2 || group.index < 0 || group.world_size != 4) {
+    std::fprintf(stderr, "bind failed index=%d ranks=%d\n", group.index,
+                 group.ranks);
+    MPI_Abort(MPI_COMM_WORLD, 2);
+  }
+  rgpot::CPMDPot pot;
+  if (!pot.available()) {
+    std::fprintf(stderr, "engine not loaded\n");
+    MPI_Abort(MPI_COMM_WORLD, 2);
+  }
+  std::array<double, 4> result{0.0, 0.0, 0.0, 0.0};
+  if (group.index == 0) {
+    double pos[3] = {0.0, 0.0, 0.0};
+    int atm = 8;
+    double box[9] = {20.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 20.0};
+    rgpot::ForceOut out{};
+    out.F = result.data() + 1;
+    const rgpot::ForceInput in{
+        .nAtoms = 1, .pos = pos, .atmnrs = &atm, .box = box};
+    pot.forceImpl(in, &out);
+    result[0] = out.energy;
+  }
+  const std::array<double, 4> mine = result;
+  if (rgpot::shareFromCalculator(0, result.data(), sizeof(result)) != 1) {
+    std::fprintf(stderr, "uneven share failed\n");
+    return 4;
+  }
+  if (group.index == 0 && result != mine) {
+    std::fprintf(stderr, "uneven share changed the owner's result\n");
+    return 4;
+  }
+  std::fprintf(stderr, "uneven ok %.6f\n", result[0]);
+  return 0;
+}
+
 int runOwner() {
   rgpot::bindCalculators(1);
   rgpot::finalizeMpiAtExit();
@@ -154,5 +201,7 @@ int main(int argc, char **argv) {
     return runShareBad();
   if (std::strcmp(mode, "share-ok") == 0)
     return runShareOk();
+  if (std::strcmp(mode, "uneven") == 0)
+    return runUneven();
   return runAbort();
 }

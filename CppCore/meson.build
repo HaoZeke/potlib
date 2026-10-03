@@ -659,6 +659,16 @@ if get_option('with_tests')
                 suite: 'cpmd',
             )
             test(
+                'CalculatorUnevenBatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'uneven'],
+                env: cpmdc_fake_env,
+                depends: [cpmdc_fake_engine, rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
                 'RankExceptionFinalizeOwner',
                 rank_exception_sh,
                 args: [rank_exception.full_path(), 'finalize-owner'],

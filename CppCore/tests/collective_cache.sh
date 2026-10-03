@@ -1,5 +1,5 @@
 #!/bin/sh
-# Launch CollectiveCacheTest on two ranks under a 30 s bound: a hang in
+# Launch CollectiveCacheTest on four ranks under a 30 s bound: a hang in
 # the potential's collective shows up as the timeout's status 124.
 set -eu
 if [ "$#" -ne 1 ]; then
@@ -25,7 +25,7 @@ elif printf '%s\n' "$help" | grep -q oversubscribe; then
 fi
 if command -v timeout >/dev/null 2>&1; then
   # shellcheck disable=SC2086
-  exec timeout 30 "$LAUNCH" -n 2 $OVER "$EXE"
+  exec timeout 30 "$LAUNCH" -n 4 $OVER "$EXE"
 fi
 # shellcheck disable=SC2086
-exec "$LAUNCH" -n 2 $OVER "$EXE"
+exec "$LAUNCH" -n 4 $OVER "$EXE"

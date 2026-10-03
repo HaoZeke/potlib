@@ -228,38 +228,47 @@ void abortWithLocal(int rank, const std::string &message) {
 }
 #endif
 
-// When more than one calculator rank is bound, every rank enters this
-// call from forceImpl. A non-empty message is printed on every rank,
-// then MPI_Abort runs on MPI_COMM_WORLD.
+// Every rank of the calling calculator enters this call from forceImpl,
+// and only those ranks: a host evaluating an uneven batch calls forceImpl
+// on some calculators and not on others, so the exchange stays on the
+// calculator's own communicator. A non-empty message is printed on every
+// rank of that calculator, then MPI_Abort runs on MPI_COMM_WORLD, which
+// takes the idle calculators down too.
 void publishForceError(const std::string &message) {
 #ifdef RGPOT_HAS_MPI
   int inited = 0;
   MPI_Initialized(&inited);
   if (!inited)
     return;
-  int rank = 0;
-  int size = 1;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if (calculatorWorldSize() < 2 || size < 2 || thisCalculator().index < 0) {
+  int world_rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  const CalculatorGroup &group = thisCalculator();
+  MPI_Comm comm = MPI_COMM_NULL;
+  if (group.index < 0 || group.ranks < 2 ||
+      calculatorComm(&comm, sizeof(comm)) != 1 || comm == MPI_COMM_NULL) {
     if (!message.empty())
-      abortWithLocal(rank, message);
+      abortWithLocal(world_rank, message);
     return;
   }
+  int size = 1;
+  MPI_Comm_size(comm, &size);
+  // Group rank r of calculator g is world rank g * ranks + r
+  // (bindCalculators splits by rank / ranks, keyed by rank % ranks).
+  const int world_base = group.index * group.ranks;
 
   const int local_n = static_cast<int>(
       std::min(message.size(), static_cast<std::size_t>(kForceErrorCap)));
   std::vector<int> counts(static_cast<std::size_t>(size), 0);
   MPI_Request req = MPI_REQUEST_NULL;
-  if (MPI_Iallgather(&local_n, 1, MPI_INT, counts.data(), 1, MPI_INT,
-                     MPI_COMM_WORLD, &req) != MPI_SUCCESS) {
-    abortWithLocal(rank, message);
+  if (MPI_Iallgather(&local_n, 1, MPI_INT, counts.data(), 1, MPI_INT, comm,
+                     &req) != MPI_SUCCESS) {
+    abortWithLocal(world_rank, message);
     return;
   }
   if (message.empty()) {
     MPI_Wait(&req, MPI_STATUS_IGNORE);
   } else if (!waitRequest(&req, kForceErrorWaitS)) {
-    abortWithLocal(rank, message);
+    abortWithLocal(world_rank, message);
     return;
   }
 
@@ -287,14 +296,14 @@ void publishForceError(const std::string &message) {
   }
   req = MPI_REQUEST_NULL;
   if (MPI_Iallgather(send.data(), max_n, MPI_CHAR, recv.data(), max_n, MPI_CHAR,
-                     MPI_COMM_WORLD, &req) != MPI_SUCCESS) {
-    abortWithLocal(rank, message);
+                     comm, &req) != MPI_SUCCESS) {
+    abortWithLocal(world_rank, message);
     return;
   }
   if (message.empty()) {
     MPI_Wait(&req, MPI_STATUS_IGNORE);
   } else if (!waitRequest(&req, kForceErrorWaitS)) {
-    abortWithLocal(rank, message);
+    abortWithLocal(world_rank, message);
     return;
   }
 
@@ -305,7 +314,7 @@ void publishForceError(const std::string &message) {
     const int show = count < max_n ? count : max_n;
     const std::size_t offset =
         static_cast<std::size_t>(src) * static_cast<std::size_t>(max_n);
-    std::fprintf(stderr, "rgpot rank %d: %.*s\n", src, show,
+    std::fprintf(stderr, "rgpot rank %d: %.*s\n", world_base + src, show,
                  recv.data() + offset);
   }
   std::fflush(stderr);

@@ -25,7 +25,9 @@ The same abort runs when one rank leaves =CPMDPot::forceImpl= by an exception.
 =MPI_Finalize= at process exit runs when =bindCalculators= called =MPI_Init=.
 A host that called =MPI_Init= finalizes itself.
 
-=CPMDPot= reports =PotCaps::worldCollective=: once calculators are bound across more than one rank, every rank enters each of its force calls together.
-For such a potential the result cache decides hit or miss jointly, through =calculatorsAgree= (a logical AND over =MPI_COMM_WORLD=).
-A geometry that any rank misses is computed on every rank, so no rank waits alone inside the call.
+=CPMDPot= reports =PotCaps::groupCollective=: every rank of a calculator enters each of its force calls together, and the call's collectives stay on that calculator's communicator.
+A host may hand calculators an uneven batch, with some calculators making no call at all, and then share results with =shareFromCalculator=.
+A failure inside the call prints on every rank of the failing calculator, then =MPI_Abort= on =MPI_COMM_WORLD= ends the run.
+For such a potential the result cache decides hit or miss jointly, through =calculatorAgree= (a logical AND over the calculator's communicator).
+A geometry that any rank of the calculator misses is computed on all of its ranks, so no rank waits alone inside the call.
 Give each rank its own cache directory: RocksDB locks a directory to one process.

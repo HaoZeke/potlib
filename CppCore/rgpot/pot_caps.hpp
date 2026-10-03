@@ -40,12 +40,13 @@ struct PotCaps {
   bool batched = false;
   /// Kernel supports periodic boundary conditions.
   bool periodic = true;
-  /// Once calculators are bound across more than one rank, every rank of
-  /// MPI_COMM_WORLD enters each force call together (an MPI engine whose
-  /// call runs collectives on the world). The result cache then takes its
-  /// hit-or-miss decision jointly over the world: a hit on one rank and a
-  /// miss on another would leave the missing rank alone in a collective.
-  bool worldCollective = false;
+  /// Every rank of a calculator group enters each force call together (an
+  /// MPI engine whose call runs collectives on the group's communicator).
+  /// The result cache then takes its hit-or-miss decision jointly over the
+  /// group: a hit on one rank and a miss on another would leave the missing
+  /// rank alone in a collective. Other groups take no part, so a host may
+  /// hand groups uneven batches.
+  bool groupCollective = false;
 };
 
 } // namespace rgpot
