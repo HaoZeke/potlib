@@ -32,13 +32,13 @@ fortran_pots_sources = files(
     'rgpot_lenosky.f90',
     'rgpot_lenosky_capi.f90',
     'rgpot_neighbors.f90',
-    'rgpot_workspace.f90',
     'rgpot_sw.f90',
     'rgpot_sw_capi.f90',
     'rgpot_tersoff.f90',
     'rgpot_tersoff_capi.f90',
     'rgpot_water_h.f90',
     'rgpot_water_h_capi.f90',
+    'rgpot_workspace.f90',
 )
 
 # C++ faces over the bind(c) entries.
