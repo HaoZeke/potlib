@@ -23,17 +23,19 @@ public:
   CPMDPot(const CPMDPot &) = delete;
   CPMDPot &operator=(const CPMDPot &) = delete;
 
-  /// When a calculator group is bound and calculatorWorldSize() is
-  /// greater than 1, every rank enters this call. The call fills
-  /// ForceOut on the rank that calls it. A failure is printed on every
-  /// rank in the call, then MPI_Abort runs on MPI_COMM_WORLD, and then
-  /// the exception leaves the call.
+  /// Every rank of the calling calculator enters this call together; other
+  /// calculators need not (a host may give them no system in a batch).
+  /// The call fills ForceOut on the rank that calls it. A failure is
+  /// printed on every rank of the calculator, then MPI_Abort runs on
+  /// MPI_COMM_WORLD, and then the exception leaves the call.
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /// The dlopen'd engine keeps global session state: serialize
-  /// process-wide.
+  /// process-wide. Every rank of a calculator enters forceImpl together:
+  /// the engine's SCF and the error exchange are collectives on the
+  /// calculator's communicator.
   [[nodiscard]] PotCaps caps() const noexcept override {
-    return {.reentrancy = Reentrancy::ProcessSerial};
+    return {.reentrancy = Reentrancy::ProcessSerial, .groupCollective = true};
   }
 
   /// FNV-1a over the serialized CPMDParams bytes plus kKernelVersion, so

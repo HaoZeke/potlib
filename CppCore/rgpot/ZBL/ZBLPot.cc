@@ -211,12 +211,12 @@ void ZBLPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 
   const double rInner = cut_inner;
   const double rInnerSq = cut_inner_sq;
-  double energyAcc = 0.0;
-  nlist::PairListCache::global().evaluate(
-      R, static_cast<std::size_t>(N), box_use, opt,
-      [&](int32_t i, int32_t j, double dx, double dy, double dz, double r2) {
-        const std::size_t ti = static_cast<std::size_t>(typeIdx[i]);
-        const std::size_t tj = static_cast<std::size_t>(typeIdx[j]);
+  const int *types = typeIdx.data();
+  *U = nlist::PairListCache::global().accumulate(
+      R, static_cast<std::size_t>(N), box_use, opt, F,
+      [&](int32_t i, int32_t j, double r2) noexcept {
+        const auto ti = static_cast<std::size_t>(types[i]);
+        const auto tj = static_cast<std::size_t>(types[j]);
         const ZblPairCoeffs &p = coeffs[ti * nTypes + tj];
 
         const double r = std::sqrt(r2);
@@ -227,22 +227,9 @@ void ZBLPot::forceImpl(const ForceInput &in, ForceOut *out) const {
           energy_pair += t * t * t * (p.sw3 + p.sw4 * t);
           dEdr += t * t * (p.sw1 + p.sw2 * t);
         }
-        energyAcc += energy_pair;
-
-        // -dU/dr / r along d = r_i - r_j.
-        const double fscale = -dEdr / r;
-        const double fx = fscale * dx;
-        const double fy = fscale * dy;
-        const double fz = fscale * dz;
-
-        F[3 * i] += fx;
-        F[3 * i + 1] += fy;
-        F[3 * i + 2] += fz;
-        F[3 * j] -= fx;
-        F[3 * j + 1] -= fy;
-        F[3 * j + 2] -= fz;
+        // -dU/dr / r: the force on i is fscale * (r_i - r_j).
+        return nlist::PairTerm{energy_pair, -dEdr / r};
       });
-  *U = energyAcc;
 }
 
 } // namespace rgpot

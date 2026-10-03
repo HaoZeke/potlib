@@ -21,9 +21,9 @@
 typedef struct DLManagedTensorVersioned DLManagedTensorVersioned;
 #endif
 
-#define RGPOT_VERSION "3.3.0"
+#define RGPOT_VERSION "3.4.0"
 #define RGPOT_VERSION_MAJOR 3
-#define RGPOT_VERSION_MINOR 3
+#define RGPOT_VERSION_MINOR 4
 #define RGPOT_VERSION_PATCH 0
 
 /**
@@ -468,6 +468,28 @@ enum rgpot_status_t rgpot_rpc_calculate(rgpot_rpc_client_t *client,
  */
 void rgpot_rpc_client_free(rgpot_rpc_client_t *client);
 #endif
+
+/**
+ * Full version string of the loaded library, e.g. `"3.4.0"`.
+ *
+ * The pointer refers to static storage: never free it.
+ */
+const char *rgpot_version(void);
+
+/**
+ * Major version of the loaded library.
+ */
+uint32_t rgpot_version_major(void);
+
+/**
+ * Minor version of the loaded library.
+ */
+uint32_t rgpot_version_minor(void);
+
+/**
+ * Patch version of the loaded library.
+ */
+uint32_t rgpot_version_patch(void);
 
 #if defined(RGPOT_HAS_RPC)
 /**

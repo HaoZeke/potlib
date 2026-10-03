@@ -69,6 +69,36 @@ if [ "$mode" = "abort" ]; then
   exit 0
 fi
 
+if [ "$mode" = "uneven" ]; then
+  out=$(mktemp -d)
+  trap 'rm -rf "$out"' EXIT
+  export RGPOT_RANK_LOG_DIR="$out"
+  rc=0
+  set +e
+  if printf '%s\n' "$help" | grep -q -- '--oversubscribe'; then
+    run_bounded "$launcher" -n 4 --oversubscribe \
+      -x RGPOT_RANK_LOG_DIR -x RGPOT_CPMD_ENGINE \
+      "$exe" uneven
+  else
+    run_bounded "$launcher" -n 4 "$exe" uneven
+  fi
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    echo "uneven batch status $rc (124 is the 30 s hang bound)" >&2
+    cat "$out"/rank-*.log >&2 || true
+    exit 1
+  fi
+  for rank in 0 1 2 3; do
+    if ! grep -q 'uneven ok' "$out/rank-$rank.log"; then
+      echo "rank $rank did not finish the uneven batch" >&2
+      cat "$out"/rank-*.log >&2 || true
+      exit 1
+    fi
+  done
+  exit 0
+fi
+
 if [ "$mode" = "share-bad" ] || [ "$mode" = "share-ok" ]; then
   out=$(mktemp -d)
   trap 'rm -rf "$out"' EXIT
