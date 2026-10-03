@@ -10,9 +10,9 @@
 // linked-cell scan from cell_visit.hpp once the box holds enough cells
 // (O(n) per search), and with the fused brute-force scan from
 // vesin_visit.hpp below that (O(n^2), cheaper for a handful of cells).
-// Both report the same pair set. Outside the MIC regime every call runs
-// the brute-force eval-only scan, which reproduces the historical per-call
-// MIC loop exactly, so behaviour never degrades below the uncached code.
+// Both report the same pair set. Outside the cached regime every call
+// performs a brute-force scan. Nonorthogonal cells use the full lattice
+// minimum image; orthorhombic cells retain the componentwise fold.
 //
 // Design invariants (see the eOn failure analysis for the derivation):
 // - Slots are immutable after build and handed out as shared_ptr, so
@@ -39,6 +39,7 @@
 #include <mutex>
 #include <vector>
 
+#include "rgpot/nlist/MinimumImage.hpp"
 #include "rgpot/nlist/cell_visit.hpp"
 #include "rgpot/nlist/vesin_visit.hpp"
 
@@ -60,7 +61,7 @@ class CachedPairList {
 public:
   /// How evaluation turns r_i - r_j into the minimum image: no fold (free
   /// boundaries), a per-call rounding fold, or a shift recorded at build.
-  enum class FoldMode : uint8_t { None, Round, Coded };
+  enum class FoldMode : uint8_t { None, Round, Coded, General };
 
   struct Options {
     double cutoff{0.0};
@@ -115,7 +116,9 @@ public:
     auto flip = [&](int32_t i, int32_t j, double dx, double dy, double dz,
                     double r2) { fn(i, j, -dx, -dy, -dz, r2); };
     CellGrid grid;
-    if (mic_ && grid.build(R, n, w, inv, opt.cutoff)) {
+    if (general_) {
+      generalVisit(R, n, -1.0, opt.cutoff * opt.cutoff, flip);
+    } else if (mic_ && grid.build(R, n, w, inv, opt.cutoff)) {
       cell_visit<false>(grid, R, w, inv, HUGE_VAL, opt.cutoff * opt.cutoff,
                         pairsIJ_, flip);
     } else {
@@ -143,7 +146,9 @@ public:
                     double r2) { fn(i, j, -dx, -dy, -dz, r2); };
     CellGrid grid;
     const bool cells = mic_ && grid.build(R, n, w, inv, bc);
-    if (cells) {
+    if (general_) {
+      generalVisit(R, n, bc * bc, opt.cutoff * opt.cutoff, flip);
+    } else if (cells) {
       cell_visit<true>(grid, R, w, inv, bc * bc, opt.cutoff * opt.cutoff,
                        pairsIJ_, flip);
     } else {
@@ -175,7 +180,9 @@ public:
     auto none = [](int32_t, int32_t, double, double, double, double) {};
     CellGrid grid;
     const bool cells = mic_ && grid.build(R, n, w, inv, opt.cutoff);
-    if (cells) {
+    if (general_) {
+      generalVisit(R, n, std::nextafter(c2, HUGE_VAL), -1.0, none);
+    } else if (cells) {
       cell_visit<true>(grid, R, w, inv, std::nextafter(c2, HUGE_VAL), -1.0,
                        pairsIJ_, none);
     } else {
@@ -220,6 +227,9 @@ public:
     case FoldMode::Coded:
       forEachImpl<FoldMode::Coded>(R, fn);
       break;
+    case FoldMode::General:
+      forEachImpl<FoldMode::General>(R, fn);
+      break;
     }
   }
 
@@ -239,6 +249,8 @@ public:
       return accumulateImpl<FoldMode::Round>(R, F, kernel, observe);
     case FoldMode::Coded:
       return accumulateImpl<FoldMode::Coded>(R, F, kernel, observe);
+    case FoldMode::General:
+      return accumulateImpl<FoldMode::General>(R, F, kernel, observe);
     }
     return 0.0;
   }
@@ -307,9 +319,34 @@ private:
     return energy;
   }
 
+  template <typename Fn>
+  void generalVisit(const double *R, std::size_t n, double listCutoff2,
+                    double visitCutoff2, Fn &fn) {
+    pairsIJ_.clear();
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        double dx = R[3 * j] - R[3 * i];
+        double dy = R[3 * j + 1] - R[3 * i + 1];
+        double dz = R[3 * j + 2] - R[3 * i + 2];
+        generalImage_.fold(dx, dy, dz);
+        const double r2 = dx * dx + dy * dy + dz * dz;
+        if (r2 < listCutoff2) {
+          pairsIJ_.push_back(static_cast<int32_t>(i));
+          pairsIJ_.push_back(static_cast<int32_t>(j));
+        }
+        if (r2 <= visitCutoff2)
+          fn(static_cast<int32_t>(i), static_cast<int32_t>(j), dx, dy, dz, r2);
+      }
+    }
+  }
+
   void setup(std::size_t n, const double *box, const Options &opt) {
     const bool orthorhombic = box[1] == 0.0 && box[2] == 0.0 && box[3] == 0.0 &&
                               box[5] == 0.0 && box[6] == 0.0 && box[7] == 0.0;
+    general_ = !orthorhombic &&
+               (opt.periodic[0] || opt.periodic[1] || opt.periodic[2]);
+    if (general_)
+      generalImage_ = MinimumImage(box, opt.periodic);
     // The atom cap bounds the brute-force list build; a fully periodic box
     // that the linked-cell scan can serve needs no cap.
     mic_ = orthorhombic && (n <= 20000 || cellGridFits(n, box, opt));
@@ -402,7 +439,10 @@ private:
     }
     pairsIJ_.clear();
     pairsIJ_.shrink_to_fit();
-    if (codes) {
+    if (general_) {
+      code_.clear();
+      fold_ = FoldMode::General;
+    } else if (codes) {
       buildImageCodes();
     } else {
       code_.clear();
@@ -479,6 +519,7 @@ private:
     double inv[3];
     const uint8_t *code;
     const double *shift;
+    const MinimumImage *general;
 
     template <FoldMode M>
     void apply(const double *R, std::size_t i, std::size_t j, std::size_t p,
@@ -486,7 +527,9 @@ private:
       dx = R[3 * i] - R[3 * j];
       dy = R[3 * i + 1] - R[3 * j + 1];
       dz = R[3 * i + 2] - R[3 * j + 2];
-      if constexpr (M == FoldMode::Coded) {
+      if constexpr (M == FoldMode::General) {
+        general->fold(dx, dy, dz);
+      } else if constexpr (M == FoldMode::Coded) {
         const double *sh = shift + 3 * static_cast<std::size_t>(code[p]);
         dx -= sh[0];
         dy -= sh[1];
@@ -504,7 +547,8 @@ private:
                 {boxref_[0], boxref_[4], boxref_[8]},
                 {micInv_[0], micInv_[1], micInv_[2]},
                 code_.data(),
-                shift_.data()};
+                shift_.data(),
+                &generalImage_};
   }
 
   std::vector<int32_t> pairsIJ_;   //!< Scan output, (a, b) flat; build only.
@@ -518,6 +562,8 @@ private:
   Options opt_{};
   std::size_t n_{0};
   FoldMode fold_{FoldMode::None};
+  MinimumImage generalImage_;
+  bool general_{false};
   bool mic_{false};
   bool phantom_{false};
   bool complete_{false};

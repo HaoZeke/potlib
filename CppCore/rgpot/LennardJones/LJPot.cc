@@ -27,7 +27,7 @@ namespace rgpot {
  * @details
  *
  * Pairwise interactions within the cutoff radius, minimum image convention
- * on an orthogonal box. Pairs come from the shared
+ * with the full cell. Pairs come from the shared
  * ``rgpot::nlist::PairListCache`` (the eOn PairListCache design): repeated
  * evaluations on nearby geometries reuse a Verlet-skin cached candidate
  * list, and one-shot evaluations run a single fused scan identical in pair
@@ -37,8 +37,6 @@ namespace rgpot {
  * 12-6 energy times the C^2 quintic switch of PairSwitch.hpp, so energy,
  * force and curvature reach zero at the cutoff; otherwise the energy is
  * shifted to zero there and the force jumps.
- *
- * @warning The box is assumed to be orthogonal.
  *
  */
 void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
