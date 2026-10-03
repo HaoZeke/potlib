@@ -60,9 +60,7 @@ static_assert(offsetof(CPMDCStressTensor, values) == 8,
 
 AdoptCommFn g_cpmd_adopt = nullptr;
 
-int cpmd_calculator_hook(int) {
-  return adoptCalculatorComm(g_cpmd_adopt);
-}
+int cpmd_calculator_hook(int) { return adoptCalculatorComm(g_cpmd_adopt); }
 
 struct ParamsView {
   const void *data = nullptr;
@@ -150,8 +148,8 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
 
   b.energy_gradient =
       b.engine_lib.sym_optional<EnergyGradientFn>("cpmdc_energy_gradient");
-  const auto adopt_comm = b.engine_lib.sym_optional<AdoptCommFn>(
-      "cpmdc_adopt_calculator_comm");
+  const auto adopt_comm =
+      b.engine_lib.sym_optional<AdoptCommFn>("cpmdc_adopt_calculator_comm");
   b.set_params = b.engine_lib.sym_optional<SetParamsFn>("cpmdc_set_params");
   b.session_create =
       b.engine_lib.sym_optional<SessionCreateFn>("cpmdc_session_create");

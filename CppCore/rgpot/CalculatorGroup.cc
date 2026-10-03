@@ -34,9 +34,7 @@ std::mutex g_load_mu;
 std::atomic<const rgpot_mpi_api_t *> g_api{nullptr};
 std::string g_load_error;
 
-const rgpot_mpi_api_t *api() {
-  return g_api.load(std::memory_order_acquire);
-}
+const rgpot_mpi_api_t *api() { return g_api.load(std::memory_order_acquire); }
 
 int abortRequested() {
   return g_abort_at_exit.load(std::memory_order_acquire) ? 1 : 0;
@@ -62,8 +60,8 @@ const rgpot_mpi_api_t *openLibrary(const std::string &path) {
     g_load_error = why ? why : ("cannot open " + path);
     return nullptr;
   }
-  auto fn = reinterpret_cast<rgpot_mpi_api_fn>(
-      dlsym(handle, RGPOT_MPI_API_SYMBOL));
+  auto fn =
+      reinterpret_cast<rgpot_mpi_api_fn>(dlsym(handle, RGPOT_MPI_API_SYMBOL));
   if (fn == nullptr) {
     g_load_error = path + " lacks " RGPOT_MPI_API_SYMBOL;
     return nullptr;

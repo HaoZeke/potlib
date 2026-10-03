@@ -60,10 +60,11 @@ int main(int argc, char **argv) {
     const bool available = rgpot::CPMDPot::probe_available();
     const auto group = rgpot::bindCalculators(2);
     const int splits = profile ? split_count(&profile) - before : -1;
-    std::printf("adopt-probe rank %d available %d index %d splits %d\n",
-                rank, available, group.index, splits);
-    const int rc = (available && profile && group.index == rank / 2 &&
-                    splits == 1) ? 0 : 7;
+    std::printf("adopt-probe rank %d available %d index %d splits %d\n", rank,
+                available, group.index, splits);
+    const int rc =
+        (available && profile && group.index == rank / 2 && splits == 1) ? 0
+                                                                         : 7;
     MPI_Finalize();
     return rc;
   }
@@ -83,8 +84,7 @@ int main(int argc, char **argv) {
 
   if (std::strcmp(mode, "missing") == 0) {
     const int idx = rgpot::CPMDPot::bindCalculators(1);
-    const int splits =
-        profile ? split_count(&profile) - splits_at_init : -1;
+    const int splits = profile ? split_count(&profile) - splits_at_init : -1;
     std::printf("adopt-missing rank %d %d splits %d\n", rank, idx, splits);
     const int rc = (profile && idx == -1 && splits == 0) ? 0 : 4;
     MPI_Finalize();
@@ -97,18 +97,20 @@ int main(int argc, char **argv) {
     const int idx = rgpot::CPMDPot::bindCalculators(2);
     const int repeated = rgpot::CPMDPot::bindCalculators(2);
     const int splits = profile ? split_count(&profile) - splits_at_init : -1;
-    std::printf("adopt-refused rank %d index %d repeated %d hooks %d splits %d\n",
-                rank, idx, repeated, hook_calls, splits);
+    std::printf(
+        "adopt-refused rank %d index %d repeated %d hooks %d splits %d\n", rank,
+        idx, repeated, hook_calls, splits);
     const int rc = (profile && idx == -1 && repeated == -1 && hook_calls == 2 &&
-                    splits == 1) ? 0 : 6;
+                    splits == 1)
+                       ? 0
+                       : 6;
     MPI_Finalize();
     return rc;
   }
 
   if (std::strcmp(mode, "split") == 0) {
     const int idx = rgpot::CPMDPot::bindCalculators(2);
-    const int splits =
-        profile ? split_count(&profile) - splits_at_init : -1;
+    const int splits = profile ? split_count(&profile) - splits_at_init : -1;
     MPI_Comm mine = MPI_COMM_NULL;
     const int got = rgpot::calculatorComm(&mine, sizeof(mine));
     using AdoptedFn = int (*)(void *, std::size_t);
