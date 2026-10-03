@@ -12,6 +12,14 @@ Stages:
   3. torch.export
   4. AOTInductor .pt2
   5. Load .pt2 in-process and compare again
+
+torch.export tries dynamic-nonstrict (single system only), static-nonstrict
+and static-strict, then falls back to make_fx(tracing_mode="real") followed by
+a nonstrict export of the traced module. With torch 2.13 and fairchem-core
+2.23 every UMA export takes the fallback. The fallback package is static: it
+accepts only the traced atom count and edge count, so pass --molecular-box
+for anything that moves (every intramolecular pair is then an edge). The path
+taken is embedded as export_path.
 """
 
 from __future__ import annotations
@@ -975,16 +983,24 @@ def main() -> int:
         attempts.insert(0, ("dynamic-nonstrict",
                             dict(dynamic_shapes=dyn, strict=False)))
     last = None
+    export_path = ""
     for attempt, kwargs in attempts:
         try:
             print("try export", attempt, flush=True)
             exported = torch.export.export(wrap, example, **kwargs)
             print("export ok", attempt, type(exported), flush=True)
+            export_path = attempt
             break
         except Exception as exc:
             last = exc
             print(f"{attempt} failed: {type(exc).__name__}: {exc}", flush=True)
     if exported is None:
+        # torch 2.13 with fairchem-core 2.23 lands here for every UMA
+        # export: the nonstrict exports fail on a fake tensor in the
+        # exported program's constants and the strict export on
+        # torch.autograd.grad. Real-mode make_fx records the concrete
+        # example shapes, so the package is static: atom count and edge
+        # count are those of the traced geometry.
         print("try make_fx(tracing_mode=real)", flush=True)
         from torch.fx.experimental.proxy_tensor import make_fx
 
@@ -993,12 +1009,23 @@ def main() -> int:
         try:
             exported = torch.export.export(gm, example, strict=False)
             print("export ok make_fx-nonstrict", type(exported), flush=True)
+            export_path = "make_fx-nonstrict"
         except Exception as exc:
             last = exc
             print(f"make_fx export failed: {type(exc).__name__}: {exc}", flush=True)
             raise last from exc
 
     print("export ok", type(exported), flush=True)
+    meta["export_path"] = export_path
+    if export_path == "make_fx-nonstrict" and not (
+        args.molecular_box and args.molecular_box > 0.0
+    ):
+        print(
+            f"WARNING: static package without --molecular-box: every call "
+            f"must produce exactly {example[4].shape[1]} vesin edges, so a "
+            f"geometry that moves a pair across the {cutoff} A cutoff aborts",
+            flush=True,
+        )
     with torch.enable_grad():
         e_x, f_x = exported.module()(*example)
     if not compare_batched("exported", e_x.detach().cpu(), f_x.detach().cpu().numpy(), e_ref, f_ref, len(atoms)):

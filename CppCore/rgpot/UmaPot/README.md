@@ -24,7 +24,7 @@ package is read.
 | `task_name`, `charge`, `spin` | must equal `UmaConfig` |
 | `z_set`, `natoms`, `counts` | must match the input atoms |
 | `label`, `shapes`, `inputs`, `outputs` | recorded |
-| `model`, `torch_version`, `fairchem_version` | recorded |
+| `model`, `torch_version`, `fairchem_version`, `export_path` | recorded |
 
 `UmaConfig.cutoff` / `max_neighbors` are defaults. The embedded
 values win when present.
@@ -50,6 +50,18 @@ C2H2 from C2H4.
 `scripts/export_baker_uma_aoti.py` walks Baker endpoints and
 deduplicates by exact composition (atom count per element), charge
 and spin.
+
+## Export path
+
+`export_uma_aoti.py` tries `torch.export` (dynamic nonstrict, static
+nonstrict, static strict) and falls back to
+`make_fx(tracing_mode="real")` plus a nonstrict export of the traced
+module. With torch 2.13 and fairchem-core 2.23 every UMA export takes
+the fallback, and `export_path` reads `make_fx-nonstrict`. That
+package is static in atom count and edge count, so export with
+`--molecular-box` (complete intramolecular graph, `n(n-1)` edges at
+every geometry). Without it the exporter warns: a geometry that moves
+a pair across the cutoff changes the edge count and the call fails.
 
 ## potserv
 
