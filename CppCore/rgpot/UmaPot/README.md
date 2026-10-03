@@ -48,7 +48,8 @@ exporter. Older packages get the `z_set` check, which cannot tell
 C2H2 from C2H4.
 
 `scripts/export_baker_uma_aoti.py` walks Baker endpoints and
-deduplicates by `(z_set, charge, spin)`.
+deduplicates by exact composition (atom count per element), charge
+and spin.
 
 ## potserv
 

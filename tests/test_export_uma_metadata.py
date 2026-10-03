@@ -57,3 +57,35 @@ def test_runtime_metadata_carries_the_contract():
     assert meta["torch_version"] == torch.__version__
     assert isinstance(meta["fairchem_version"], str)
     assert meta["fairchem_version"]
+
+
+def test_baker_dedup_keeps_compositions_that_share_an_element_set(
+    tmp_path, monkeypatch
+):
+    import export_baker_uma_aoti as baker
+
+    structures = {
+        "01_c2h2": "C2H2",
+        "02_c2h4": "C2H4",
+        "03_h2cc": "H2C2",
+        "04_ch3o": "CH3O",
+        "05_ch3o_closed": "CH3O",
+    }
+    for label in structures:
+        (tmp_path / label).mkdir()
+        (tmp_path / label / "reactant.con").write_text("")
+
+    def fake_load(path):
+        formula = structures[Path(path).parent.name]
+        n = len(ase.Atoms(formula))
+        return ase.Atoms(formula, positions=[[0, 0, i] for i in range(n)])
+
+    monkeypatch.setattr(baker, "load_atoms", fake_load)
+    jobs = baker.collect_jobs(tmp_path)
+    labels = [j["label"] for j in jobs]
+    # C2H2 and C2H4 share z_set [1, 6] and are different packages; H2C2
+    # is C2H2 again. CH3O doublet and singlet differ in spin.
+    assert labels == ["01_c2h2", "02_c2h4", "04_ch3o", "05_ch3o_closed"]
+    assert jobs[0]["counts"] == {1: 2, 6: 2}
+    assert jobs[1]["counts"] == {1: 4, 6: 2}
+    assert jobs[1]["z_set"] == [1, 6]
