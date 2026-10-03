@@ -272,6 +272,10 @@ endif()
 # --- Tests ---
 if(RGPOT_BUILD_TESTS)
   enable_testing()
+  add_executable(MolecularFrameTest CppCore/tests/MolecularFrameTest.cc)
+  target_include_directories(MolecularFrameTest PRIVATE CppCore)
+  target_compile_features(MolecularFrameTest PRIVATE cxx_std_20)
+  add_test(NAME MolecularFrameTest COMMAND MolecularFrameTest)
   find_package(Catch2 3 REQUIRED)
 
   if(RGPOT_RPC_CLIENT_ONLY)
