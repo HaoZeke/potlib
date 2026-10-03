@@ -248,6 +248,13 @@ if(RGPOT_IS_TOP_LEVEL)
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
       INCLUDES
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    if(TARGET rgpot_mpi)
+      install(TARGETS rgpot_mpi
+              LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+              RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
+    install(FILES CppCore/rgpot/calculator_mpi_abi.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgpot)
     install(
       DIRECTORY CppCore/rgpot
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
