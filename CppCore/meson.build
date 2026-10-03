@@ -353,6 +353,16 @@ endif
 
 if get_option('with_tests')
     test(
+        'AotiPublicationTest',
+        executable(
+            'aoti_publication_test',
+            'tests/AotiPublicationTest.cc',
+            include_directories: ['.'],
+            dependencies: dependency('threads'),
+            override_options: ['cpp_std=c++20'],
+        ),
+    )
+    test(
         'MolecularFrameTest',
         executable(
             'molecular_frame_test',
