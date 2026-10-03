@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <string>
 #include <time.h>
+#include <utility>
 #include <vector>
 
 namespace rgpot {
@@ -57,10 +58,6 @@ struct CPMDCStressTensor {
 using LastStressFn = int (*)(CPMDCStressTensor *);
 static_assert(offsetof(CPMDCStressTensor, values) == 8,
               "CPMDCStressTensor values follow the valid flag");
-
-AdoptCommFn g_cpmd_adopt = nullptr;
-
-int cpmd_calculator_hook(int) { return adoptCalculatorComm(g_cpmd_adopt); }
 
 struct ParamsView {
   const void *data = nullptr;
@@ -110,12 +107,14 @@ struct EngineBundle {
   LastStressFn last_stress = nullptr;
   SelectOrbitalsFn select_orbitals = nullptr;
   AdoptCommFn adopt_comm = nullptr;
+  std::string loaded_path;
   std::string load_error;
   bool loaded = false;
 };
 
 bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.load_error.clear();
+  b.loaded_path.clear();
   b.loaded = false;
   b.energy_gradient = nullptr;
   b.set_params = nullptr;
@@ -137,6 +136,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   for (const auto &cand : engine_lib_candidates(engine_path)) {
     try {
       b.engine_lib.open(cand);
+      b.loaded_path = cand;
       eng_ok = true;
       break;
     } catch (const std::exception &ex) {
@@ -192,6 +192,31 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   }
   b.loaded = true;
   return true;
+}
+
+bool register_engine_adopter(const EngineBundle &b) {
+  if (!b.adopt_comm)
+    return true;
+  struct PinnedEngine {
+    DynLib library;
+    AdoptCommFn callback;
+  };
+  // The registry retains one handle per callback through the MPI exit
+  // handler. Availability probes never enter it. Instance destruction
+  // and enginePath changes cannot unload a registered callback.
+  static auto *engines = new std::vector<PinnedEngine>;
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
+  for (const auto &engine : *engines) {
+    if (engine.callback == b.adopt_comm)
+      return addCalculatorCommAdopter(engine.callback);
+  }
+  DynLib library(b.loaded_path);
+  if (library.sym_optional<AdoptCommFn>("cpmdc_adopt_calculator_comm") !=
+      b.adopt_comm)
+    throw std::runtime_error("CPMD communicator callback changed while loading");
+  engines->push_back({std::move(library), b.adopt_comm});
+  return addCalculatorCommAdopter(b.adopt_comm);
 }
 
 bool has_session_result_abi(const EngineBundle &b) {
@@ -370,6 +395,12 @@ void CPMDPot::Impl::destroySession() {
 }
 
 bool CPMDPot::Impl::configure() {
+  if (!register_engine_adopter(bundle)) {
+    bundle.load_error = "engine refused calculator communicator";
+    bundle.loaded = false;
+    destroySession();
+    return false;
+  }
   if (has_session_result_abi(bundle)) {
     // A session holds the engine's converged wavefunction; recreating
     // it for identical params costs a cold SCF on the next force. Keep
@@ -515,23 +546,11 @@ bool CPMDPot::available() const {
 }
 
 int CPMDPot::bindCalculators(int ranks_per_calc) {
-  // cpmdc_adopt_calculator_comm stores the borrowed communicator in the
-  // engine, and the hook list runs once per process. The bundle that
-  // loaded the engine for the bind therefore lives as long as the
-  // process: a dlclose here, with no CPMDPot alive to hold another
-  // reference, would drop the engine and its communicator. Heap
-  // allocated and never freed so no static destructor unloads it
-  // behind the MPI exit handler.
-  static EngineBundle *bundle = new EngineBundle;
-  if (!bundle->loaded)
-    try_load_engine(*bundle, "");
+  EngineBundle bundle;
   // Reject an incompatible engine before creating an MPI communicator.
-  if (!bundle->loaded || !bundle->adopt_comm)
+  if (!try_load_engine(bundle, "") || !bundle.adopt_comm ||
+      !register_engine_adopter(bundle))
     return -1;
-  // Only this process-lifetime handle owns a registered engine callback.
-  // Availability probes and per-instance handles may be unloaded.
-  g_cpmd_adopt = bundle->adopt_comm;
-  addCalculatorHook(cpmd_calculator_hook);
   return ::rgpot::bindCalculators(ranks_per_calc).index;
 }
 

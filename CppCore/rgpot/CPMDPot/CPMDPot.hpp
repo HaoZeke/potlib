@@ -76,12 +76,11 @@ public:
   /// it before the first force. Returns the group index, or -1 before
   /// the split when the engine has no communicator-adoption symbol.
   ///
-  /// Ordering: the engine is loaded here and stays loaded for the rest
-  /// of the process, whether or not a CPMDPot exists yet. The split
-  /// communicator is borrowed by the engine and the calculator hooks run
-  /// once, so an engine unloaded between this call and the first
-  /// CPMDPot would lose the split with no way to redo it. Construct
-  /// CPMDPot instances after this call; they share the loaded engine.
+  /// Instances may be constructed before or after calculator binding.
+  /// Every rank uses the same construction and binding order. Each
+  /// engine adopts the split once and stays loaded through process exit.
+  /// Constructing an instance after rgpot::bindCalculators gives its
+  /// engine the existing communicator without another split.
   static int bindCalculators(int ranks_per_calc);
 
 private:

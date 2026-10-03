@@ -58,6 +58,15 @@ int calculatorComm(void *comm_out, std::size_t comm_bytes);
 using CalculatorCommAdopter = int (*)(const void *, std::size_t, int);
 int adoptCalculatorComm(CalculatorCommAdopter callback);
 
+// Registers each callback once by address. Its code must stay loaded for
+// the process lifetime. Registration before binding queues the callback;
+// registration after binding gives it the existing communicator at once.
+// Every rank registers the same callbacks in the same order. A callback
+// must not reenter calculator binding or registration. Returns false for
+// a null callback or a refused bind; a refusal remains in thisCalculator.
+// Registration alone does not load MPI.
+bool addCalculatorCommAdopter(CalculatorCommAdopter callback);
+
 // Loads librgpot_mpi when needed, then 1 when MPI_Initialized reports
 // that MPI is up. 0 when the library cannot be loaded, and 0 when MPI is
 // not initialized.
