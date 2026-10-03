@@ -154,8 +154,9 @@ Eval cachedLJ(const std::vector<double> &R0, const std::vector<double> &R,
   REQUIRE(list.valid(R.data(), n, box.data(), opt));
   mode = list.foldMode();
   Eval e{0.0, std::vector<double>(3 * n, 0.0)};
-  e.energy = list.accumulate(R.data(), e.F.data(),
-                             [](int32_t, int32_t, double r2) { return ljTerm(r2); });
+  e.energy =
+      list.accumulate(R.data(), e.F.data(),
+                      [](int32_t, int32_t, double r2) { return ljTerm(r2); });
   return e;
 }
 
@@ -350,9 +351,9 @@ TEST_CASE("Pair potentials: warm, cold and cell-grid calls agree",
       e.energy = fo.energy;
       return e;
     };
-    const Eval cold = call(R);     // first sighting: list at the cutoff
-    const Eval capture = call(R);  // second sighting: list captured
-    const Eval warm = call(R);     // list hit
+    const Eval cold = call(R);    // first sighting: list at the cutoff
+    const Eval capture = call(R); // second sighting: list captured
+    const Eval warm = call(R);    // list hit
     // Every call sums the same pairs in the same order, so the three agree
     // to the bit whichever list served them.
     REQUIRE(capture.energy == cold.energy);
@@ -385,7 +386,8 @@ TEST_CASE("Pair forces equal minus the energy gradient", "[PairList]") {
   const std::array<double, 9> box{side, 0, 0, 0, side, 0, 0, 0, side};
   SECTION("LJPot, Ar") {
     const auto R = randomPositions(24, 0.0, side, 3.2, 41);
-    const rgpot::LJPot pot{rgpot::LJConfig{.u0 = 0.0104, .cutoff = 8.5, .psi = 3.4}};
+    const rgpot::LJPot pot{
+        rgpot::LJConfig{.u0 = 0.0104, .cutoff = 8.5, .psi = 3.4}};
     requireForcesAreMinusGradient(pot, R, std::vector<int>(24, 18), box, 1e-6);
   }
   SECTION("LJClusterPot, Ar") {
@@ -463,12 +465,14 @@ TEST_CASE("Quintic switch takes the pair term smoothly to zero",
     mc.switch_width = 2.5;
     const rgpot::MorsePot morse{mc};
     REQUIRE(morse.energyShift() == 0.0);
-    requireForcesAreMinusGradient(morse, randomPositions(24, 0.0, side, 2.4, 52),
+    requireForcesAreMinusGradient(morse,
+                                  randomPositions(24, 0.0, side, 2.4, 52),
                                   std::vector<int>(24, 78), cell, 1e-6);
     rgpot::LJClusterConfig cc{.u0 = 0.0104, .cutoff = 8.5, .psi = 3.4};
     cc.switch_width = 1.5;
     const rgpot::LJClusterPot cluster{cc};
-    requireForcesAreMinusGradient(cluster, randomPositions(24, 0.0, 12.0, 3.2, 53),
+    requireForcesAreMinusGradient(cluster,
+                                  randomPositions(24, 0.0, 12.0, 3.2, 53),
                                   std::vector<int>(24, 18), cell, 1e-6);
   }
 
@@ -485,11 +489,10 @@ TEST_CASE("Quintic switch takes the pair term smoothly to zero",
   }
 }
 
-
 namespace {
-std::array<double, 3> enumeratedImage(
-    std::array<double, 3> displacement, const std::array<double, 9> &cell,
-    const std::array<bool, 3> &periodic) {
+std::array<double, 3> enumeratedImage(std::array<double, 3> displacement,
+                                      const std::array<double, 9> &cell,
+                                      const std::array<bool, 3> &periodic) {
   auto best = displacement;
   const auto norm2 = [](const auto &v) {
     return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
@@ -503,8 +506,8 @@ std::array<double, 3> enumeratedImage(
       for (int k = -nz; k <= nz; ++k) {
         std::array<double, 3> v{};
         for (int c = 0; c < 3; ++c)
-          v[c] = displacement[c] - i * cell[c] -
-                 j * cell[3 + c] - k * cell[6 + c];
+          v[c] =
+              displacement[c] - i * cell[c] - j * cell[3 + c] - k * cell[6 + c];
         if (norm2(v) < shortest) {
           shortest = norm2(v);
           best = v;
@@ -516,13 +519,12 @@ std::array<double, 3> enumeratedImage(
 
 TEST_CASE("Full-cell pair paths match independent lattice enumeration",
           "[PairList][triclinic]") {
-  const std::array<std::array<double, 9>, 3> cells{{
-      {4.0, 0.2, 0.1, 0.3, 5.0, -0.2, 0.1, -0.3, 6.0},
-      {4.0, 0.0, 0.0, 15.6, 0.5, 0.0, 0.2, 0.3, 5.0},
-      {0.1, -0.3, 6.0, 0.3, 5.0, -0.2, 4.0, 0.2, 0.1}}};
-  const std::array<double, 12> positions{
-      0.17, -0.31, 0.23, 3.87, 0.42, -0.39,
-      -3.46, 0.21, 1.63, 7.31, -0.41, 2.07};
+  const std::array<std::array<double, 9>, 3> cells{
+      {{4.0, 0.2, 0.1, 0.3, 5.0, -0.2, 0.1, -0.3, 6.0},
+       {4.0, 0.0, 0.0, 15.6, 0.5, 0.0, 0.2, 0.3, 5.0},
+       {0.1, -0.3, 6.0, 0.3, 5.0, -0.2, 4.0, 0.2, 0.1}}};
+  const std::array<double, 12> positions{0.17,  -0.31, 0.23, 3.87, 0.42,  -0.39,
+                                         -3.46, 0.21,  1.63, 7.31, -0.41, 2.07};
   for (const auto &cell : cells) {
     for (unsigned mask = 0; mask < 8; ++mask) {
       CAPTURE(cell, mask);
@@ -541,7 +543,8 @@ TEST_CASE("Full-cell pair paths match independent lattice enumeration",
           const auto folded = enumeratedImage(d, cell, opt.periodic);
           const double r2 = folded[0] * folded[0] + folded[1] * folded[1] +
                             folded[2] * folded[2];
-          if (r2 > opt.cutoff * opt.cutoff) continue;
+          if (r2 > opt.cutoff * opt.cutoff)
+            continue;
           expected.emplace_back(i, j, folded[0], folded[1], folded[2]);
           expected_energy += 0.5 * r2;
           for (int k = 0; k < 3; ++k) {
@@ -555,9 +558,12 @@ TEST_CASE("Full-cell pair paths match independent lattice enumeration",
         for (std::size_t p = 0; p < got.size(); ++p) {
           REQUIRE(std::get<0>(got[p]) == std::get<0>(expected[p]));
           REQUIRE(std::get<1>(got[p]) == std::get<1>(expected[p]));
-          REQUIRE_THAT(std::get<2>(got[p]), WithinAbs(std::get<2>(expected[p]), 1e-12));
-          REQUIRE_THAT(std::get<3>(got[p]), WithinAbs(std::get<3>(expected[p]), 1e-12));
-          REQUIRE_THAT(std::get<4>(got[p]), WithinAbs(std::get<4>(expected[p]), 1e-12));
+          REQUIRE_THAT(std::get<2>(got[p]),
+                       WithinAbs(std::get<2>(expected[p]), 1e-12));
+          REQUIRE_THAT(std::get<3>(got[p]),
+                       WithinAbs(std::get<3>(expected[p]), 1e-12));
+          REQUIRE_THAT(std::get<4>(got[p]),
+                       WithinAbs(std::get<4>(expected[p]), 1e-12));
         }
       };
       std::vector<PairRecord> got;
@@ -582,9 +588,10 @@ TEST_CASE("Full-cell pair paths match independent lattice enumeration",
         list.forEach(positions.data(), collect);
         check(got);
         std::array<double, 12> force{};
-        const double energy = list.accumulate(
-            positions.data(), force.data(),
-            [](int32_t, int32_t, double r2) { return PairTerm{0.5 * r2, -1.0}; });
+        const double energy = list.accumulate(positions.data(), force.data(),
+                                              [](int32_t, int32_t, double r2) {
+                                                return PairTerm{0.5 * r2, -1.0};
+                                              });
         REQUIRE_THAT(energy, WithinAbs(expected_energy, 1e-12));
         for (std::size_t i = 0; i < force.size(); ++i)
           REQUIRE_THAT(force[i], WithinAbs(expected_force[i], 1e-12));
@@ -597,12 +604,15 @@ TEST_CASE("Full-cell image search rejects invalid and unrepresentable cells",
           "[PairList][triclinic]") {
   const std::array<bool, 3> periodic{true, true, true};
   const double singular[9] = {1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0};
-  REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(singular, periodic), std::invalid_argument);
-  auto invalid = std::array<double, 9>{1.0, 0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+  REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(singular, periodic),
+                    std::invalid_argument);
+  auto invalid =
+      std::array<double, 9>{1.0, 0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
   invalid[1] = std::numeric_limits<double>::infinity();
-  REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(invalid.data(), periodic), std::invalid_argument);
+  REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(invalid.data(), periodic),
+                    std::invalid_argument);
   const double ill_conditioned[9] = {1.0, 1.0, 0.0, 1.0, 1.0 + 1e-12,
-                                    0.0, 0.0, 0.0, 1.0};
+                                     0.0, 0.0, 0.0, 1.0};
   REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(ill_conditioned, periodic),
                     std::invalid_argument);
   const double cell[9] = {1.0, 0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};

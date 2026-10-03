@@ -27,21 +27,17 @@ public:
       cell_[k] = cell[k];
     }
     const auto &a = cell_;
-    const long double det =
-        a[0] * (a[4] * a[8] - a[5] * a[7]) -
-        a[1] * (a[3] * a[8] - a[5] * a[6]) +
-        a[2] * (a[3] * a[7] - a[4] * a[6]);
+    const long double det = a[0] * (a[4] * a[8] - a[5] * a[7]) -
+                            a[1] * (a[3] * a[8] - a[5] * a[6]) +
+                            a[2] * (a[3] * a[7] - a[4] * a[6]);
     if (!std::isfinite(det) || det == 0.0L)
       throw std::invalid_argument("periodic cell must be nonsingular");
-    inverse_ = {(a[4] * a[8] - a[5] * a[7]) / det,
-                (a[2] * a[7] - a[1] * a[8]) / det,
-                (a[1] * a[5] - a[2] * a[4]) / det,
-                (a[5] * a[6] - a[3] * a[8]) / det,
-                (a[0] * a[8] - a[2] * a[6]) / det,
-                (a[2] * a[3] - a[0] * a[5]) / det,
-                (a[3] * a[7] - a[4] * a[6]) / det,
-                (a[1] * a[6] - a[0] * a[7]) / det,
-                (a[0] * a[4] - a[1] * a[3]) / det};
+    inverse_ = {
+        (a[4] * a[8] - a[5] * a[7]) / det, (a[2] * a[7] - a[1] * a[8]) / det,
+        (a[1] * a[5] - a[2] * a[4]) / det, (a[5] * a[6] - a[3] * a[8]) / det,
+        (a[0] * a[8] - a[2] * a[6]) / det, (a[2] * a[3] - a[0] * a[5]) / det,
+        (a[3] * a[7] - a[4] * a[6]) / det, (a[1] * a[6] - a[0] * a[7]) / det,
+        (a[0] * a[4] - a[1] * a[3]) / det};
     long double cell_norm = 0.0L, inverse_norm = 0.0L;
     for (int row = 0; row < 3; ++row) {
       long double cell_sum = 0.0L, inverse_sum = 0.0L;
@@ -56,10 +52,10 @@ public:
     // Refuse cells whose condition estimate consumes over half the
     // working precision; finite image bounds alone do not protect the inverse.
     if (!(cell_norm * inverse_norm * eps <= std::sqrt(eps)))
-      throw std::invalid_argument("periodic cell is too ill-conditioned for image bounds");
+      throw std::invalid_argument(
+          "periodic cell is too ill-conditioned for image bounds");
     for (int k = 0; k < 3; ++k) {
-      dual_norm_[k] = std::hypot(inverse_[k], inverse_[3 + k],
-                                 inverse_[6 + k]);
+      dual_norm_[k] = std::hypot(inverse_[k], inverse_[3 + k], inverse_[6 + k]);
       if (!std::isfinite(dual_norm_[k]))
         throw std::overflow_error("periodic cell inverse is not finite");
     }
@@ -72,9 +68,9 @@ public:
     std::array<long double, 3> initial{};
     for (int k = 0; k < 3; ++k) {
       if (periodic_[k])
-        initial[k] = std::round(reduced[0] * inverse_[k] +
-                                reduced[1] * inverse_[3 + k] +
-                                reduced[2] * inverse_[6 + k]);
+        initial[k] =
+            std::round(reduced[0] * inverse_[k] + reduced[1] * inverse_[3 + k] +
+                       reduced[2] * inverse_[6 + k]);
       checkedIndex(initial[k]);
     }
     for (int c = 0; c < 3; ++c)
@@ -98,8 +94,9 @@ public:
       }
       const auto width = static_cast<std::uint64_t>(high[k]) -
                          static_cast<std::uint64_t>(low[k]) + 1;
-      if (width == 0 || count >
-            static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) / width)
+      if (width == 0 || count > static_cast<std::uint64_t>(
+                                    std::numeric_limits<std::int64_t>::max()) /
+                                    width)
         throw std::overflow_error("periodic image search count is too large");
       count *= width;
     }
@@ -108,8 +105,8 @@ public:
         for (auto k = low[2]; k <= high[2]; ++k) {
           std::array<long double, 3> candidate{};
           for (int c = 0; c < 3; ++c)
-            candidate[c] = reduced[c] - i * cell_[c] -
-                           j * cell_[3 + c] - k * cell_[6 + c];
+            candidate[c] =
+                reduced[c] - i * cell_[c] - j * cell_[3 + c] - k * cell_[6 + c];
           const long double r2 = squaredNorm(candidate);
           if (r2 < best2) {
             best = candidate;
@@ -127,7 +124,8 @@ private:
   }
   static std::int64_t checkedIndex(long double value) {
     const long double limit = std::ldexp(1.0L, 63);
-    if (!std::isfinite(value) || value <= -limit + 1.0L || value >= limit - 1.0L)
+    if (!std::isfinite(value) || value <= -limit + 1.0L ||
+        value >= limit - 1.0L)
       throw std::overflow_error("periodic image index is out of range");
     return static_cast<std::int64_t>(value);
   }
