@@ -595,6 +595,9 @@ void CPMDPot::forceImpl(const ForceInput &in, ForceOut *out) const {
 }
 
 void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
+  // A configured instance can outlive a refused calculator binding.
+  if (thisCalculator().index < 0)
+    fail_force("CPMDPot: calculator binding was refused");
   if (!available()) {
     fail_force(std::string("CPMD engine (libcpmdc) not loaded: ") +
                (impl_ ? impl_->bundle.load_error : "no impl"));
