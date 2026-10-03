@@ -9,19 +9,26 @@ call fairchem at evaluate time.
 
 ## Package
 
-One `.pt2` per composition. The sidecar next to it records cutoff,
-max neighbors, task, charge, spin, `z_set`, and label.
+One `.pt2` per composition, charge and spin. The exporter embeds the
+runtime contract in the package itself
+(`aot_inductor.metadata`). `UmaPot` reads it with
+`AOTIModelPackageLoader::get_metadata()`; no file next to the
+package is read.
+
+| Key | Use at runtime |
+| --- | --- |
+| `cutoff`, `max_neighbors` | vesin neighbor list |
+| `molecular_box` | re-center into this cube (0: caller's cell) |
+| `batch_max` | band graph size (0 or 1: single system) |
+| `pos_dtype` | `float64` switches the input dtype |
+| `task_name`, `charge`, `spin`, `z_set` | recorded |
+| `label`, `shapes`, `inputs`, `outputs` | recorded |
+
+`UmaConfig.cutoff` / `max_neighbors` are defaults. The embedded
+values win when present.
 
 `scripts/export_baker_uma_aoti.py` walks Baker endpoints and
 deduplicates by `(z_set, charge, spin)`.
-
-| File | Role |
-| --- | --- |
-| `model.pt2` | AOTInductor package |
-| `model.pt2.json` | sidecar: cutoff, neighbors, task, `z_set` |
-
-`UmaConfig.cutoff` / `max_neighbors` are defaults. The sidecar wins
-when it is present.
 
 ## potserv
 

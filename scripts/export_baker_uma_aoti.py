@@ -108,7 +108,7 @@ def main() -> int:
     p.add_argument("--eager-only", action="store_true")
     p.add_argument("--skip-aoti", action="store_true")
     # A static-shape package freezes the traced edge count, so a band
-    # that stretches past it aborts. The sidecar makes the intramolecular
+    # that stretches past it aborts. A molecular box makes the intramolecular
     # graph complete and the edge count constant at n(n-1).
     p.add_argument("--molecular-box", type=float, default=0.0)
     args = p.parse_args()

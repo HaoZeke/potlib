@@ -256,7 +256,7 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   }
 
   // Under the molecular-box convention the caller's cell is replaced by
-  // the sidecar's cube and positions re-center into it. Energies and
+  // the package's molecular_box cube and positions re-center into it. Energies and
   // forces are translation invariant, so only the graph changes.
   const bool molecular = m_impl->molecular_box > 0.0;
   std::vector<double> mol_pos;
