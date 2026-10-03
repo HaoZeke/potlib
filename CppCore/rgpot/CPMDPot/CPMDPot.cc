@@ -109,6 +109,7 @@ struct EngineBundle {
   FeatureFindFn feature_find = nullptr;
   LastStressFn last_stress = nullptr;
   SelectOrbitalsFn select_orbitals = nullptr;
+  AdoptCommFn adopt_comm = nullptr;
   std::string load_error;
   bool loaded = false;
 };
@@ -129,6 +130,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
   b.feature_find = nullptr;
   b.last_stress = nullptr;
   b.select_orbitals = nullptr;
+  b.adopt_comm = nullptr;
 
   bool eng_ok = false;
   std::string eng_err;
@@ -148,7 +150,7 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
 
   b.energy_gradient =
       b.engine_lib.sym_optional<EnergyGradientFn>("cpmdc_energy_gradient");
-  const auto adopt_comm =
+  b.adopt_comm =
       b.engine_lib.sym_optional<AdoptCommFn>("cpmdc_adopt_calculator_comm");
   b.set_params = b.engine_lib.sym_optional<SetParamsFn>("cpmdc_set_params");
   b.session_create =
@@ -189,9 +191,6 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
     return false;
   }
   b.loaded = true;
-  g_cpmd_adopt = adopt_comm;
-  if (g_cpmd_adopt)
-    addCalculatorHook(cpmd_calculator_hook);
   return true;
 }
 
@@ -527,8 +526,12 @@ int CPMDPot::bindCalculators(int ranks_per_calc) {
   if (!bundle->loaded)
     try_load_engine(*bundle, "");
   // Reject an incompatible engine before creating an MPI communicator.
-  if (!bundle->loaded || !g_cpmd_adopt)
+  if (!bundle->loaded || !bundle->adopt_comm)
     return -1;
+  // Only this process-lifetime handle owns a registered engine callback.
+  // Availability probes and per-instance handles may be unloaded.
+  g_cpmd_adopt = bundle->adopt_comm;
+  addCalculatorHook(cpmd_calculator_hook);
   return ::rgpot::bindCalculators(ranks_per_calc).index;
 }
 
