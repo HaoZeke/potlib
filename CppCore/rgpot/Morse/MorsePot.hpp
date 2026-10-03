@@ -52,12 +52,8 @@ public:
   MorsePot() : MorsePot(MorseConfig{}) {}
 
   explicit MorsePot(const MorseConfig &c)
-      : Potential(PotType::Morse),
-        De{c.De},
-        a{c.a},
-        re{c.re},
-        cuttOffR{c.cutoff},
-        m_config{c} {
+      : Potential(PotType::Morse), De{c.De}, a{c.a}, re{c.re},
+        cuttOffR{c.cutoff}, m_config{c} {
     // Shift so U(cuttOffR) = 0, evaluating the same closed form as the
     // pair kernel below.
     const double d = 1.0 - std::exp(-a * (cuttOffR - re));

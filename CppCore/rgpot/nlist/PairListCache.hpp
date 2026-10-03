@@ -119,8 +119,8 @@ public:
       cell_visit<false>(grid, R, w, inv, HUGE_VAL, opt.cutoff * opt.cutoff,
                         pairsIJ_, flip);
     } else {
-      vesin::cpu::brute_force_visit_only(R, n, w, inv,
-                                         opt.cutoff * opt.cutoff, flip);
+      vesin::cpu::brute_force_visit_only(R, n, w, inv, opt.cutoff * opt.cutoff,
+                                         flip);
     }
     if (mic_) {
       pairsIJ_.clear();
@@ -230,8 +230,7 @@ public:
   /// force stays in registers across its row. The optional observer receives
   /// the same force scale and displacement once per accepted pair.
   template <typename Kernel, typename Observer = IgnorePairContribution>
-  [[nodiscard]] double accumulate(const double *R, double *F,
-                                  Kernel &&kernel,
+  [[nodiscard]] double accumulate(const double *R, double *F, Kernel &&kernel,
                                   Observer &&observe = {}) const {
     switch (fold_) {
     case FoldMode::None:
@@ -309,9 +308,8 @@ private:
   }
 
   void setup(std::size_t n, const double *box, const Options &opt) {
-    const bool orthorhombic = box[1] == 0.0 && box[2] == 0.0 &&
-                              box[3] == 0.0 && box[5] == 0.0 &&
-                              box[6] == 0.0 && box[7] == 0.0;
+    const bool orthorhombic = box[1] == 0.0 && box[2] == 0.0 && box[3] == 0.0 &&
+                              box[5] == 0.0 && box[6] == 0.0 && box[7] == 0.0;
     // The atom cap bounds the brute-force list build; a fully periodic box
     // that the linked-cell scan can serve needs no cap.
     mic_ = orthorhombic && (n <= 20000 || cellGridFits(n, box, opt));
@@ -474,7 +472,6 @@ private:
     fold_ = FoldMode::Coded;
   }
 
-
   /// How the evaluation loops turn r_i - r_j into the minimum image.
   struct Fold {
     FoldMode mode;
@@ -510,10 +507,10 @@ private:
                 shift_.data()};
   }
 
-  std::vector<int32_t> pairsIJ_; //!< Scan output, (a, b) flat; build only.
-  std::vector<int32_t> rows_;    //!< CSR row starts, n + 1 entries.
-  std::vector<int32_t> nbr_;     //!< Partner j > i of each candidate.
-  std::vector<uint8_t> code_;    //!< Image code per candidate (Coded fold).
+  std::vector<int32_t> pairsIJ_;   //!< Scan output, (a, b) flat; build only.
+  std::vector<int32_t> rows_;      //!< CSR row starts, n + 1 entries.
+  std::vector<int32_t> nbr_;       //!< Partner j > i of each candidate.
+  std::vector<uint8_t> code_;      //!< Image code per candidate (Coded fold).
   std::array<double, 81> shift_{}; //!< 27 image shifts, three doubles each.
   std::vector<double> Rref_;
   std::array<double, 9> boxref_{};
@@ -557,9 +554,8 @@ public:
   template <typename Kernel, typename Observer = IgnorePairContribution>
   [[nodiscard]] double accumulate(const double *R, std::size_t n,
                                   const double *box,
-                                  const CachedPairList::Options &opt,
-                                  double *F, Kernel &&kernel,
-                                  Observer &&observe = {}) {
+                                  const CachedPairList::Options &opt, double *F,
+                                  Kernel &&kernel, Observer &&observe = {}) {
     std::shared_ptr<const CachedPairList> hit = lookup(R, n, box, opt);
     if (hit && !hit->isPhantom()) {
       return hit->accumulate(R, F, kernel, observe);

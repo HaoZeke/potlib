@@ -83,9 +83,11 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
           const double v = b * (a - 1.0);
           const double r = std::sqrt(r2);
           const auto s = sw(r);
-          return nlist::PairTerm{
-              v * s.s, 6.0 * b * invR2 * (2.0 * a - 1.0) * s.s - v * s.dsdr / r};
-        }, observe);
+          return nlist::PairTerm{v * s.s,
+                                 6.0 * b * invR2 * (2.0 * a - 1.0) * s.s -
+                                     v * s.dsdr / r};
+        },
+        observe);
     publishCauchyStress(out, strain, volume);
     return;
   }
@@ -99,7 +101,8 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         // -dU/dr / r: the force on i is fscale * (r_i - r_j).
         return nlist::PairTerm{b * (a - 1.0) - shiftU,
                                6.0 * b * invR2 * (2.0 * a - 1.0)};
-      }, observe);
+      },
+      observe);
   publishCauchyStress(out, strain, volume);
   return;
 }

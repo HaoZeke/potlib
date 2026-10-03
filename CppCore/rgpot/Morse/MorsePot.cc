@@ -76,7 +76,8 @@ void MorsePot::forceImpl(const ForceInput &in, ForceOut *out) const {
           const auto s = sw(r);
           return nlist::PairTerm{
               v * s.s, (twoDeA * d * (d - 1.0) * s.s - v * s.dsdr) / r};
-        }, observe);
+        },
+        observe);
     publishCauchyStress(out, strain, volume);
     return;
   }
@@ -88,7 +89,8 @@ void MorsePot::forceImpl(const ForceInput &in, ForceOut *out) const {
         // -dU/dr / r: the force on i is fscale * (r_i - r_j).
         return nlist::PairTerm{depth * d * d - depth - shiftU,
                                twoDeA * d * (d - 1.0) / r};
-      }, observe);
+      },
+      observe);
   publishCauchyStress(out, strain, volume);
 }
 

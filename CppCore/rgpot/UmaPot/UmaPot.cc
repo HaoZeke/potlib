@@ -3,9 +3,9 @@
 #include "rgpot/UmaPot/UmaPot.hpp"
 #include "rgpot/UmaPot/MolecularFrame.hpp"
 
+#include "rgpot/MetatomicPot/vesin_compat.hpp"
 #include "rgpot/UmaPot/UmaContract.hpp"
 #include "rgpot/UmaPot/aoti_execstack.hpp"
-#include "rgpot/MetatomicPot/vesin_compat.hpp"
 #include "vesin.h"
 
 #include <array>
@@ -26,8 +26,6 @@
 
 namespace rgpot {
 namespace {
-
-
 
 bool ends_with(const std::string &s, const std::string &suf) {
   return s.size() >= suf.size() &&
@@ -60,10 +58,10 @@ EdgeList vesin_fairchem_edges(const ForceInput &in, double cutoff,
   VesinDevice cpu = vesin_compat::make_cpu_device();
   const char *err = nullptr;
   bool pbc[3] = {true, true, true};
-  const int status = vesin_neighbors(
-      reinterpret_cast<const double(*)[3]>(in.pos), in.nAtoms,
-      reinterpret_cast<const double(*)[3]>(in.box), pbc, cpu, options, &nl,
-      &err);
+  const int status =
+      vesin_neighbors(reinterpret_cast<const double(*)[3]>(in.pos), in.nAtoms,
+                      reinterpret_cast<const double(*)[3]>(in.box), pbc, cpu,
+                      options, &nl, &err);
   if (status != EXIT_SUCCESS) {
     std::string msg = "UmaPot: vesin_neighbors failed";
     if (err)
@@ -120,11 +118,16 @@ EdgeList vesin_fairchem_edges(const ForceInput &in, double cutoff,
   // reproducible only if this order is. Total order on (center, distance,
   // neighbor, shift).
   std::sort(keep.begin(), keep.end(), [](const Cand &a, const Cand &b) {
-    if (a.c != b.c) return a.c < b.c;
-    if (a.dist != b.dist) return a.dist < b.dist;
-    if (a.n != b.n) return a.n < b.n;
-    if (a.s0 != b.s0) return a.s0 < b.s0;
-    if (a.s1 != b.s1) return a.s1 < b.s1;
+    if (a.c != b.c)
+      return a.c < b.c;
+    if (a.dist != b.dist)
+      return a.dist < b.dist;
+    if (a.n != b.n)
+      return a.n < b.n;
+    if (a.s0 != b.s0)
+      return a.s0 < b.s0;
+    if (a.s1 != b.s1)
+      return a.s1 < b.s1;
     return a.s2 < b.s2;
   });
   if (max_neighbors > 0) {
@@ -286,9 +289,7 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   if (nedges == 0)
     throw std::runtime_error("UmaPot: vesin produced no edges");
 
-  auto opts_f = torch::TensorOptions()
-                    .dtype(m_impl->dtype)
-                    .device(torch::kCPU);
+  auto opts_f = torch::TensorOptions().dtype(m_impl->dtype).device(torch::kCPU);
   auto opts_l = torch::TensorOptions().dtype(torch::kLong).device(torch::kCPU);
 
   auto pos = torch::empty({n, 3}, torch::dtype(torch::kFloat64));
@@ -321,8 +322,8 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     ei[1][e] = edges.center[static_cast<size_t>(e)];
   }
   auto cell_offsets =
-      torch::from_blob(const_cast<float *>(edges.offsets.data()),
-                       {nedges, 3}, torch::dtype(torch::kFloat32))
+      torch::from_blob(const_cast<float *>(edges.offsets.data()), {nedges, 3},
+                       torch::dtype(torch::kFloat32))
           .clone()
           .to(opts_f);
   auto charge = torch::tensor({static_cast<int64_t>(m_config.charge)}, opts_l);
@@ -343,10 +344,9 @@ void UmaPot::forceImpl(const ForceInput &in, ForceOut *out) const {
     natoms = natoms.to(m_impl->device);
   }
 
-  std::vector<torch::Tensor> inputs = {pos,         atomic_numbers, cell,
-                                       pbc,         edge_index,     cell_offsets,
-                                       charge,      spin,           batch,
-                                       natoms};
+  std::vector<torch::Tensor> inputs = {pos,        atomic_numbers, cell,   pbc,
+                                       edge_index, cell_offsets,   charge, spin,
+                                       batch,      natoms};
 
   std::lock_guard<std::mutex> lock(m_impl->mutex);
   ensureLoaded();
@@ -437,8 +437,8 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
       }
       const ForceInput local{static_cast<size_t>(n), pos_b.data(), in.atmnrs,
                              box_b.data()};
-      sys_edges[static_cast<size_t>(b)] = vesin_fairchem_edges(
-          local, m_impl->cutoff, m_impl->max_neighbors);
+      sys_edges[static_cast<size_t>(b)] =
+          vesin_fairchem_edges(local, m_impl->cutoff, m_impl->max_neighbors);
       nedges_total += static_cast<int64_t>(
           sys_edges[static_cast<size_t>(b)].neighbor.size());
     }
@@ -457,10 +457,9 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
     auto edge_index = torch::empty({2, nedges_total}, opts_l);
     auto cell_offsets =
         torch::empty({nedges_total, 3}, torch::dtype(torch::kFloat32));
-    auto charge = torch::full({B}, static_cast<int64_t>(m_config.charge),
-                              opts_l);
-    auto spin =
-        torch::full({B}, static_cast<int64_t>(m_config.spin), opts_l);
+    auto charge =
+        torch::full({B}, static_cast<int64_t>(m_config.charge), opts_l);
+    auto spin = torch::full({B}, static_cast<int64_t>(m_config.spin), opts_l);
     auto batch_vec = torch::empty({B * n}, opts_l);
     auto natoms = torch::full({B}, n, opts_l);
     auto nedges_t = torch::empty({B}, opts_l);
@@ -491,8 +490,8 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
         }
         for (int r = 0; r < 3; ++r)
           for (int c = 0; c < 3; ++c)
-            cell_a[b][r][c] = sys_box[static_cast<size_t>(b)]
-                                     [static_cast<size_t>(3 * r + c)];
+            cell_a[b][r][c] =
+                sys_box[static_cast<size_t>(b)][static_cast<size_t>(3 * r + c)];
         const auto &edges = sys_edges[static_cast<size_t>(b)];
         const auto ne = static_cast<int64_t>(edges.neighbor.size());
         for (int64_t e = 0; e < ne; ++e) {
@@ -524,12 +523,12 @@ void UmaPot::forceBatchImpl(const ForceBatch &batch) const {
     }
 
     std::vector<torch::Tensor> inputs = {
-        pos,    atomic_numbers, cell,      pbc,    edge_index,
-        cell_offsets_f, charge, spin, batch_vec, natoms, nedges_t};
+        pos,    atomic_numbers, cell,      pbc,    edge_index, cell_offsets_f,
+        charge, spin,           batch_vec, natoms, nedges_t};
 
     std::lock_guard<std::mutex> lock(m_impl->mutex);
     c10::InferenceMode guard;
-  auto outputs = m_impl->loader->run(inputs);
+    auto outputs = m_impl->loader->run(inputs);
     if (outputs.size() < 2)
       throw std::runtime_error("UmaPot: AOTI package returned <2 tensors");
     auto energies = outputs[0].to(torch::kFloat64).cpu().contiguous();

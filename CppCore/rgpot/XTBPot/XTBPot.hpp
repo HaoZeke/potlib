@@ -44,7 +44,6 @@ public:
     return {.reentrancy = Reentrancy::PerInstance, .stress = true};
   }
 
-
 private:
   XTBConfig m_config;
 

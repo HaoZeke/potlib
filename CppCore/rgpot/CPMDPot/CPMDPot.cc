@@ -18,12 +18,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <time.h>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <time.h>
 #include <vector>
-
 
 namespace rgpot {
 
@@ -39,8 +38,9 @@ using SetParamsFn = int (*)(const void *, size_t);
 using SessionCreateFn = CPMDCSession *(*)(const void *, size_t);
 using SessionDestroyFn = void (*)(CPMDCSession *);
 using PotentialResultSizeFn = size_t (*)(const void *, size_t);
-using SessionCalculateResultFn = CPMDCResult (*)(
-    CPMDCSession *, const void *, size_t, void *, size_t, size_t *);
+using SessionCalculateResultFn = CPMDCResult (*)(CPMDCSession *, const void *,
+                                                 size_t, void *, size_t,
+                                                 size_t *);
 using VersionFn = const char *(*)(void);
 using AvailableFn = int (*)(void);
 using FeatureCountFn = size_t (*)(void);
@@ -71,8 +71,8 @@ struct ParamsView {
   size_t size = 0;
 };
 
-
-std::vector<std::string> engine_lib_candidates(const std::string &explicit_path) {
+std::vector<std::string>
+engine_lib_candidates(const std::string &explicit_path) {
   std::vector<std::string> out;
   if (!explicit_path.empty())
     out.emplace_back(explicit_path);
@@ -175,15 +175,14 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
       b.engine_lib.sym_optional<FeatureTableFn>("cpmdc_feature_table");
   b.feature_find =
       b.engine_lib.sym_optional<FeatureFindFn>("cpmdc_feature_find");
-  b.last_stress =
-      b.engine_lib.sym_optional<LastStressFn>("cpmdc_last_stress");
+  b.last_stress = b.engine_lib.sym_optional<LastStressFn>("cpmdc_last_stress");
   b.select_orbitals = b.engine_lib.sym_optional<SelectOrbitalsFn>(
       "cpmdc_session_select_orbitals");
 
   const bool has_one_shot = b.energy_gradient && b.set_params;
-  const bool has_session_result =
-      b.session_create && b.session_destroy &&
-      b.potential_result_size_for_force_input && b.session_calculate_result;
+  const bool has_session_result = b.session_create && b.session_destroy &&
+                                  b.potential_result_size_for_force_input &&
+                                  b.session_calculate_result;
   const bool has_feature_discovery =
       b.feature_count && b.feature_table && b.feature_find;
   if (!has_feature_discovery) {
@@ -208,7 +207,8 @@ void publishForceError(const std::string &message) {
   publishCalculatorError(message);
 }
 
-std::vector<::capnp::word> serialize_params(const ::CPMDParams::Reader &params) {
+std::vector<::capnp::word>
+serialize_params(const ::CPMDParams::Reader &params) {
   ::capnp::MallocMessageBuilder msg;
   msg.setRoot(params);
   auto words = ::capnp::messageToFlatArray(msg);
@@ -293,9 +293,9 @@ void copy_params_to_builder(const ::CPMDParams::Reader &params,
   out.setInputSections(params.getInputSections());
 }
 
-::CPMDParams::Reader read_params_words(
-    const std::vector<::capnp::word> &params_words,
-    ::capnp::FlatArrayMessageReader &reader) {
+::CPMDParams::Reader
+read_params_words(const std::vector<::capnp::word> &params_words,
+                  ::capnp::FlatArrayMessageReader &reader) {
   (void)params_words;
   return reader.getRoot<::CPMDParams>();
 }
@@ -621,9 +621,8 @@ void CPMDPot::forceImplOrThrow(const ForceInput &in, ForceOut *out) const {
 void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
   const auto force_words = serialize_force_input(in);
   const ParamsView force_view = params_view(force_words);
-  const size_t required =
-      bundle.potential_result_size_for_force_input(force_view.data,
-                                                   force_view.size);
+  const size_t required = bundle.potential_result_size_for_force_input(
+      force_view.data, force_view.size);
   if (required == 0)
     fail_force("CPMD engine rejected ForceInput sizing");
 
@@ -633,8 +632,7 @@ void CPMDPot::Impl::forceSession(const ForceInput &in, ForceOut *out) {
   // The engine keeps converged orbitals per key; naming the key on every
   // call keeps it right when the session was recreated since.
   if (has_orbital_key && bundle.select_orbitals &&
-      bundle.select_orbitals(session, static_cast<long long>(orbital_key)) !=
-          0)
+      bundle.select_orbitals(session, static_cast<long long>(orbital_key)) != 0)
     fail_force("CPMD engine refused the orbital key");
   CPMDCResult res = bundle.session_calculate_result(
       session, force_view.data, force_view.size, result_words.data(),

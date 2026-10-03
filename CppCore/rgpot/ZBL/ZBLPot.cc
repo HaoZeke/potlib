@@ -88,11 +88,8 @@ double d2zbldr2(const ZblPairCoeffs &p, double r) {
 } // namespace
 
 ZBLPot::ZBLPot(const ZBLConfig &c)
-    : Potential(PotType::ZBL),
-      cut_inner{c.cut_inner},
-      cut_global{c.cut_global},
-      cut_inner_sq{c.cut_inner * c.cut_inner},
-      m_config{c} {
+    : Potential(PotType::ZBL), cut_inner{c.cut_inner}, cut_global{c.cut_global},
+      cut_inner_sq{c.cut_inner * c.cut_inner}, m_config{c} {
   if (!(cut_inner > 0.0) || !(cut_inner < cut_global)) {
     throw std::invalid_argument(
         "ZBLPot: invalid cutoffs, require 0.0 < cut_inner < cut_global.");
@@ -236,7 +233,8 @@ void ZBLPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         }
         // -dU/dr / r: the force on i is fscale * (r_i - r_j).
         return nlist::PairTerm{energy_pair, -dEdr / r};
-      }, observe);
+      },
+      observe);
   publishCauchyStress(out, strain, volume);
 }
 

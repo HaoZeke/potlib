@@ -73,14 +73,16 @@ TEST_CASE("CPMDPot passes serialized CPMDParams to cpmdc engine",
 
   const double pos[3] = {0.0, 0.0, 0.0};
   const int atm = 8;
-  const double flat_box[9] = {20.0, 0.0, 0.0, 0.0, 21.0, 0.0, 0.0, 0.0, cell_zz};
+  const double flat_box[9] = {20.0, 0.0, 0.0, 0.0,    21.0,
+                              0.0,  0.0, 0.0, cell_zz};
   std::array<double, 3> raw_forces{};
   rgpot::ForceOut raw{};
   raw.F = raw_forces.data();
   const rgpot::ForceInput in{
       .nAtoms = 1, .pos = pos, .atmnrs = &atm, .box = flat_box};
   pot.forceImpl(in, &raw);
-  REQUIRE_THAT(raw.energy, WithinAbs(hartree * rgpot::units::HARTREE_TO_EV, 1e-12));
+  REQUIRE_THAT(raw.energy,
+               WithinAbs(hartree * rgpot::units::HARTREE_TO_EV, 1e-12));
   REQUIRE(raw.has_stress == 1);
   for (int i = 0; i < 9; ++i) {
     REQUIRE_THAT(raw.stress[i],
@@ -161,8 +163,7 @@ TEST_CASE("CPMDPot paramsKey follows the serialized params", "[cpmd][abi]") {
 // selectOrbitals reaches the engine session before every force, so a
 // calculator that evaluates several images or beads in turn keeps each
 // one's orbitals apart. A pot that never names a key names none.
-TEST_CASE("CPMDPot names the orbital key before each force",
-          "[cpmd][abi]") {
+TEST_CASE("CPMDPot names the orbital key before each force", "[cpmd][abi]") {
   rgpot::DynLib lib;
   const char *path = std::getenv("RGPOT_CPMD_ENGINE");
   REQUIRE(path != nullptr);

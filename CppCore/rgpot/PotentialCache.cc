@@ -12,10 +12,10 @@
 #include "rgpot/PotentialCache.hpp"
 #include <algorithm>
 #include <cstring>
-#include <stdexcept>
 #include <iostream>
 #include <memory>
 #include <rocksdb/options.h>
+#include <stdexcept>
 #include <vector>
 
 namespace rgpot::cache {

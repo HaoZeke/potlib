@@ -38,7 +38,6 @@ public:
     return {.reentrancy = Reentrancy::PerInstance, .stress = true};
   }
 
-
 private:
   TBLiteConfig m_config;
 

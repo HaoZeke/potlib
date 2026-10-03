@@ -1,11 +1,11 @@
 // MIT License
 // Copyright 2023--present rgpot developers
-#include <catch2/catch_all.hpp>
 #include <array>
-#include <limits>
-#include <memory>
+#include <catch2/catch_all.hpp>
 #include <chrono>
 #include <filesystem>
+#include <limits>
+#include <memory>
 #include <random>
 
 #include "rgpot/LennardJones/LJPot.hpp"
@@ -193,9 +193,9 @@ TEST_CASE("Cache keys separate parameter sets", "[Potential][cache]") {
   REQUIRE(eNarrow2 == eNarrow);
 }
 
-
 namespace {
-class ResultMetadataPotential : public rgpot::Potential<ResultMetadataPotential> {
+class ResultMetadataPotential
+    : public rgpot::Potential<ResultMetadataPotential> {
 public:
   ResultMetadataPotential() : Potential(rgpot::PotType::LJ) {}
   mutable size_t evaluations = 0;
@@ -246,11 +246,11 @@ TEST_CASE("Cached force batches retain result metadata through misses and hits",
                             {0.5, 0.6, 0.7, 1.6, 1.7, 1.8}};
   const int types[2] = {1, 1};
   const double box[9] = {8.0, 0.0, 0.0, 0.0, 8.0, 0.0, 0.0, 0.0, 8.0};
-  const rgpot::ForceInput inputs[] = {
-      {2, positions[0], types, box}, {2, positions[1], types, box}};
+  const rgpot::ForceInput inputs[] = {{2, positions[0], types, box},
+                                      {2, positions[1], types, box}};
   double forces[2][6] = {};
-  rgpot::ForceOut outputs[] = {
-      {forces[0], 0.0, 0.0, {}, 0}, {forces[1], 0.0, 0.0, {}, 0}};
+  rgpot::ForceOut outputs[] = {{forces[0], 0.0, 0.0, {}, 0},
+                               {forces[1], 0.0, 0.0, {}, 0}};
   const rgpot::ForceBatch batch{2, inputs, outputs};
   const std::string path = resultCachePath();
   {
@@ -326,7 +326,8 @@ TEST_CASE("Stress batches refresh energy-force-only cache records",
   REQUIRE(pot.evaluations == 1);
   checkResultMetadata(input, out);
 
-  std::unique_ptr<rocksdb::Iterator> it(db->NewIterator(rocksdb::ReadOptions()));
+  std::unique_ptr<rocksdb::Iterator> it(
+      db->NewIterator(rocksdb::ReadOptions()));
   it->SeekToFirst();
   REQUIRE(it->Valid());
   const std::string key = it->key().ToString();

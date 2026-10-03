@@ -248,8 +248,7 @@ public:
    */
   virtual void forceBatchImpl(const ForceBatch &batch) const {
     for (size_t i = 0; i < batch.nSystems; ++i) {
-      static_cast<const Derived *>(this)->forceImpl(batch.in[i],
-                                                    &batch.out[i]);
+      static_cast<const Derived *>(this)->forceImpl(batch.in[i], &batch.out[i]);
     }
   }
 
@@ -283,8 +282,8 @@ public:
         keys.push_back(cacheKey(batch.in[i]));
         hits.push_back(_cache->find(keys[i]));
         if (hits.back() && caps().stress &&
-            !cache::PotentialCache::has_result_metadata(
-                *hits.back(), batch.in[i].nAtoms)) {
+            !cache::PotentialCache::has_result_metadata(*hits.back(),
+                                                        batch.in[i].nAtoms)) {
           hits.back().reset();
         }
       }
@@ -325,8 +324,9 @@ public:
         missIn.push_back(batch.in[idx]);
         missOut.push_back(batch.out[idx]);
       }
-      ForceBatch missBatch{
-          .nSystems = missIn.size(), .in = missIn.data(), .out = missOut.data()};
+      ForceBatch missBatch{.nSystems = missIn.size(),
+                           .in = missIn.data(),
+                           .out = missOut.data()};
       static_cast<Derived *>(this)->forceBatchImpl(missBatch);
 
       for (size_t j = 0; j < misses.size(); ++j) {

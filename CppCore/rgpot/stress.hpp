@@ -32,8 +32,8 @@ inline double cellVolume(const double *box) {
   const double m21 = box[7];
   const double m22 = box[8];
   return std::abs(m00 * (m11 * m22 - m12 * m21) -
-                   m01 * (m10 * m22 - m12 * m20) +
-                   m02 * (m10 * m21 - m11 * m20));
+                  m01 * (m10 * m22 - m12 * m20) +
+                  m02 * (m10 * m21 - m11 * m20));
 }
 
 /// Add one pair to the six Voigt components of dE/dε: xx, yy, zz, yz, xz, xy.

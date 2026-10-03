@@ -138,11 +138,11 @@ static std::vector<uint8_t> stored_zip_with_so(const std::vector<uint8_t> &so) {
 
 TEST_CASE("clear_elf_gnu_stack drops PF_X", "[UmaPot][execstack]") {
   auto elf = elf64_gnu_stack(7);
-  REQUIRE(rgpot::aoti_execstack::elf_needs_gnu_stack_clear(elf.data(),
-                                                           elf.size()));
+  REQUIRE(
+      rgpot::aoti_execstack::elf_needs_gnu_stack_clear(elf.data(), elf.size()));
   REQUIRE(rgpot::aoti_execstack::clear_elf_gnu_stack(elf.data(), elf.size()));
-  REQUIRE_FALSE(rgpot::aoti_execstack::elf_needs_gnu_stack_clear(
-      elf.data(), elf.size()));
+  REQUIRE_FALSE(
+      rgpot::aoti_execstack::elf_needs_gnu_stack_clear(elf.data(), elf.size()));
   REQUIRE(rgpot::aoti_execstack::rd32(elf.data() + 68) == 6u);
 }
 
@@ -154,7 +154,8 @@ TEST_CASE("prepare_pt2_for_load caches a noexec copy", "[UmaPot][execstack]") {
     REQUIRE(out.write(reinterpret_cast<const char *>(zip.data()),
                       static_cast<std::streamsize>(zip.size())));
   }
-  const std::string dst = rgpot::aoti_execstack::prepare_pt2_for_load(src.string());
+  const std::string dst =
+      rgpot::aoti_execstack::prepare_pt2_for_load(src.string());
   REQUIRE(dst != src.string());
   auto patched = rgpot::aoti_execstack::read_all(dst);
   REQUIRE_FALSE(rgpot::aoti_execstack::scan_or_clear_pt2(
@@ -184,12 +185,15 @@ TEST_CASE("AOTI ZIP64 local sizes use the central directory",
   const size_t central = payload + elf.size();
   rgpot::aoti_execstack::wr32(zip.data() + zip.size() - 6, central);
 
-  REQUIRE(rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), false));
-  REQUIRE(rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), true));
+  REQUIRE(
+      rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), false));
+  REQUIRE(
+      rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), true));
   REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + payload + 68) == 6u);
   // CRC-32 of elf64_gnu_stack(6), independently evaluated with zlib.
   REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + 14) == 0x43b0270au);
-  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + central + 16) == 0x43b0270au);
+  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + central + 16) ==
+          0x43b0270au);
 }
 
 TEST_CASE("AOTI data descriptors retain payload checksums",
@@ -209,11 +213,15 @@ TEST_CASE("AOTI data descriptors retain payload checksums",
   rgpot::aoti_execstack::wr32(zip.data() + descriptor + 12, elf.size());
   rgpot::aoti_execstack::wr32(zip.data() + zip.size() - 6, central);
 
-  REQUIRE(rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), false));
-  REQUIRE(rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), true));
+  REQUIRE(
+      rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), false));
+  REQUIRE(
+      rgpot::aoti_execstack::scan_or_clear_pt2(zip.data(), zip.size(), true));
   REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + payload + 68) == 6u);
-  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + descriptor + 4) == 0x43b0270au);
-  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + central + 16) == 0x43b0270au);
+  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + descriptor + 4) ==
+          0x43b0270au);
+  REQUIRE(rgpot::aoti_execstack::rd32(zip.data() + central + 16) ==
+          0x43b0270au);
 }
 
 TEST_CASE("UmaPot rejects a metatomic checkpoint", "[UmaPot]") {
@@ -237,11 +245,11 @@ TEST_CASE("UmaPot paramsKey changes with charge and path", "[UmaPot]") {
 
 // Metadata as scripts/export_uma_aoti.py embeds it for Baker HCN.
 static std::unordered_map<std::string, std::string> hcn_metadata() {
-  return {{"task_name", "omol"},       {"charge", "0"},
-          {"spin", "1"},               {"z_set", "[1, 6, 7]"},
-          {"natoms", "3"},             {"counts", R"({"1": 1, "6": 1, "7": 1})"},
-          {"cutoff", "10.0"},          {"label", "hcn"},
-          {"model", "uma-s-1p1"},      {"torch_version", "2.13.0+cpu"}};
+  return {{"task_name", "omol"},  {"charge", "0"},
+          {"spin", "1"},          {"z_set", "[1, 6, 7]"},
+          {"natoms", "3"},        {"counts", R"({"1": 1, "6": 1, "7": 1})"},
+          {"cutoff", "10.0"},     {"label", "hcn"},
+          {"model", "uma-s-1p1"}, {"torch_version", "2.13.0+cpu"}};
 }
 
 static rgpot::UmaConfig hcn_config() {
@@ -252,8 +260,7 @@ static rgpot::UmaConfig hcn_config() {
   return cfg;
 }
 
-template <class F>
-static std::string contract_field(F &&f) {
+template <class F> static std::string contract_field(F &&f) {
   try {
     f();
   } catch (const rgpot::UmaContractError &e) {
@@ -384,8 +391,7 @@ TEST_CASE("UmaPot refuses a charge, spin or composition the package lacks",
   SECTION("charge") {
     cfg.charge = 1;
     rgpot::UmaPot pot(cfg);
-    REQUIRE(contract_field([&] { pot(positions, atmtypes, box); }) ==
-            "charge");
+    REQUIRE(contract_field([&] { pot(positions, atmtypes, box); }) == "charge");
   }
   SECTION("spin set after construction") {
     rgpot::UmaPot pot(cfg);
@@ -515,8 +521,8 @@ TEST_CASE("UmaPot band batch matches per-system evaluation",
        12.54149850420264563, 12.50069809648255514, 13.65514544631068446},
   }};
   const std::vector<int> atmtypes{6, 7, 1};
-  const std::array<double, 9> box{25.0, 0.0, 0.0, 0.0, 25.0, 0.0,
-                                  0.0, 0.0, 25.0};
+  const std::array<double, 9> box{25.0, 0.0, 0.0, 0.0, 25.0,
+                                  0.0,  0.0, 0.0, 25.0};
   const std::array<std::array<double, 3>, 3> box33{
       {{25.0, 0.0, 0.0}, {0.0, 25.0, 0.0}, {0.0, 0.0, 25.0}}};
 
@@ -542,8 +548,8 @@ TEST_CASE("UmaPot band batch matches per-system evaluation",
   std::vector<rgpot::ForceOut> out;
   std::array<std::array<double, 9>, 3> f_batch{};
   for (size_t s = 0; s < 3; ++s) {
-    in.push_back(rgpot::ForceInput{3, geoms[s].data(), atmtypes.data(),
-                                   box.data()});
+    in.push_back(
+        rgpot::ForceInput{3, geoms[s].data(), atmtypes.data(), box.data()});
     out.push_back(rgpot::ForceOut{f_batch[s].data(), 0.0, 0.0});
   }
   const rgpot::ForceBatch batch{3, in.data(), out.data()};

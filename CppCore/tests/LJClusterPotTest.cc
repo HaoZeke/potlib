@@ -13,8 +13,8 @@
 
 #include "rgpot/LennardJones/LJClusterPot.hpp"
 #include "rgpot/LennardJones/LJPot.hpp"
-#include "rgpot/ZBL/ZBLPot.hpp"
 #include "rgpot/Morse/MorsePot.hpp"
+#include "rgpot/ZBL/ZBLPot.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 
 using Catch::Matchers::WithinAbs;
@@ -140,10 +140,9 @@ TEST_CASE("LJPot stress matches a coordinate difference", "[LJPot]") {
   pot.forceImpl(rgpot::ForceInput{2, pos.data(), types.data(), box}, &out);
   REQUIRE(out.has_stress == 1);
 
-  const double volume =
-      std::abs(box[0] * (box[4] * box[8] - box[5] * box[7]) -
-               box[1] * (box[3] * box[8] - box[5] * box[6]) +
-               box[2] * (box[3] * box[7] - box[4] * box[6]));
+  const double volume = std::abs(box[0] * (box[4] * box[8] - box[5] * box[7]) -
+                                 box[1] * (box[3] * box[8] - box[5] * box[6]) +
+                                 box[2] * (box[3] * box[7] - box[4] * box[6]));
   constexpr double step = 1e-6;
   const int rows[6] = {0, 1, 2, 1, 0, 0};
   const int cols[6] = {0, 1, 2, 2, 2, 1};
@@ -174,14 +173,13 @@ TEST_CASE("LJPot stress matches a coordinate difference", "[LJPot]") {
   }
 }
 
-
 namespace {
 template <class Potential>
 void checkPairStressByStrain(const Potential &pot, const AtomMatrix &positions,
-                            const std::vector<int> &types) {
+                             const std::vector<int> &types) {
   REQUIRE(pot.caps().stress);
   const std::array<double, 9> box{20.0, 0.0, 0.0, 0.0, 21.0,
-                                0.0, 0.0, 0.0, 22.0};
+                                  0.0,  0.0, 0.0, 22.0};
   constexpr double volume = 20.0 * 21.0 * 22.0;
   constexpr double step = 1e-6;
   AtomMatrix forces(positions.rows(), 3);
@@ -204,7 +202,8 @@ void checkPairStressByStrain(const Potential &pot, const AtomMatrix &positions,
         AtomMatrix sample_forces(positions.rows(), 3);
         rgpot::ForceOut sample{sample_forces.data(), 0.0, 0.0, {}, 0};
         pot.forceImpl({static_cast<size_t>(positions.rows()), moved.data(),
-                       types.data(), cell.data()}, &sample);
+                       types.data(), cell.data()},
+                      &sample);
         return sample.energy;
       };
       const double expected =
@@ -223,8 +222,9 @@ void checkPairStressByStrain(const Potential &pot, const AtomMatrix &positions,
 }
 } // namespace
 
-TEST_CASE("Pair stresses differentiate the actual truncated and switched energy",
-          "[stress][LJPot][MorsePot][ZBLPot]") {
+TEST_CASE(
+    "Pair stresses differentiate the actual truncated and switched energy",
+    "[stress][LJPot][MorsePot][ZBLPot]") {
   const std::vector<int> types{6, 8};
   SECTION("periodic Lennard-Jones pair crosses the cell boundary") {
     rgpot::LJPot pot;
@@ -260,8 +260,8 @@ TEST_CASE("Pair stress is cleared when the configuration has no pair",
   const double box[9] = {20.0, 0.0, 0.0, 0.0, 21.0, 0.0, 0.0, 0.0, 22.0};
   double forces[3] = {};
   const auto check = [&](const auto &pot) {
-    rgpot::ForceOut out{forces, 1.0, 0.0,
-                        {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0}, 0};
+    rgpot::ForceOut out{
+        forces, 1.0, 0.0, {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0}, 0};
     pot.forceImpl({1, position, &type, box}, &out);
     REQUIRE(out.has_stress == 1);
     REQUIRE(out.energy == 0.0);
