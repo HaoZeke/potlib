@@ -782,6 +782,54 @@ if get_option('with_tests')
                 is_parallel: false,
                 suite: 'cpmd',
             )
+            cpmdc_adopt_engine = shared_library(
+                'cpmdc_adopt_engine',
+                sources: ['tests/cpmdc_adopt_engine.cc'],
+                dependencies: [_mpi_dep],
+                include_directories: _incdirs + ['.'] + include_directories(
+                    'rgpot/CPMDPot',
+                ),
+                install: false,
+            )
+            mpi_split_profile = shared_library(
+                'mpi_split_profile',
+                sources: ['tests/mpi_split_profile.c'],
+                dependencies: [dependency('mpi', language: 'c')],
+                install: false,
+            )
+            adopt_comm = executable(
+                'adopt_comm',
+                sources: ['tests/AdoptComm.cc'],
+                dependencies: test_deps + [ptlrpc_dep, rgpot_mpi_dep, _dl_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            adopt_comm_sh = find_program(
+                meson.current_source_dir() / 'tests/adopt_comm.sh',
+            )
+            foreach entry : [
+                ['AdoptCommMissing', 'missing', cpmdc_gradient_engine],
+                ['AdoptCommSplit', 'split', cpmdc_adopt_engine],
+                ['AdoptCommRefusedHook', 'refused-hook', cpmdc_adopt_engine],
+            ]
+                test(
+                    entry[0],
+                    adopt_comm_sh,
+                    args: [
+                        entry[1],
+                        adopt_comm.full_path(),
+                        entry[2].full_path(),
+                        mpi_split_profile.full_path(),
+                    ],
+                    depends: [adopt_comm, entry[2], mpi_split_profile],
+                    timeout: 60,
+                    is_parallel: false,
+                    suite: 'cpmd',
+                )
+            endforeach
             if get_option('with_cache')
                 collective_cache = executable(
                     'collective_cache_test',
