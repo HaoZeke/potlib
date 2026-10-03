@@ -23,9 +23,9 @@ ver=$("$LAUNCH" --version 2>&1 || true)
 OVER=
 case "$MODE" in
   missing) N=2 ;;
-  split|refused-hook|probe) N=4 ;;
+  split|refused-hook|probe|instance-first|bound-static|bound-instance) N=4 ;;
   *)
-    echo "mode must be missing, split, refused-hook, or probe" >&2
+    echo "unrecognized communicator test mode" >&2
     exit 2
     ;;
 esac

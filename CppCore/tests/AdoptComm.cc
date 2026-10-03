@@ -69,6 +69,53 @@ int main(int argc, char **argv) {
     return rc;
   }
 
+  if (std::strcmp(mode, "instance-first") == 0 ||
+      std::strcmp(mode, "bound-static") == 0 ||
+      std::strcmp(mode, "bound-instance") == 0) {
+    MPI_Init(&argc, &argv);
+    int rank = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    bool profile = false;
+    const int before = split_count(&profile);
+    int idx = -1;
+    if (std::strcmp(mode, "instance-first") == 0) {
+      { rgpot::CPMDPot instance; }
+      idx = rgpot::bindCalculators(2).index;
+    } else {
+      idx = rgpot::bindCalculators(2).index;
+      if (std::strcmp(mode, "bound-static") == 0)
+        idx = rgpot::CPMDPot::bindCalculators(2);
+      else {
+        { rgpot::CPMDPot first; }
+        { rgpot::CPMDPot second; }
+      }
+    }
+    const int repeated = rgpot::bindCalculators(2).index;
+    const int splits = profile ? split_count(&profile) - before : -1;
+    void *handle = dlopen(engine, RTLD_NOW | RTLD_NOLOAD);
+    using AdoptedFn = int (*)(void *, std::size_t);
+    using CountFn = int (*)();
+    auto adopted = handle ? reinterpret_cast<AdoptedFn>(
+        dlsym(handle, "cpmdc_adopted_comm")) : nullptr;
+    auto count = handle ? reinterpret_cast<CountFn>(
+        dlsym(handle, "cpmdc_adopt_call_count")) : nullptr;
+    MPI_Comm mine = MPI_COMM_NULL, theirs = MPI_COMM_NULL;
+    const int got = rgpot::calculatorComm(&mine, sizeof(mine));
+    const int copied = adopted ? adopted(&theirs, sizeof(theirs)) : -1;
+    int cmp = MPI_UNEQUAL;
+    if (got == 1 && copied == 0)
+      MPI_Comm_compare(mine, theirs, &cmp);
+    const int calls = count ? count() : -1;
+    std::printf("adopt-order %s rank %d index %d repeated %d ident %d splits %d calls %d\n",
+                mode, rank, idx, repeated, cmp == MPI_IDENT, splits, calls);
+    const int rc = (profile && idx == rank / 2 && repeated == idx &&
+                   cmp == MPI_IDENT && splits == 1 && calls == 1) ? 0 : 8;
+    if (handle)
+      dlclose(handle);
+    MPI_Finalize();
+    return rc;
+  }
+
   // Keep the engine mapped while inspecting its stored communicator.
   void *keep = dlopen(engine, RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
   if (!keep) {

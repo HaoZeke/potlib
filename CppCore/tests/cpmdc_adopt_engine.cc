@@ -17,6 +17,7 @@ constexpr CPMDCFeatureEntry kFeatures[] = {
 
 MPI_Comm g_comm = MPI_COMM_NULL;
 bool g_set = false;
+int g_adopt_calls = 0;
 
 } // namespace
 
@@ -49,6 +50,7 @@ CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
 // Stores the communicator from rgpot. Does not call MPI_Comm_split.
 int cpmdc_adopt_calculator_comm(const void *comm, size_t comm_bytes,
                                 int ranks_per_calc) {
+  ++g_adopt_calls;
   if (comm == nullptr || comm_bytes != sizeof(MPI_Comm))
     return -1;
   MPI_Comm incoming = MPI_COMM_NULL;
@@ -74,6 +76,8 @@ int cpmdc_adopt_calculator_comm(const void *comm, size_t comm_bytes,
   }
   return rank / rpc;
 }
+
+int cpmdc_adopt_call_count() { return g_adopt_calls; }
 
 int cpmdc_adopted_comm(void *out, size_t nbytes) {
   if (!g_set || out == nullptr || nbytes != sizeof(MPI_Comm))
