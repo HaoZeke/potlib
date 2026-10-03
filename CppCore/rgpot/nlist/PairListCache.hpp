@@ -120,7 +120,7 @@ public:
     }
     if (mic_) {
       pairsIJ_.clear();
-      finishRebuild(R, n, box, opt);
+      finishRebuild(R, n, box, opt, true, false);
       phantom_ = true;
     }
   }
@@ -138,14 +138,15 @@ public:
     auto flip = [&](int32_t i, int32_t j, double dx, double dy, double dz,
                     double r2) { fn(i, j, -dx, -dy, -dz, r2); };
     CellGrid grid;
-    if (grid.build(R, n, w, inv, bc)) {
+    const bool cells = mic_ && grid.build(R, n, w, inv, bc);
+    if (cells) {
       cell_visit<true>(grid, R, w, inv, bc * bc, opt.cutoff * opt.cutoff,
                        pairsIJ_, flip);
     } else {
       vesin::cpu::brute_force_visit(R, n, w, inv, bc * bc,
                                     opt.cutoff * opt.cutoff, pairsIJ_, flip);
     }
-    finishRebuild(R, n, box, opt);
+    finishRebuild(R, n, box, opt, !cells, true);
   }
 
   /// Build the candidate list at cutoff + skin for positions ``R``, the
@@ -169,14 +170,17 @@ public:
     const double c2 = opt.cutoff * opt.cutoff;
     auto none = [](int32_t, int32_t, double, double, double, double) {};
     CellGrid grid;
-    if (mic_ && grid.build(R, n, w, inv, opt.cutoff)) {
+    const bool cells = mic_ && grid.build(R, n, w, inv, opt.cutoff);
+    if (cells) {
       cell_visit<true>(grid, R, w, inv, std::nextafter(c2, HUGE_VAL), -1.0,
                        pairsIJ_, none);
     } else {
       vesin::cpu::brute_force_visit(R, n, w, inv, std::nextafter(c2, HUGE_VAL),
                                     -1.0, pairsIJ_, none);
     }
-    finishRebuild(R, n, box, opt);
+    // One evaluation: the rounding fold costs what recording the images
+    // would, and gives the same vectors bit for bit.
+    finishRebuild(R, n, box, opt, !cells, false);
   }
 
   /// Turn an evaluated slot into a phantom: keep the stamp, drop the pairs.
@@ -341,8 +345,11 @@ private:
     }
   }
 
+  /// ``rowsSorted``: the scan already emitted each row in ascending
+  /// partner order (the brute-force scan does). ``codes``: record image
+  /// codes for a list later calls reuse.
   void finishRebuild(const double *R, std::size_t n, const double *box,
-                     const Options &opt) {
+                     const Options &opt, bool rowsSorted, bool codes) {
     // The fold of the historical per-call loop: diagonal widths along the
     // periodic axes, also for a box the pool will not cache.
     {
@@ -383,12 +390,21 @@ private:
     // Rows from the cell scan arrive in cell order; sorting each row keeps
     // the partner order, and so the summation order, independent of the
     // scan that built the list.
-    for (std::size_t i = 0; i < n; ++i) {
-      std::sort(nbr_.begin() + rows_[i], nbr_.begin() + rows_[i + 1]);
+    if (!rowsSorted) {
+      for (std::size_t i = 0; i < n; ++i) {
+        std::sort(nbr_.begin() + rows_[i], nbr_.begin() + rows_[i + 1]);
+      }
     }
     pairsIJ_.clear();
     pairsIJ_.shrink_to_fit();
-    buildImageCodes();
+    if (codes) {
+      buildImageCodes();
+    } else {
+      code_.clear();
+      const bool fold =
+          micInv_[0] != 0.0 || micInv_[1] != 0.0 || micInv_[2] != 0.0;
+      fold_ = fold ? FoldMode::Round : FoldMode::None;
+    }
     built_ = true;
   }
 
