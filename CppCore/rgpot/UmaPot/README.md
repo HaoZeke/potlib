@@ -21,11 +21,30 @@ package is read.
 | `molecular_box` | re-center into this cube (0: caller's cell) |
 | `batch_max` | band graph size (0 or 1: single system) |
 | `pos_dtype` | `float64` switches the input dtype |
-| `task_name`, `charge`, `spin`, `z_set` | recorded |
+| `task_name`, `charge`, `spin` | must equal `UmaConfig` |
+| `z_set`, `natoms`, `counts` | must match the input atoms |
 | `label`, `shapes`, `inputs`, `outputs` | recorded |
 
 `UmaConfig.cutoff` / `max_neighbors` are defaults. The embedded
 values win when present.
+
+## Contract checks
+
+`merge_mole` folds one composition, charge and spin into the graph.
+A different charge or spin evaluates another potential energy
+surface without any error; a different composition aborts inside
+the graph. Every force call therefore checks the config and the
+input against the embedded keys and throws `rgpot::UmaContractError`
+(a `std::runtime_error`; `field()` names the key) on a mismatch:
+
+```
+UmaPot: config charge is -1, the package was exported for 0
+UmaPot: input counts is {1: 4, 6: 2}, the package was exported for {1: 2, 6: 2}
+```
+
+`natoms` and `counts` exist only in packages from the current
+exporter. Older packages get the `z_set` check, which cannot tell
+C2H2 from C2H4.
 
 `scripts/export_baker_uma_aoti.py` walks Baker endpoints and
 deduplicates by `(z_set, charge, spin)`.
