@@ -601,6 +601,10 @@ TEST_CASE("Full-cell image search rejects invalid and unrepresentable cells",
   auto invalid = std::array<double, 9>{1.0, 0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
   invalid[1] = std::numeric_limits<double>::infinity();
   REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(invalid.data(), periodic), std::invalid_argument);
+  const double ill_conditioned[9] = {1.0, 1.0, 0.0, 1.0, 1.0 + 1e-12,
+                                    0.0, 0.0, 0.0, 1.0};
+  REQUIRE_THROWS_AS(rgpot::nlist::MinimumImage(ill_conditioned, periodic),
+                    std::invalid_argument);
   const double cell[9] = {1.0, 0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
   const rgpot::nlist::MinimumImage image(cell, periodic);
   double dx = 1e30, dy = 0.0, dz = 0.0;

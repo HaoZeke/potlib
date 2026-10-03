@@ -2,6 +2,7 @@
 // MIT License
 // Copyright 2023--present rgpot developers
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -13,7 +14,8 @@ namespace rgpot::nlist {
 /// Nearest periodic image for row-major lattice vectors: d - n H.
 /// The dual-vector bound includes every image shorter than the initial
 /// rounded fractional image. No lattice reduction or fixed image radius
-/// is assumed. Singular cells and unrepresentable search bounds throw.
+/// is assumed. Singular or ill-conditioned cells and unrepresentable
+/// search bounds throw.
 class MinimumImage {
 public:
   MinimumImage() = default;
@@ -40,6 +42,21 @@ public:
                 (a[3] * a[7] - a[4] * a[6]) / det,
                 (a[1] * a[6] - a[0] * a[7]) / det,
                 (a[0] * a[4] - a[1] * a[3]) / det};
+    long double cell_norm = 0.0L, inverse_norm = 0.0L;
+    for (int row = 0; row < 3; ++row) {
+      long double cell_sum = 0.0L, inverse_sum = 0.0L;
+      for (int col = 0; col < 3; ++col) {
+        cell_sum += std::abs(cell_[3 * row + col]);
+        inverse_sum += std::abs(inverse_[3 * row + col]);
+      }
+      cell_norm = std::max(cell_norm, cell_sum);
+      inverse_norm = std::max(inverse_norm, inverse_sum);
+    }
+    const long double eps = std::numeric_limits<long double>::epsilon();
+    // Refuse cells whose condition estimate consumes over half the
+    // working precision; finite image bounds alone do not protect the inverse.
+    if (!(cell_norm * inverse_norm * eps <= std::sqrt(eps)))
+      throw std::invalid_argument("periodic cell is too ill-conditioned for image bounds");
     for (int k = 0; k < 3; ++k) {
       dual_norm_[k] = std::hypot(inverse_[k], inverse_[3 + k],
                                  inverse_[6 + k]);
@@ -74,8 +91,8 @@ public:
                               reduced[1] * inverse_[3 + k] +
                               reduced[2] * inverse_[6 + k];
         const long double extent = radius * dual_norm_[k];
-        // Outward integer rounding and one extra lattice plane retain
-        // boundary candidates in the presence of arithmetic rounding.
+        // Outward integer rounding adds one lattice plane of numerical
+        // margin around the real-arithmetic image bounds.
         low[k] = checkedIndex(std::floor(f - extent) - 1.0L);
         high[k] = checkedIndex(std::ceil(f + extent) + 1.0L);
       }
