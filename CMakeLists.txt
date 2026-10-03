@@ -300,6 +300,10 @@ if(RGPOT_BUILD_TESTS)
       add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endfunction()
 
+    add_pot_test(LJClusterPotTest CppCore/tests/LJClusterPotTest.cc)
+    add_pot_test(PairListTest CppCore/tests/PairListTest.cc)
+    add_pot_test(MorsePotTest CppCore/tests/MorsePotTest.cc)
+
     if(RGPOT_WITH_CACHE)
       add_pot_test(InvarianceTest CppCore/tests/InvarianceTest.cc)
       add_pot_test(CacheTest CppCore/tests/CacheTest.cc)
