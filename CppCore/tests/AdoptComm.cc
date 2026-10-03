@@ -51,6 +51,23 @@ int main(int argc, char **argv) {
   if (setenv("RGPOT_CPMD_ENGINE", engine, 1) != 0)
     return 2;
 
+  if (std::strcmp(mode, "probe") == 0) {
+    MPI_Init(&argc, &argv);
+    int rank = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    bool profile = false;
+    const int before = split_count(&profile);
+    const bool available = rgpot::CPMDPot::probe_available();
+    const auto group = rgpot::bindCalculators(2);
+    const int splits = profile ? split_count(&profile) - before : -1;
+    std::printf("adopt-probe rank %d available %d index %d splits %d\n",
+                rank, available, group.index, splits);
+    const int rc = (available && profile && group.index == rank / 2 &&
+                    splits == 1) ? 0 : 7;
+    MPI_Finalize();
+    return rc;
+  }
+
   // Keep the engine mapped while inspecting its stored communicator.
   void *keep = dlopen(engine, RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
   if (!keep) {

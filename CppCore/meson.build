@@ -814,6 +814,7 @@ if get_option('with_tests')
                 ['AdoptCommMissing', 'missing', cpmdc_gradient_engine],
                 ['AdoptCommSplit', 'split', cpmdc_adopt_engine],
                 ['AdoptCommRefusedHook', 'refused-hook', cpmdc_adopt_engine],
+                ['AdoptCommProbe', 'probe', cpmdc_adopt_engine],
             ]
                 test(
                     entry[0],

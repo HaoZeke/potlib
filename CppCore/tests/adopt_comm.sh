@@ -23,9 +23,9 @@ ver=$("$LAUNCH" --version 2>&1 || true)
 OVER=
 case "$MODE" in
   missing) N=2 ;;
-  split|refused-hook) N=4 ;;
+  split|refused-hook|probe) N=4 ;;
   *)
-    echo "mode must be missing, split, or refused-hook" >&2
+    echo "mode must be missing, split, refused-hook, or probe" >&2
     exit 2
     ;;
 esac
