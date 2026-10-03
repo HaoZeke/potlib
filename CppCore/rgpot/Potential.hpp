@@ -21,6 +21,7 @@
 
 #ifdef RGPOT_HAS_CACHE
 #define XXH_INLINE_ALL
+#include "rgpot/CalculatorGroup.hpp"
 #include "rgpot/PotentialCache.hpp"
 #include <xxhash.h>
 #endif
@@ -191,6 +192,14 @@ public:
     // Cache Read
     if (_cache) {
       auto hit = _cache->find(key);
+      if (caps().groupCollective) {
+        // Every rank must agree before any skips the collective call.
+        unsigned char have = hit ? 1 : 0;
+        calculatorAgree(&have, 1);
+        if (!have) {
+          hit.reset();
+        }
+      }
       if (hit) {
         _cache->deserialize_hit(*hit, fo.energy, forces);
         return {fo.energy, std::move(forces), fo.variance};
@@ -260,12 +269,31 @@ public:
     if (_cache) {
       std::vector<size_t> misses;
       std::vector<rgpot::cache::KeyHash> keys;
+      std::vector<std::optional<std::string>> hits;
       misses.reserve(batch.nSystems);
       keys.reserve(batch.nSystems);
-
+      hits.reserve(batch.nSystems);
       for (size_t i = 0; i < batch.nSystems; ++i) {
         keys.push_back(cacheKey(batch.in[i]));
-        auto hit = _cache->find(keys[i]);
+        hits.push_back(_cache->find(keys[i]));
+      }
+      if (caps().groupCollective) {
+        // One joint decision per system, so a system any rank misses is
+        // computed on every rank.
+        std::vector<unsigned char> have(batch.nSystems);
+        for (size_t i = 0; i < batch.nSystems; ++i) {
+          have[i] = hits[i] ? 1 : 0;
+        }
+        calculatorAgree(have.data(), have.size());
+        for (size_t i = 0; i < batch.nSystems; ++i) {
+          if (!have[i]) {
+            hits[i].reset();
+          }
+        }
+      }
+
+      for (size_t i = 0; i < batch.nSystems; ++i) {
+        auto &hit = hits[i];
         if (hit) {
           types::AtomMatrix forces =
               types::AtomMatrix::Zero(batch.in[i].nAtoms, 3);

@@ -28,6 +28,10 @@ namespace rgpot {
  * geometries (NEB images, dimer rotations) reuse a Verlet-skin cached
  * candidate list.
  *
+ * With ``MorseConfig::switch_width`` set, each pair term is the unshifted
+ * Morse energy times the C^2 quintic switch of PairSwitch.hpp; otherwise
+ * the energy is shifted to zero at the cutoff and the force jumps there.
+ *
  * @warning The box is assumed to be orthogonal.
  */
 void MorsePot::forceImpl(const ForceInput &in, ForceOut *out) const {
@@ -48,28 +52,35 @@ void MorsePot::forceImpl(const ForceInput &in, ForceOut *out) const {
   opt.cutoff = cuttOffR;
 
   const double twoDeA = 2.0 * De * a;
-  double energyAcc = 0.0;
-  nlist::PairListCache::global().evaluate(
-      R, static_cast<std::size_t>(N), box, opt,
-      [&](int32_t i, int32_t j, double dx, double dy, double dz, double r2) {
+  const double depth = De;
+  const double range = a;
+  const double rEq = re;
+  const double shiftU = energyCutoff;
+  auto &pool = nlist::PairListCache::global();
+  if (m_config.switch_width != 0.0) {
+    // Unshifted pair term times the C^2 switch S; fscale = -(V S)' / r.
+    const QuinticSwitch sw = m_switch;
+    *U = pool.accumulate(
+        R, static_cast<std::size_t>(N), box, opt, F,
+        [=](int32_t, int32_t, double r2) noexcept {
+          const double r = std::sqrt(r2);
+          const double d = 1.0 - std::exp(-range * (r - rEq));
+          const double v = depth * d * d - depth;
+          const auto s = sw(r);
+          return nlist::PairTerm{
+              v * s.s, (twoDeA * d * (d - 1.0) * s.s - v * s.dsdr) / r};
+        });
+    return;
+  }
+  *U = pool.accumulate(
+      R, static_cast<std::size_t>(N), box, opt, F,
+      [=](int32_t, int32_t, double r2) noexcept {
         const double r = std::sqrt(r2);
-        const double d = 1.0 - std::exp(-a * (r - re));
-        energyAcc += De * d * d - De - energyCutoff;
-
-        // -dU/dr / r along d = r_i - r_j.
-        const double fscale = twoDeA * d * (d - 1.0) / r;
-        const double fx = fscale * dx;
-        const double fy = fscale * dy;
-        const double fz = fscale * dz;
-
-        F[3 * i] += fx;
-        F[3 * i + 1] += fy;
-        F[3 * i + 2] += fz;
-        F[3 * j] -= fx;
-        F[3 * j + 1] -= fy;
-        F[3 * j + 2] -= fz;
+        const double d = 1.0 - std::exp(-range * (r - rEq));
+        // -dU/dr / r: the force on i is fscale * (r_i - r_j).
+        return nlist::PairTerm{depth * d * d - depth - shiftU,
+                               twoDeA * d * (d - 1.0) / r};
       });
-  *U = energyAcc;
 }
 
 } // namespace rgpot

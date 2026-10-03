@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
   rgpot
-  VERSION 3.2.0
+  VERSION 3.4.0
   DESCRIPTION "Cpp core for potential energy surface functionality"
   HOMEPAGE_URL "https://github.com/OmniPotentRPC/rgpot"
   LANGUAGES C CXX)
@@ -161,10 +161,17 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   add_library(rgpot ${RGPOT_SOURCES})
   set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX)
 
+  # librgpot never links MPI; it loads librgpot_mpi with dlopen when a host
+  # asks for calculator groups (CppCore/rgpot/calculator_mpi_abi.h).
+  target_link_libraries(rgpot PRIVATE ${CMAKE_DL_LIBS})
   find_package(MPI QUIET COMPONENTS CXX)
   if(MPI_FOUND)
-    target_link_libraries(rgpot PUBLIC MPI::MPI_CXX)
-    target_compile_definitions(rgpot PUBLIC RGPOT_HAS_MPI)
+    add_library(rgpot_mpi SHARED CppCore/rgpot/CalculatorGroupMpi.cc)
+    target_include_directories(rgpot_mpi
+                               PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/CppCore)
+    target_link_libraries(rgpot_mpi PRIVATE MPI::MPI_CXX)
+    set_target_properties(rgpot_mpi PROPERTIES CXX_VISIBILITY_PRESET hidden
+                                               SOVERSION 3)
   endif()
 
   if(RGPOT_WITH_CACHE)

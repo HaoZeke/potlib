@@ -1,6 +1,6 @@
 [project]
 name = "rgpot"
-version = "3.2.0"
+version = "3.4.0"
 description = "Potential energy surfaces for atomistic simulation (LJ + Metatomic multi-ABI dlopen; nanobind abi3)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -134,6 +134,9 @@ before-all = "yum install -y gcc-gfortran openblas-devel || dnf install -y gcc-g
 # Torch / metatomic / metatensor are runtime deps of the Metatomic engine
 # plugin (dlopen / RPATH). Do not vendor them into the wheel — exclude so
 # auditwheel leaves those NEEDED entries for the installed torch stack.
+# libgomp stays in: torch wheels carry their own renamed copy, which does not
+# answer librgpot's NEEDED libgomp.so.1, so excluding it left plain installs
+# depending on a system OpenMP runtime.
 repair-wheel-command = """
   set -eu
   # mesonpy zip drops ELF soversion links; _core NEEDs librgpot.so.3.
@@ -150,9 +153,13 @@ repair-wheel-command = """
       --exclude libtorch_python.so \
       --exclude libmetatensor_torch.so \
       --exclude libmetatomic_torch.so \
-      --exclude libmetatensor.so \
-      --exclude libgomp.so.1
+      --exclude libmetatensor.so
   rm -rf "$tmp"
+  # auditwheel rewrites NEEDED in librgpot.so.X.Y.Z alone; refresh the
+  # soname copies _core loads from the repaired file.
+  for w in {dest_dir}/*.whl; do
+    bash scripts/rgpot_sync_soname_copies.sh "$w"
+  done
 """
 
 [tool.cibuildwheel.macos]

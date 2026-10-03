@@ -7,7 +7,35 @@ if get_option('with_cache') and not get_option('with_rpc_client_only')
     _rgpot_srcs += files('rgpot/PotentialCache.cc')
 endif
 
+# Calculator groups split MPI_COMM_WORLD and broadcast results between
+# groups. librgpot itself never links MPI: the MPI side is librgpot_mpi,
+# which CalculatorGroup.cc loads with dlopen when a host asks for groups
+# (calculator_mpi_abi.h). Without it a process is one group of one rank.
+_mpi_dep = dependency('mpi', language: 'cpp', required: get_option('with_mpi'))
+_dl_dep = meson.get_compiler('cpp').find_library('dl', required: false)
+_deps += _dl_dep
 _rgpot_srcs += files('rgpot/CalculatorGroup.cc')
+rgpot_mpi_lib = disabler()
+rgpot_mpi_dep = disabler()
+if _mpi_dep.found()
+    rgpot_mpi_lib = shared_library(
+        'rgpot_mpi',
+        files('rgpot/CalculatorGroupMpi.cc'),
+        dependencies: [_mpi_dep],
+        include_directories: include_directories('.'),
+        gnu_symbol_visibility: 'hidden',
+        version: meson.project_version(),
+        soversion: '3',
+        install: not meson.is_subproject(),
+    )
+    # Hosts never need to link this: librgpot finds it next to itself.
+    # Tests and hosts that want it loaded up front link it.
+    rgpot_mpi_dep = declare_dependency(
+        link_with: rgpot_mpi_lib,
+        dependencies: [_mpi_dep],
+        compile_args: ['-DRGPOT_HAS_MPI'],
+    )
+endif
 _rgpot_srcs += files('rgpot/PotHelpers.cc')
 _rgpot_srcs += files('rgpot/units.cc')
 
@@ -72,10 +100,11 @@ if not get_option('with_rpc_client_only')
         )
     endif
 
+    # XTBDlopen frontend always (no libxtb). Linked pot + engine when has_xtb.
+    subdir('rgpot/XTBPot')
+    _linkto += [xtb_dlopen]
     if has_xtb
-        subdir('rgpot/XTBPot')  # 'xtbpot' + engine + dlopen frontend
         rgpotentials += [xtbpot]
-        _linkto += [xtb_dlopen]
     endif
 
     if has_xckernel
@@ -191,6 +220,15 @@ if not get_option('with_rpc_client_only')
             depends: [rgpot],
         )
     endif
+    # librgpot must not pull libmpi into a host: the MPI side is dlopen'd.
+    if get_option('with_tests') and host_system == 'linux'
+        test(
+            'CoreLinksNoMpi',
+            find_program('../scripts/check_no_mpi_needed.sh'),
+            args: [rgpot.full_path()],
+            depends: [rgpot],
+        )
+    endif
     # nm/readelf ELF dump; same host gate as FortranSymbolAudit.
     if get_option('with_tests') and host_system != 'windows'
         test(
@@ -203,11 +241,15 @@ if not get_option('with_rpc_client_only')
     endif
 endif
 
-# Metatomic engine + dlopen frontend for client-only (eOn with_rgpot) consumers.
-# Thin host links metatomic_dlopen_dep; optional libmetatomic_engine.so holds torch.
-if get_option('with_rpc_client_only') and has_metatomic
-    subdir('rgpot/MetatomicPot')
-    _metatomic_build_rpath = _engine_build_rpath
+# Client-only (eOn with_rgpot): thin dlopen frontends without fat link deps.
+# XTB always; metatomic only when torch/metatomic are available to build the
+# engine, whose optional libmetatomic_engine.so holds torch.
+if get_option('with_rpc_client_only')
+    subdir('rgpot/XTBPot')
+    if has_metatomic
+        subdir('rgpot/MetatomicPot')
+        _metatomic_build_rpath = _engine_build_rpath
+    endif
 endif
 
 # ------------------------ Server
@@ -263,6 +305,34 @@ if get_option('with_examples') and not get_option('with_rpc_client_only')
         link_with: _linkto,
         cpp_args: _args,
     )
+    # Not a meson test: scripts/bench_pair_scaling.sh drives this.
+    executable(
+        'time_pair_scaling',
+        sources: ['examples/time_pair_scaling.cc'],
+        dependencies: _deps + [vesin_dep] + fortran_rt_deps,
+        link_with: _linkto,
+        cpp_args: _args,
+    )
+    if rpc_enabled
+        # Not a meson test: needs a running potserv (see the file header).
+        executable(
+            'time_rpc_call',
+            sources: ['examples/time_rpc_call.cc'],
+            link_with: [pot_bridge],
+            include_directories: _incdirs,
+            cpp_args: _args,
+        )
+    endif
+    if _mpi_dep.found()
+        # Not a meson test: run under mpirun (see the file header).
+        executable(
+            'time_calculator_share',
+            sources: ['examples/time_calculator_share.cc'],
+            dependencies: _deps + [vesin_dep, rgpot_mpi_dep] + fortran_rt_deps,
+            link_with: _linkto,
+            cpp_args: _args,
+        )
+    endif
     foreach example : example_array
         test(
             example.get(0),
@@ -293,6 +363,11 @@ if get_option('with_tests')
     )
     test_args = _args
     test_args += ['-DRGPOTTEST']
+    if _mpi_dep.found()
+        # Tests expect librgpot_mpi next to them (it builds in this
+        # directory), whether or not they link MPI themselves.
+        test_args += ['-DRGPOT_HAS_MPI']
+    endif
     # Client-only builds skip rgpot_core; UnitsTest still needs units.cc.
     if get_option('with_rpc_client_only')
         units_for_tests = static_library(
@@ -317,6 +392,19 @@ if get_option('with_tests')
     if not get_option('with_rpc_client_only')
         test_array += [
             ['MorsePotTest', 'morse_pot_test', 'MorsePotTest.cc', ''],
+            ['PairListTest', 'pair_list_test', 'PairListTest.cc', ''],
+            [
+                'CalculatorGroupTest',
+                'calculator_group_test',
+                'CalculatorGroupTest.cc',
+                '',
+            ],
+            [
+                'CalculatorAbortFlagTest',
+                'calculator_abort_flag_test',
+                'CalculatorAbortFlagTest.cc',
+                '',
+            ],
             [
                 'LJClusterPotTest',
                 'ljcluster_pot_test',
@@ -324,6 +412,8 @@ if get_option('with_tests')
                 '',
             ],
             ['ZBLPotTest', 'zbl_pot_test', 'ZBLPotTest.cc', ''],
+            # The dlopen frontend is in librgpot whether or not with_xtb is.
+            ['XTBDlopenTest', 'xtb_dlopen_test', 'XTBDlopenTest.cc', ''],
         ]
     endif
     if has_fortran
@@ -529,6 +619,36 @@ if get_option('with_tests')
             'RGPOT_CPMD_ENGINE',
             cpmdc_fake_engine.full_path(),
         )
+        cpmdc_gradient_engine = shared_library(
+            'cpmdc_gradient_engine',
+            sources: ['tests/cpmdc_gradient_engine.cc'],
+            include_directories: _incdirs + ['.'] + include_directories(
+                'rgpot/CPMDPot',
+            ),
+            install: false,
+        )
+        cpmdc_gradient_env = environment()
+        cpmdc_gradient_env.set(
+            'RGPOT_CPMD_ENGINE',
+            cpmdc_gradient_engine.full_path(),
+        )
+        test(
+            'CPMDPotGradientStressTest',
+            executable(
+                'cpmd_pot_gradient_stress_test',
+                sources: ['tests/CPMDPotGradientStressTest.cc'],
+                dependencies: test_deps + [ptlrpc_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            ),
+            env: cpmdc_gradient_env,
+            depends: cpmdc_gradient_engine,
+            workdir: meson.source_root(),
+            suite: 'cpmd',
+        )
         test(
             'CPMDPotMessageAbiTest',
             executable(
@@ -546,6 +666,127 @@ if get_option('with_tests')
             workdir: meson.source_root(),
             suite: 'cpmd',
         )
+        mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _mpi_dep.found() and mpiexec.found()
+            rank_exception = executable(
+                'rank_exception_abort',
+                sources: ['tests/RankExceptionAbort.cc'],
+                dependencies: test_deps + [ptlrpc_dep, rgpot_mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            rank_exception_sh = find_program(
+                meson.current_source_dir() / 'tests/rank_exception_abort.sh',
+            )
+            test(
+                'RankExceptionAbort',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'abort'],
+                env: cpmdc_fake_env,
+                depends: [cpmdc_fake_engine, rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'CalculatorUnevenBatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'uneven'],
+                env: cpmdc_fake_env,
+                depends: [cpmdc_fake_engine, rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeOwner',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-owner'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'RankExceptionFinalizeGuest',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'finalize-guest'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'ShareBroadcastMismatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-bad'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'ShareBroadcastMatch',
+                rank_exception_sh,
+                args: [rank_exception.full_path(), 'share-ok'],
+                env: cpmdc_fake_env,
+                depends: [rank_exception],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            refused_split = executable(
+                'refused_split',
+                sources: ['tests/RefusedSplit.cc'],
+                dependencies: test_deps + [ptlrpc_dep, rgpot_mpi_dep],
+                include_directories: _incdirs + ['.'],
+                cpp_args: test_args,
+                link_with: _linkto,
+                link_language: 'cpp',
+                build_rpath: _metatomic_build_rpath,
+            )
+            refused_split_sh = find_program(
+                meson.current_source_dir() / 'tests/refused_split.sh',
+            )
+            test(
+                'RefusedSplit',
+                refused_split_sh,
+                args: [refused_split.full_path()],
+                depends: [refused_split],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            if get_option('with_cache')
+                collective_cache = executable(
+                    'collective_cache_test',
+                    sources: ['tests/CollectiveCacheTest.cc'],
+                    dependencies: test_deps + [rgpot_mpi_dep],
+                    include_directories: _incdirs + ['.'],
+                    cpp_args: test_args,
+                    link_with: _linkto,
+                    link_language: 'cpp',
+                    build_rpath: _metatomic_build_rpath,
+                )
+                test(
+                    'CollectiveCache',
+                    find_program(
+                        meson.current_source_dir() / 'tests/collective_cache.sh',
+                    ),
+                    args: [collective_cache.full_path()],
+                    depends: [collective_cache],
+                    timeout: 60,
+                    is_parallel: false,
+                    suite: 'cpmd',
+                )
+            endif
+        endif
         test(
             'ProfileLoaderTest',
             executable(
@@ -661,22 +902,53 @@ if get_option('with_tests')
         )
     endif
 
+    calculator_group_test_exe = disabler()
     foreach test : test_array
+        _test_exe = executable(
+            test.get(1),
+            sources: ['tests/' + test.get(2)],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            build_rpath: _metatomic_build_rpath,
+        )
         test(
             test.get(0),
-            executable(
-                test.get(1),
-                sources: ['tests/' + test.get(2)],
-                dependencies: test_deps,
-                include_directories: _incdirs + ['.'],
-                cpp_args: test_args,
-                link_with: _linkto,
-                link_language: 'cpp',
-                build_rpath: _metatomic_build_rpath,
-            ),
+            _test_exe,
             workdir: meson.source_root() + test.get(3),
         )
+        if test.get(1) == 'calculator_group_test'
+            calculator_group_test_exe = _test_exe
+        endif
     endforeach
+    if _mpi_dep.found() and not is_disabler(calculator_group_test_exe)
+        _calc_mpiexec = find_program('mpirun', 'mpiexec', required: false)
+        if _calc_mpiexec.found()
+            calculator_group_mpi_sh = find_program(
+                meson.current_source_dir() / 'tests/calculator_group_mpi.sh',
+            )
+            test(
+                'CalculatorGroupShare',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'share'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+            test(
+                'CalculatorGroupBadOwner',
+                calculator_group_mpi_sh,
+                args: [calculator_group_test_exe.full_path(), 'bad-owner'],
+                depends: [calculator_group_test_exe],
+                timeout: 60,
+                is_parallel: false,
+                suite: 'cpmd',
+            )
+        endif
+    endif
 
     if has_dftd3 or has_dftd4
         test(
@@ -802,6 +1074,7 @@ endif
 #   -Dwith_rpc_client_only=true -Dpure_lib=true
 #   -Dwith_tests=false -Dwith_examples=false
 #   -Dwith_xtb=false -Dwith_metatomic=false
+# XTBDlopen frontend still builds; set RGPOT_XTB_ENGINE for libxtb_engine.so.
 # See docs/eon_pkgconfig.md.
 if not meson.is_subproject()
     # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
@@ -862,6 +1135,11 @@ if not meson.is_subproject()
         if has_skala
             _pc_cflags += ['-DRGPOT_HAS_SKALA=TRUE']
         endif
+        if get_option('with_cache')
+            # PotentialCache.hpp includes rocksdb/db.h.
+            _pc_cflags += ['-DRGPOT_HAS_CACHE=TRUE']
+            _pc_requires += ['rocksdb']
+        endif
     endif
     if _rpc_stack
         _pc_libs += [nwchempot, cpmdpot]
@@ -884,4 +1162,23 @@ if not meson.is_subproject()
         extra_cflags: _pc_cflags,
         filebase: 'rgpot',
     )
+    if _mpi_dep.found()
+        # The MPI side of the calculator groups. librgpot loads it with
+        # dlopen; linking it is for hosts that want MPI mapped up front.
+        pkg.generate(
+            rgpot_mpi_lib,
+            name: 'rgpot-mpi',
+            description: 'rgpot calculator groups over MPI (dlopen side of librgpot)',
+            url: 'https://github.com/OmniPotentRPC/rgpot',
+            version: meson.project_version(),
+            subdirs: ['.'],
+            extra_cflags: ['-DRGPOT_HAS_MPI'],
+            filebase: 'rgpot-mpi',
+        )
+    endif
+endif
+
+if _mpi_dep.found()
+    # Subproject consumers: dependency('rgpot-mpi') resolves to this build.
+    meson.override_dependency('rgpot-mpi', rgpot_mpi_dep)
 endif

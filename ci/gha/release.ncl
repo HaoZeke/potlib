@@ -138,6 +138,15 @@ let P = S.pins in
               echo "Re-enable publish and switch git deps to registry versions first."
               exit 0
             fi
+            # publish.yml (OIDC) uploads the same tag; whichever finishes
+            # second must not fail the release and skip gh-release.
+            version=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r '.packages[] | select(.name == "rgpot-core") | .version')
+            if curl -fsS -A "rgpot-release (github.com/OmniPotentRPC/rgpot)" \
+                "https://crates.io/api/v1/crates/rgpot-core/${version}" >/dev/null; then
+              echo "rgpot-core ${version} is already on crates.io; skipping cargo publish."
+              exit 0
+            fi
             cargo publish -p rgpot-core --locked
           "%,
           env = { CARGO_REGISTRY_TOKEN = "${{ secrets.CARGO_REGISTRY_TOKEN }}" },

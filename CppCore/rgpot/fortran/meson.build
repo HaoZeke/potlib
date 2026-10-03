@@ -38,6 +38,7 @@ fortran_pots_sources = files(
     'rgpot_tersoff_capi.f90',
     'rgpot_water_h.f90',
     'rgpot_water_h_capi.f90',
+    'rgpot_workspace.f90',
 )
 
 # C++ faces over the bind(c) entries.
@@ -96,6 +97,7 @@ rgpot_cuh2 = library(
         'rgpot_kinds.f90',
         'rgpot_ferror.f90',
         'rgpot_neighbors.f90',
+        'rgpot_workspace.f90',
         'rgpot_cuh2.f90',
         'rgpot_cuh2_capi.f90',
     ],
