@@ -24,12 +24,15 @@ using Catch::Matchers::WithinAbs;
 using rgpot::types::AtomMatrix;
 namespace fs = std::filesystem;
 
-// ASE FAIRChemCalculator uma-s-1p1 / omol on Baker 01_hcn reactant.con.
-static constexpr double kHcnAseOmolEnergy = -2542.4200325775496;
+// ASE FAIRChemCalculator 2.22.0 / torch 2.13.0, uma-s-1p1 / omol.
+// Baker 01_hcn positions are centered in double before model evaluation.
+// Checkpoint SHA256:
+// 07068e9c76702ca173d13155095f2117c1b327ec228557e64cd2709c777b824a
+static constexpr double kHcnAseOmolEnergy = -2542.4200323230975;
 static constexpr double kHcnAseOmolForces[3][3] = {
-    {0.029140297323465347, 0.011646071448922157, -1.4753634929656982},
-    {-0.016493169590830803, -0.0065111019648611546, 1.7600582838058472},
-    {-0.012647130526602268, -0.0051349685527384281, -0.28469470143318176},
+    {0.029150184243917465, 0.011640587821602821, -1.475394606590271},
+    {-0.016498778015375137, -0.006508127320557833, 1.7600626945495605},
+    {-0.012651405297219753, -0.005132460035383701, -0.2846679985523224},
 };
 
 static std::string resolve_uma_omol_pt2() {
