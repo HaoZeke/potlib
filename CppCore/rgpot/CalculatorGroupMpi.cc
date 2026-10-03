@@ -93,6 +93,12 @@ int comm(void *comm_out, std::size_t comm_bytes) {
   return 1;
 }
 
+int adopt(int (*callback)(const void *, std::size_t, int)) {
+  if (!callback || !g_bound || g_group.index < 0 || g_comm == MPI_COMM_NULL)
+    return -1;
+  return callback(&g_comm, sizeof(g_comm), g_group.ranks);
+}
+
 int initialized() {
   int inited = 0;
   MPI_Initialized(&inited);
@@ -345,6 +351,7 @@ const rgpot_mpi_api_t kApi = {
     &finalizeAtExit,
     &agree,
     &publishError,
+    &adopt,
 };
 
 } // namespace

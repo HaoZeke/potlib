@@ -166,8 +166,9 @@ CalculatorGroup bindCalculators(int ranks_per_calculator) {
   }
   for (CalculatorHook hook : g_hooks) {
     int idx = hook(rpc);
-    if (g_group.index < 0 && idx >= 0)
-      g_group.index = idx;
+    // A hook cannot recover a refused split or another hook's refusal.
+    if (idx < 0)
+      g_group.index = -1;
   }
   g_bound = true;
   g_bound_rpc = rpc;
@@ -179,6 +180,11 @@ const CalculatorGroup &thisCalculator() { return g_group; }
 int calculatorComm(void *comm_out, std::size_t comm_bytes) {
   const rgpot_mpi_api_t *mpi = api();
   return mpi ? mpi->comm(comm_out, comm_bytes) : 0;
+}
+
+int adoptCalculatorComm(CalculatorCommAdopter callback) {
+  const rgpot_mpi_api_t *mpi = api();
+  return mpi && callback ? mpi->adopt(callback) : -1;
 }
 
 int calculatorsUseMpi() {

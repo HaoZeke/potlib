@@ -46,7 +46,7 @@ using AvailableFn = int (*)(void);
 using FeatureCountFn = size_t (*)(void);
 using FeatureTableFn = const CPMDCFeatureEntry *(*)(void);
 using FeatureFindFn = const CPMDCFeatureEntry *(*)(const char *);
-using BindCalculatorsFn = int (*)(int);
+using AdoptCommFn = int (*)(const void *, std::size_t, int);
 using SelectOrbitalsFn = int (*)(CPMDCSession *, long long);
 
 // Layout matches cpmdc CPMDCStressTensor: int valid, then nine doubles.
@@ -58,12 +58,10 @@ using LastStressFn = int (*)(CPMDCStressTensor *);
 static_assert(offsetof(CPMDCStressTensor, values) == 8,
               "CPMDCStressTensor values follow the valid flag");
 
-BindCalculatorsFn g_cpmd_bind = nullptr;
+AdoptCommFn g_cpmd_adopt = nullptr;
 
-int cpmd_calculator_hook(int ranks_per_calc) {
-  if (!g_cpmd_bind)
-    return -1;
-  return g_cpmd_bind(ranks_per_calc);
+int cpmd_calculator_hook(int) {
+  return adoptCalculatorComm(g_cpmd_adopt);
 }
 
 struct ParamsView {
@@ -152,10 +150,8 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
 
   b.energy_gradient =
       b.engine_lib.sym_optional<EnergyGradientFn>("cpmdc_energy_gradient");
-  g_cpmd_bind =
-      b.engine_lib.sym_optional<BindCalculatorsFn>("cpmdc_bind_calculator");
-  if (g_cpmd_bind)
-    addCalculatorHook(cpmd_calculator_hook);
+  const auto adopt_comm = b.engine_lib.sym_optional<AdoptCommFn>(
+      "cpmdc_adopt_calculator_comm");
   b.set_params = b.engine_lib.sym_optional<SetParamsFn>("cpmdc_set_params");
   b.session_create =
       b.engine_lib.sym_optional<SessionCreateFn>("cpmdc_session_create");
@@ -195,6 +191,9 @@ bool try_load_engine(EngineBundle &b, const std::string &engine_path) {
     return false;
   }
   b.loaded = true;
+  g_cpmd_adopt = adopt_comm;
+  if (g_cpmd_adopt)
+    addCalculatorHook(cpmd_calculator_hook);
   return true;
 }
 
@@ -519,7 +518,7 @@ bool CPMDPot::available() const {
 }
 
 int CPMDPot::bindCalculators(int ranks_per_calc) {
-  // cpmdc_bind_calculator stores the split communicator inside the
+  // cpmdc_adopt_calculator_comm stores the borrowed communicator in the
   // engine, and the hook list runs once per process. The bundle that
   // loaded the engine for the bind therefore lives as long as the
   // process: a dlclose here, with no CPMDPot alive to hold another
@@ -529,6 +528,9 @@ int CPMDPot::bindCalculators(int ranks_per_calc) {
   static EngineBundle *bundle = new EngineBundle;
   if (!bundle->loaded)
     try_load_engine(*bundle, "");
+  // Reject an incompatible engine before creating an MPI communicator.
+  if (!bundle->loaded || !g_cpmd_adopt)
+    return -1;
   return ::rgpot::bindCalculators(ranks_per_calc).index;
 }
 
