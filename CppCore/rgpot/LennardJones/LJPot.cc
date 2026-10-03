@@ -16,6 +16,7 @@
 
 #include "rgpot/LennardJones/LJPot.hpp"
 #include "rgpot/nlist/PairListCache.hpp"
+#include "rgpot/stress.hpp"
 #include "rgpot/types/AtomMatrix.hpp"
 using rgpot::types::AtomMatrix;
 
@@ -46,6 +47,12 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   const double *box = in.box;
   double *F = out->F;
   double *U = &out->energy;
+  double strain[6] = {};
+  const double volume = cellVolume(in.box);
+  publishCauchyStress(out, strain, volume);
+  const auto observe = [&](double fscale, double dx, double dy, double dz) {
+    accumulatePairStrain(strain, fscale, dx, dy, dz);
+  };
   *U = 0;
   for (long i = 0; i < N; i++) {
     F[3 * i] = 0;
@@ -78,7 +85,8 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
           const auto s = sw(r);
           return nlist::PairTerm{
               v * s.s, 6.0 * b * invR2 * (2.0 * a - 1.0) * s.s - v * s.dsdr / r};
-        });
+        }, observe);
+    publishCauchyStress(out, strain, volume);
     return;
   }
   *U = pool.accumulate(
@@ -91,7 +99,8 @@ void LJPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         // -dU/dr / r: the force on i is fscale * (r_i - r_j).
         return nlist::PairTerm{b * (a - 1.0) - shiftU,
                                6.0 * b * invR2 * (2.0 * a - 1.0)};
-      });
+      }, observe);
+  publishCauchyStress(out, strain, volume);
   return;
 }
 

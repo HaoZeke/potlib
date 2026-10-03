@@ -19,6 +19,7 @@
 
 #include "rgpot/ZBL/ZBLPot.hpp"
 #include "rgpot/nlist/PairListCache.hpp"
+#include "rgpot/stress.hpp"
 
 namespace rgpot {
 
@@ -179,6 +180,12 @@ void ZBLPot::forceImpl(const ForceInput &in, ForceOut *out) const {
   const double *R = in.pos;
   double *F = out->F;
   double *U = &out->energy;
+  double strain[6] = {};
+  const double volume = cellVolume(in.box);
+  publishCauchyStress(out, strain, volume);
+  const auto observe = [&](double fscale, double dx, double dy, double dz) {
+    accumulatePairStrain(strain, fscale, dx, dy, dz);
+  };
   *U = 0.0;
   std::fill(F, F + 3 * N, 0.0);
   if (N < 2) {
@@ -229,7 +236,8 @@ void ZBLPot::forceImpl(const ForceInput &in, ForceOut *out) const {
         }
         // -dU/dr / r: the force on i is fscale * (r_i - r_j).
         return nlist::PairTerm{energy_pair, -dEdr / r};
-      });
+      }, observe);
+  publishCauchyStress(out, strain, volume);
 }
 
 } // namespace rgpot

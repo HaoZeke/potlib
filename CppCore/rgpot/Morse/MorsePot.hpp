@@ -86,6 +86,10 @@ public:
     return m_config.switch_width != 0.0 ? 0.0 : energyCutoff;
   }
 
+  [[nodiscard]] PotCaps caps() const noexcept override {
+    return {.stress = true};
+  }
+
   [[nodiscard]] uint64_t paramsKey() const noexcept override {
     return m_paramsKey;
   }

@@ -52,6 +52,10 @@ struct PairTerm {
   double fscale;
 };
 
+struct IgnorePairContribution {
+  void operator()(double, double, double, double) const noexcept {}
+};
+
 class CachedPairList {
 public:
   /// How evaluation turns r_i - r_j into the minimum image: no fold (free
@@ -223,17 +227,19 @@ public:
   /// the pair energy and ``fscale = -V'(r) / r``; the loop adds
   /// ``fscale * d`` to atom i and subtracts it from atom j (``d = r_i -
   /// r_j``, minimum image applied) and returns the summed energy. Atom i's
-  /// force stays in registers across its row.
-  template <typename Kernel>
+  /// force stays in registers across its row. The optional observer receives
+  /// the same force scale and displacement once per accepted pair.
+  template <typename Kernel, typename Observer = IgnorePairContribution>
   [[nodiscard]] double accumulate(const double *R, double *F,
-                                  Kernel &&kernel) const {
+                                  Kernel &&kernel,
+                                  Observer &&observe = {}) const {
     switch (fold_) {
     case FoldMode::None:
-      return accumulateImpl<FoldMode::None>(R, F, kernel);
+      return accumulateImpl<FoldMode::None>(R, F, kernel, observe);
     case FoldMode::Round:
-      return accumulateImpl<FoldMode::Round>(R, F, kernel);
+      return accumulateImpl<FoldMode::Round>(R, F, kernel, observe);
     case FoldMode::Coded:
-      return accumulateImpl<FoldMode::Coded>(R, F, kernel);
+      return accumulateImpl<FoldMode::Coded>(R, F, kernel, observe);
     }
     return 0.0;
   }
@@ -260,9 +266,9 @@ private:
     }
   }
 
-  template <FoldMode M, typename Kernel>
+  template <FoldMode M, typename Kernel, typename Observer>
   [[nodiscard]] double accumulateImpl(const double *R, double *F,
-                                      Kernel &kernel) const {
+                                      Kernel &kernel, Observer &observe) const {
     const double cutoff2 = opt_.cutoff * opt_.cutoff;
     const Fold fold = makeFold();
     double energy = 0.0;
@@ -292,6 +298,7 @@ private:
           F[3 * j] -= fx;
           F[3 * j + 1] -= fy;
           F[3 * j + 2] -= fz;
+          observe(t.fscale, dx, dy, dz);
         }
       }
       F[3 * i] += fxi;
@@ -547,23 +554,24 @@ public:
   /// inside the cutoff and their summation order are then the same whichever
   /// slot or scan served the call, so a result does not depend on the pool's
   /// history or on which thread reached it first.
-  template <typename Kernel>
+  template <typename Kernel, typename Observer = IgnorePairContribution>
   [[nodiscard]] double accumulate(const double *R, std::size_t n,
                                   const double *box,
                                   const CachedPairList::Options &opt,
-                                  double *F, Kernel &&kernel) {
+                                  double *F, Kernel &&kernel,
+                                  Observer &&observe = {}) {
     std::shared_ptr<const CachedPairList> hit = lookup(R, n, box, opt);
     if (hit && !hit->isPhantom()) {
-      return hit->accumulate(R, F, kernel);
+      return hit->accumulate(R, F, kernel, observe);
     }
     auto fresh = std::make_shared<CachedPairList>();
     double energy;
     if (hit) {
       fresh->rebuild(R, n, box, opt);
-      energy = fresh->accumulate(R, F, kernel);
+      energy = fresh->accumulate(R, F, kernel, observe);
     } else {
       fresh->buildForEval(R, n, box, opt);
-      energy = fresh->accumulate(R, F, kernel);
+      energy = fresh->accumulate(R, F, kernel, observe);
       if (!fresh->cacheable()) {
         return energy;
       }
