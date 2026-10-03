@@ -444,6 +444,43 @@ TEST_CASE("UmaPot Baker HCN matches ASE FAIRChem omol", "[UmaPot][omol]") {
   REQUIRE_THAT(max_df, WithinAbs(0.0, 1e-4));
 }
 
+TEST_CASE("UmaPot package accepts its composition in any atom order",
+          "[UmaPot][omol][contract]") {
+  // The contract checks counts, not order: a package merged for HCN
+  // must evaluate N, H, C to the same energy and permuted forces.
+  const std::string model = resolve_uma_omol_pt2();
+  rgpot::UmaConfig cfg = hcn_config();
+  cfg.model_path = model;
+  cfg.device = "cpu";
+  rgpot::UmaPot pot(cfg);
+
+  const AtomMatrix hcn{
+      {12.49734736216627162, 12.49892801474515913, 12.54059929828148512},
+      {12.50115413363106498, 12.50036504272228832, 11.38209979880783251},
+      {12.50149850420264563, 12.50069809648255514, 13.61514544631068446},
+  };
+  const std::array<int, 3> perm{1, 2, 0}; // new row r holds old row perm[r]
+  AtomMatrix nhc(3, 3);
+  std::vector<int> z_nhc(3);
+  const std::vector<int> z_hcn{6, 7, 1};
+  for (int r = 0; r < 3; ++r) {
+    z_nhc[r] = z_hcn[perm[r]];
+    for (int d = 0; d < 3; ++d)
+      nhc(r, d) = hcn(perm[r], d);
+  }
+  const std::array<std::array<double, 3>, 3> box{
+      {{25.0, 0.0, 0.0}, {0.0, 25.0, 0.0}, {0.0, 0.0, 25.0}}};
+
+  auto [e0, f0, v0] = pot(hcn, z_hcn, box);
+  auto [e1, f1, v1] = pot(nhc, z_nhc, box);
+  (void)v0;
+  (void)v1;
+  REQUIRE_THAT(e1, WithinAbs(e0, 1e-4));
+  for (int r = 0; r < 3; ++r)
+    for (int d = 0; d < 3; ++d)
+      REQUIRE_THAT(f1(r, d), WithinAbs(f0(perm[r], d), 1e-4));
+}
+
 TEST_CASE("UmaPot band batch matches per-system evaluation",
           "[UmaPot][omol][band]") {
   // Needs a band package (exported with --batch-max) named beside the
