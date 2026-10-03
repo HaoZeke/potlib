@@ -349,12 +349,33 @@ TEST_CASE("Pair potentials: warm, cold and cell-grid calls agree",
       e.energy = fo.energy;
       return e;
     };
-    const Eval cold = call(R);     // first sighting: eval-only scan
+    const Eval cold = call(R);     // first sighting: list at the cutoff
     const Eval capture = call(R);  // second sighting: list captured
     const Eval warm = call(R);     // list hit
-    requireSame(capture, cold);
-    requireSame(warm, cold);
+    // Every call sums the same pairs in the same order, so the three agree
+    // to the bit whichever list served them.
+    REQUIRE(capture.energy == cold.energy);
+    REQUIRE(warm.energy == cold.energy);
+    REQUIRE(capture.F == cold.F);
+    REQUIRE(warm.F == cold.F);
     REQUIRE(std::isfinite(cold.energy));
+    // A nearby geometry served by the captured list matches a pool that
+    // never saw this family (first sighting after the pool turns over).
+    std::vector<double> near = R;
+    for (std::size_t k = 0; k < near.size(); ++k) {
+      near[k] += 0.05 * std::sin(0.7 * static_cast<double>(k));
+    }
+    const Eval nearWarm = call(near);
+    for (int k = 1; k <= 9; ++k) {
+      std::vector<double> away = R;
+      for (std::size_t q = 0; q < away.size(); q += 3) {
+        away[q] += 3.0 * k;
+      }
+      (void)call(away);
+    }
+    const Eval nearCold = call(near);
+    REQUIRE(nearWarm.energy == nearCold.energy);
+    REQUIRE(nearWarm.F == nearCold.F);
   }
 }
 

@@ -148,6 +148,47 @@ public:
     finishRebuild(R, n, box, opt);
   }
 
+  /// Build the candidate list at cutoff + skin for positions ``R``, the
+  /// list a later call reuses while the Verlet guarantee holds.
+  void rebuild(const double *R, std::size_t n, const double *box,
+               const Options &opt) {
+    rebuildFused(R, n, box, opt,
+                 [](int32_t, int32_t, double, double, double, double) {});
+  }
+
+  /// Build a list holding exactly the pairs within the cutoff of ``R``,
+  /// for one evaluation through accumulate. When the box is cacheable the
+  /// slot then becomes a phantom (dropPairs) that only stamps the
+  /// geometry, as visitOnly leaves it.
+  void buildForEval(const double *R, std::size_t n, const double *box,
+                    const Options &opt) {
+    setup(n, box, opt);
+    double w[3];
+    double inv[3];
+    fold_params(box, opt, w, inv);
+    const double c2 = opt.cutoff * opt.cutoff;
+    auto none = [](int32_t, int32_t, double, double, double, double) {};
+    CellGrid grid;
+    if (mic_ && grid.build(R, n, w, inv, opt.cutoff)) {
+      cell_visit<true>(grid, R, w, inv, std::nextafter(c2, HUGE_VAL), -1.0,
+                       pairsIJ_, none);
+    } else {
+      vesin::cpu::brute_force_visit(R, n, w, inv, std::nextafter(c2, HUGE_VAL),
+                                    -1.0, pairsIJ_, none);
+    }
+    finishRebuild(R, n, box, opt);
+  }
+
+  /// Turn an evaluated slot into a phantom: keep the stamp, drop the pairs.
+  void dropPairs() {
+    nbr_.clear();
+    nbr_.shrink_to_fit();
+    code_.clear();
+    code_.shrink_to_fit();
+    std::fill(rows_.begin(), rows_.end(), 0);
+    phantom_ = true;
+  }
+
   /// True when caching applies to this box (decided by the last build).
   [[nodiscard]] bool cacheable() const { return mic_; }
 
@@ -302,11 +343,15 @@ private:
 
   void finishRebuild(const double *R, std::size_t n, const double *box,
                      const Options &opt) {
-    for (int k = 0; k < 3; ++k) {
-      micInv_[static_cast<std::size_t>(k)] =
-          (mic_ && opt.periodic[static_cast<std::size_t>(k)])
-              ? 1.0 / box[4 * k]
-              : 0.0;
+    // The fold of the historical per-call loop: diagonal widths along the
+    // periodic axes, also for a box the pool will not cache.
+    {
+      double w[3];
+      double inv[3];
+      fold_params(box, opt, w, inv);
+      for (int k = 0; k < 3; ++k) {
+        micInv_[static_cast<std::size_t>(k)] = inv[k];
+      }
     }
     Rref_.assign(R, R + 3 * n);
     for (int k = 0; k < 9; ++k) {
@@ -478,33 +523,37 @@ public:
 
   /// Energy and forces of a radial pair potential. ``kernel(i, j, r2)``
   /// returns the pair's PairTerm; the forces are added into ``F`` (3 n
-  /// doubles, interleaved) and the total energy is returned. Cached lists
-  /// run CachedPairList::accumulate, the fused CSR loop.
+  /// doubles, interleaved) and the total energy is returned.
+  ///
+  /// Every call, cached or not, runs CachedPairList::accumulate over a
+  /// sorted CSR list: a fresh geometry first gets a list (at the cutoff for
+  /// a first sighting, at cutoff + skin when it is captured). The pairs
+  /// inside the cutoff and their summation order are then the same whichever
+  /// slot or scan served the call, so a result does not depend on the pool's
+  /// history or on which thread reached it first.
   template <typename Kernel>
   [[nodiscard]] double accumulate(const double *R, std::size_t n,
                                   const double *box,
                                   const CachedPairList::Options &opt,
                                   double *F, Kernel &&kernel) {
-    double energy = 0.0;
-    auto scan = [&](int32_t i, int32_t j, double dx, double dy, double dz,
-                    double r2) {
-      const PairTerm t = kernel(i, j, r2);
-      energy += t.energy;
-      const double fx = t.fscale * dx;
-      const double fy = t.fscale * dy;
-      const double fz = t.fscale * dz;
-      const auto ui = static_cast<std::size_t>(i);
-      const auto uj = static_cast<std::size_t>(j);
-      F[3 * ui] += fx;
-      F[3 * ui + 1] += fy;
-      F[3 * ui + 2] += fz;
-      F[3 * uj] -= fx;
-      F[3 * uj + 1] -= fy;
-      F[3 * uj + 2] -= fz;
-    };
-    run(R, n, box, opt, scan, [&](const CachedPairList &list) {
-      energy = list.accumulate(R, F, kernel);
-    });
+    std::shared_ptr<const CachedPairList> hit = lookup(R, n, box, opt);
+    if (hit && !hit->isPhantom()) {
+      return hit->accumulate(R, F, kernel);
+    }
+    auto fresh = std::make_shared<CachedPairList>();
+    double energy;
+    if (hit) {
+      fresh->rebuild(R, n, box, opt);
+      energy = fresh->accumulate(R, F, kernel);
+    } else {
+      fresh->buildForEval(R, n, box, opt);
+      energy = fresh->accumulate(R, F, kernel);
+      if (!fresh->cacheable()) {
+        return energy;
+      }
+      fresh->dropPairs();
+    }
+    store(fresh, hit);
     return energy;
   }
 
@@ -514,42 +563,28 @@ public:
   }
 
 private:
-  /// Pool lookup shared by evaluate and accumulate: ``onHit`` runs on a
-  /// captured slot, ``scan`` is the visitor for a fresh search.
-  template <typename Scan, typename OnHit>
-  void run(const double *R, std::size_t n, const double *box,
-           const CachedPairList::Options &opt, Scan &scan, OnHit &&onHit) {
-    std::shared_ptr<const CachedPairList> hit;
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      for (std::size_t s = 0; s < slots_.size(); ++s) {
-        if (slots_[s]->valid(R, n, box, opt)) {
-          if (s != 0) {
-            auto slot = std::move(slots_[s]);
-            slots_.erase(slots_.begin() + static_cast<std::ptrdiff_t>(s));
-            slots_.insert(slots_.begin(), std::move(slot));
-          }
-          hit = slots_.front();
-          break;
+  /// Most recently used slot valid for ``R``, moved to the front.
+  std::shared_ptr<const CachedPairList>
+  lookup(const double *R, std::size_t n, const double *box,
+         const CachedPairList::Options &opt) {
+    std::lock_guard<std::mutex> lock(mu_);
+    for (std::size_t s = 0; s < slots_.size(); ++s) {
+      if (slots_[s]->valid(R, n, box, opt)) {
+        if (s != 0) {
+          auto slot = std::move(slots_[s]);
+          slots_.erase(slots_.begin() + static_cast<std::ptrdiff_t>(s));
+          slots_.insert(slots_.begin(), std::move(slot));
         }
+        return slots_.front();
       }
     }
+    return nullptr;
+  }
 
-    if (hit && !hit->isPhantom()) {
-      onHit(*hit);
-      return;
-    }
-
-    auto fresh = std::make_shared<CachedPairList>();
-    if (hit) {
-      fresh->rebuildFused(R, n, box, opt, scan);
-    } else {
-      fresh->visitOnly(R, n, box, opt, scan);
-      if (!fresh->cacheable()) {
-        return; // box unsafe for caching; behave exactly like the old loop
-      }
-    }
-
+  /// Put ``fresh`` at the front, replacing the phantom ``hit`` it grew
+  /// from, and evict the least recently used slot past kMaxSlots.
+  void store(std::shared_ptr<CachedPairList> fresh,
+             const std::shared_ptr<const CachedPairList> &hit) {
     std::lock_guard<std::mutex> lock(mu_);
     if (hit) {
       for (std::size_t s = 0; s < slots_.size(); ++s) {
@@ -559,10 +594,32 @@ private:
         }
       }
     }
-    slots_.insert(slots_.begin(), fresh);
+    slots_.insert(slots_.begin(), std::move(fresh));
     if (slots_.size() > kMaxSlots) {
       slots_.pop_back();
     }
+  }
+
+  /// Pool lookup for evaluate: ``onHit`` runs on a captured slot, ``scan``
+  /// is the visitor for a fresh search.
+  template <typename Scan, typename OnHit>
+  void run(const double *R, std::size_t n, const double *box,
+           const CachedPairList::Options &opt, Scan &scan, OnHit &&onHit) {
+    std::shared_ptr<const CachedPairList> hit = lookup(R, n, box, opt);
+    if (hit && !hit->isPhantom()) {
+      onHit(*hit);
+      return;
+    }
+    auto fresh = std::make_shared<CachedPairList>();
+    if (hit) {
+      fresh->rebuildFused(R, n, box, opt, scan);
+    } else {
+      fresh->visitOnly(R, n, box, opt, scan);
+      if (!fresh->cacheable()) {
+        return; // box unsafe for caching; behave exactly like the old loop
+      }
+    }
+    store(std::move(fresh), hit);
   }
 
   std::mutex mu_;
