@@ -159,14 +159,23 @@ Configurable via =LJClusterConfig= (=u0=, =cutoff=, =psi=, =switch_width=).
 default.
 Configurable via =MorseConfig= (=De=, =a=, =re=, =cutoff=, =switch_width=).
 
-With =switch_width= at 0 (the default) these three shift each pair energy to zero at the cutoff, and the force jumps there.
-A positive =switch_width= multiplies the unshifted pair energy by the quintic switch $S(t) = 1 - 10t^3 + 15t^4 - 6t^5$, $t = (r - r_c + w)/w$ clamped to $[0, 1]$, so energy, force and curvature reach zero at the cutoff (=PairSwitch.hpp=).
+With =switch_width= at 0 (the default) these three shift each pair energy to
+zero at the cutoff, and the force jumps there.
+A positive
+=switch_width= multiplies the unshifted pair energy by the quintic switch $S(t) = 1 - 10t^3 + 15t^4 - 6t^5$, $t = (r - r_c +
+w)/w$ clamped to $[0, 1]$, so energy, force and curvature reach zero at the
+cutoff (=PairSwitch.hpp=).
 The constructors throw =std::invalid_argument= unless $0 < w \le r_c$.
-=scripts/validation/pair_kernels.py= checks the kernels and the switch with sympy, and =scripts/validation/quintic_switch.sollya= bounds the switch's binary64 evaluation error at $28u$ for $S$ and $12u$ for $S'$ ($u = 2^{-53}$).
+=scripts/validation/pair_kernels.py= checks the kernels and the switch with sympy, and =scripts/validation/quintic_switch.sollya=
+bounds the switch's binary64 evaluation error at $28u$ for $S$ and $12u$ for
+$S'$ ($u = 2^{-53}$).
 
-These pair potentials share =rgpot::nlist::PairListCache=, a pool of Verlet lists with a 1 Angstrom skin.
-A search for pairs uses linked cells once the box holds 64 or more cells of one cutoff plus skin, and an all-pairs scan below that.
-The cached list is a CSR half list, and the force loop subtracts the periodic image recorded at build whenever cutoff plus skin is below half the box.
+These pair potentials share =rgpot::nlist::PairListCache=, a pool of Verlet
+lists with a 1 Angstrom skin.
+A search for pairs uses linked cells once the box holds 64 or more cells of one
+cutoff plus skin, and an all-pairs scan below that.
+The cached list is a CSR half list, and the force loop subtracts the periodic
+image recorded at build whenever cutoff plus skin is below half the box.
 - =ZBLPot= :: Screened nuclear repulsion (Ziegler-Biersack-Littmark) with the
 LAMMPS switching function, on free boundaries.
 Configurable via =ZBLConfig= (=cut_inner=, =cut_global=); the constructor throws
