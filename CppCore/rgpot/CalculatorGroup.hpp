@@ -3,6 +3,7 @@
 // Copyright 2023--present rgpot developers
 
 #include <cstddef>
+#include <string>
 
 /// One independent calculator is one group. A NEB image or a dimer end
 /// is that group, and ranks in a group share a subcommunicator.
@@ -11,6 +12,13 @@
 /// shareFromCalculator broadcasts from the first rank of calculator
 /// owner onto MPI_COMM_WORLD.
 /// forceImpl fills ForceOut on the rank that calls it.
+///
+/// librgpot never links MPI. The MPI side lives in librgpot_mpi (meson
+/// dependency and pkg-config name rgpot-mpi), which bindCalculators and
+/// calculatorsUseMpi load with dlopen on first use through the C ABI in
+/// calculator_mpi_abi.h. A process that never calls them never maps
+/// libmpi; until the library is loaded every call below behaves as in a
+/// build without MPI.
 namespace rgpot {
 
 /// One independent calculator. A NEB image, a dimer end, or any other
@@ -43,9 +51,23 @@ const CalculatorGroup &thisCalculator();
 // Returns 0 when there is no communicator to give.
 int calculatorComm(void *comm_out, std::size_t comm_bytes);
 
-// 1 when MPI_Initialized reports that MPI is up. 0 when this build has
-// no MPI, and 0 when MPI is not initialized.
+// Loads librgpot_mpi when needed, then 1 when MPI_Initialized reports
+// that MPI is up. 0 when the library cannot be loaded, and 0 when MPI is
+// not initialized.
 int calculatorsUseMpi();
+
+// Loads librgpot_mpi and keeps it for the process. path names the library
+// file; nullptr searches RGPOT_MPI_LIBRARY, then RGPOT_MPI_LIBRARY_NAME
+// next to librgpot, then the dynamic linker's path. Returns 1 when the
+// MPI side is available (also when it was loaded already), else 0 with
+// the reason in calculatorMpiLoadError().
+int loadCalculatorMpi(const char *path = nullptr);
+
+// 1 once librgpot_mpi is loaded in this process.
+int calculatorMpiLoaded();
+
+// Why the last loadCalculatorMpi failed; empty after a success.
+std::string calculatorMpiLoadError();
 
 // MPI_COMM_WORLD size recorded by bindCalculators, including a refused
 // split. 1 while calculators are unbound.
@@ -91,5 +113,13 @@ bool mpiAbortRequested();
 // no part. Returns 1 when the flags were combined, 0 (flags untouched)
 // without MPI, before a split, or for a calculator of one rank.
 int calculatorAgree(unsigned char *flags, std::size_t n);
+
+// Error exchange at the end of a groupCollective force call. Every rank of
+// the calculator calls it with its message (empty for success). When any
+// rank has one, every message prints on every rank of the calculator and
+// MPI_COMM_WORLD aborts; otherwise it returns. Without a split, a
+// non-empty message on a calculator of one rank aborts the world; without
+// librgpot_mpi it returns and the caller's exception carries the message.
+void publishCalculatorError(const std::string &message);
 
 } // namespace rgpot
