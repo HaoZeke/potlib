@@ -116,6 +116,27 @@ int main(int argc, char **argv) {
     return rc;
   }
 
+  if (std::strcmp(mode, "refused-force") == 0) {
+    MPI_Init(&argc, &argv);
+    rgpot::CPMDPot instance;
+    rgpot::addCalculatorHook(refuse_hook);
+    const auto group = rgpot::bindCalculators(2);
+    if (group.index != -1) {
+      MPI_Finalize();
+      return 9;
+    }
+    const double positions[3] = {0.0, 0.0, 0.0};
+    const int atoms[1] = {1};
+    const double box[9] = {20.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 20.0};
+    double forces[3]{};
+    const rgpot::ForceInput input{1, positions, atoms, box};
+    rgpot::ForceOut output{};
+    output.F = forces;
+    instance.forceImpl(input, &output);
+    MPI_Finalize();
+    return 10;
+  }
+
   // Keep the engine mapped while inspecting its stored communicator.
   void *keep = dlopen(engine, RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
   if (!keep) {

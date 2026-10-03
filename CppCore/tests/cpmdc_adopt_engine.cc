@@ -3,6 +3,7 @@
 #endif
 #include "rgpot/CPMDPot/cpmd_c_abi.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include <mpi.h>
@@ -40,6 +41,8 @@ CPMDCResult cpmdc_energy_gradient(int n_atoms, const double *positions_ang,
   (void)params_capnp;
   (void)params_capnp_size_bytes;
   (void)grad_h_bohr;
+  std::fprintf(stderr, "cpmdc_adopt_engine: force call\n");
+  std::fflush(stderr);
   CPMDCResult result{};
   result.ok = 0;
   std::strncpy(result.message, "adopt engine has no energy",

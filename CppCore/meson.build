@@ -818,6 +818,7 @@ if get_option('with_tests')
                 ['AdoptCommInstanceFirst', 'instance-first', cpmdc_adopt_engine],
                 ['AdoptCommBoundStatic', 'bound-static', cpmdc_adopt_engine],
                 ['AdoptCommBoundInstance', 'bound-instance', cpmdc_adopt_engine],
+                ['AdoptCommRefusedForce', 'refused-force', cpmdc_adopt_engine],
             ]
                 test(
                     entry[0],
