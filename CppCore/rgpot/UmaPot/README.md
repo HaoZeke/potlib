@@ -24,6 +24,7 @@ package is read.
 | `task_name`, `charge`, `spin` | must equal `UmaConfig` |
 | `z_set`, `natoms`, `counts` | must match the input atoms |
 | `label`, `shapes`, `inputs`, `outputs` | recorded |
+| `model`, `torch_version`, `fairchem_version` | recorded |
 
 `UmaConfig.cutoff` / `max_neighbors` are defaults. The embedded
 values win when present.

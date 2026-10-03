@@ -51,6 +51,23 @@ def z_set_of(atoms: Atoms) -> list[int]:
     return sorted({int(z) for z in atoms.get_atomic_numbers()})
 
 
+def counts_of(atoms: Atoms) -> dict[int, int]:
+    """Atom count per atomic number, sorted by atomic number."""
+    counts: dict[int, int] = {}
+    for z in atoms.get_atomic_numbers():
+        counts[int(z)] = counts.get(int(z), 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _dist_version(name: str) -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "unknown"
+
+
 def default_label(atoms_path: str | None) -> str:
     if not atoms_path:
         return "hcn"
@@ -639,7 +656,9 @@ def runtime_metadata(
     charge: int = 0,
     spin: int = 1,
     z_set: list[int] | None = None,
+    counts: dict[int, int] | None = None,
     label: str = "hcn",
+    model: str = "",
     molecular_box: float = 0.0,
     batch_max: int = 0,
 ):
@@ -665,7 +684,17 @@ def runtime_metadata(
         "charge": int(charge),
         "spin": int(spin),
         "z_set": [int(z) for z in (z_set or [])],
+        # Per system, not per band: rgpot's UmaPot checks every input
+        # against natoms and counts, so a package for C2H2 refuses C2H4
+        # although both have z_set [1, 6].
+        "natoms": int(sum((counts or {}).values())),
+        "counts": json.dumps(
+            {str(z): int(n) for z, n in sorted((counts or {}).items())}
+        ),
         "label": str(label),
+        "model": str(model),
+        "torch_version": str(torch.__version__),
+        "fairchem_version": _dist_version("fairchem-core"),
         "batch_max": int(batch_max),
         "edge_convention": "fairchem_neighbor_center",
         "inputs": input_names,
@@ -792,13 +821,14 @@ def main() -> int:
         atoms.set_pbc(True)
     task_name = str(args.task)
     z_set = z_set_of(atoms)
+    counts = counts_of(atoms)
     if args.out is None:
         args.out = f"bench_data/uma/{args.model}-{task_name}-{label}.pt2"
     out = Path(args.out)
 
     print(
         f"label={label} task={task_name} charge={charge} spin={spin} "
-        f"z_set={z_set} natoms={len(atoms)}",
+        f"z_set={z_set} counts={counts} natoms={len(atoms)}",
         flush=True,
     )
     print("ASE FAIRChemCalculator reference", args.model, flush=True)
@@ -849,7 +879,9 @@ def main() -> int:
             charge=charge,
             spin=spin,
             z_set=z_set,
+            counts=counts,
             label=label,
+            model=args.model,
             molecular_box=float(args.molecular_box or 0.0),
             batch_max=max(0, int(args.batch_max)),
         )
@@ -904,7 +936,9 @@ def main() -> int:
         charge=charge,
         spin=spin,
         z_set=z_set,
+        counts=counts,
         label=label,
+        model=args.model,
         molecular_box=float(args.molecular_box or 0.0),
         batch_max=max(0, int(args.batch_max)),
     )
