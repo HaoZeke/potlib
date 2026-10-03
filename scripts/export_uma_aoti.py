@@ -1028,7 +1028,9 @@ def main() -> int:
         )
     with torch.enable_grad():
         e_x, f_x = exported.module()(*example)
-    if not compare_batched("exported", e_x.detach().cpu(), f_x.detach().cpu().numpy(), e_ref, f_ref, len(atoms)):
+    # Under torch 2.8 a nonstrict export's module returns tensor
+    # subclasses, which have no .numpy(); tolist() reads any of them.
+    if not compare_batched("exported", e_x.detach().cpu().tolist(), f_x.detach().cpu().tolist(), e_ref, f_ref, len(atoms)):
         print("FAIL: exported module does not match ASE", file=sys.stderr)
         return 3
 
