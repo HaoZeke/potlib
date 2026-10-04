@@ -47,7 +47,7 @@ XcKernel::XcKernel(std::string name) : m_name(std::move(name)) {
 #ifdef RGPOT_HAS_XCKERNEL
   auto it = kTable.find(m_name);
   if (it == kTable.end()) {
-    throw std::invalid_argument("unknown first-slice XcKernel: " + m_name);
+    throw std::invalid_argument("unknown XcKernel: " + m_name);
   }
   m_fn = it->second.fn;
   m_scal_names = it->second.scal_names;
@@ -86,6 +86,9 @@ int XcKernel::contract(const XcGrid &grid,
   }
   if (grid.npts <= 0 || grid.nbf <= 0 || grid.chi == nullptr ||
       grid.dchi == nullptr) {
+    return 2;
+  }
+  if (m_name.rfind("xck_mgga_lapl_", 0) == 0 && grid.lapl_chi == nullptr) {
     return 2;
   }
   std::vector<const double *> ptrs(static_cast<std::size_t>(m_n_scal), nullptr);
