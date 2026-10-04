@@ -53,6 +53,12 @@ endif
 
 # ------------------------ Main library
 if not get_option('with_rpc_client_only')
+    _deps += dependency('threads')
+    _rgpot_srcs += files(
+        'rgpot/plugin/PluginRegistry.cc',
+        'rgpot/plugin/PluginBridge.cc',
+        'rgpot/plugin/builtins/lj_plugin.cpp',
+    )
     rgpot_core = static_library(
         'rgpot_core',
         sources: _rgpot_srcs,
@@ -1281,6 +1287,7 @@ endif
 # XTBDlopen frontend still builds; set RGPOT_XTB_ENGINE for libxtb_engine.so.
 # See docs/eon_pkgconfig.md.
 if not meson.is_subproject()
+    install_headers('../include/rgpot/plugin.h', subdir: 'rgpot')
     # Headers: #include "rgpot/NWChemPot/..." with -I${prefix}/include
     install_subdir(
         'rgpot',

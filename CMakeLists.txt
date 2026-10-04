@@ -154,6 +154,9 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
       CppCore/rgpot/CalculatorGroup.cc
       CppCore/rgpot/PotHelpers.cc
       CppCore/rgpot/units.cc
+      CppCore/rgpot/plugin/PluginRegistry.cc
+      CppCore/rgpot/plugin/PluginBridge.cc
+      CppCore/rgpot/plugin/builtins/lj_plugin.cpp
       CppCore/rgpot/LennardJones/LJPot.cc
       CppCore/rgpot/LennardJones/LJClusterPot.cc
       CppCore/rgpot/Morse/MorsePot.cc
@@ -187,7 +190,7 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   add_library(rgpot ${RGPOT_SOURCES})
   set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX
                                         POSITION_INDEPENDENT_CODE ON)
-  target_link_libraries(rgpot PRIVATE rgpot_fortran_kernels)
+  target_link_libraries(rgpot PRIVATE rgpot_fortran_kernels Threads::Threads)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(
       rgpot PRIVATE
@@ -238,6 +241,7 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
 
   target_include_directories(
     rgpot PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/CppCore>
+                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                  $<INSTALL_INTERFACE:include>)
 
   if(UNIX AND NOT APPLE)
@@ -324,7 +328,7 @@ if(RGPOT_IS_TOP_LEVEL)
               LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
               RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
-    install(FILES CppCore/rgpot/calculator_mpi_abi.h
+    install(FILES CppCore/rgpot/calculator_mpi_abi.h include/rgpot/plugin.h
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgpot)
     install(
       DIRECTORY CppCore/rgpot
