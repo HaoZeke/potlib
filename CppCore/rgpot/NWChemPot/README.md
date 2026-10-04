@@ -13,7 +13,7 @@ Same schema for RPC and in-process; add future arms without new TOML/JSON:
 | `none` | void | no backend knobs / no-op configure |
 | `nwchem` | `NWChemParams` | NWChemPot |
 | *(later)* `metatomic` | `MetatomicParams` | MetatomicPot |
-| *(later)* `xtb` / `tblite` | … | XTBPot / TBLitePot |
+| *(later)* `xtb` / `tblite` | ... | XTBPot / TBLitePot |
 
 ```
 user / client
@@ -95,8 +95,8 @@ binary**, not the embed SDK; `nwchemc` needs an NWChem source tree.
 | field | default | meaning |
 |-------|---------|---------|
 | `basis` | `sto-3g` | Gaussian basis |
-| `theory` | `scf` | Method: `scf`, `dft`, `blyp`, `b3lyp`, … |
-| `scfType` | `rhf` | HF: `rhf`/`uhf`; with DFT: XC functional (`blyp`, …) |
+| `theory` | `scf` | Method: `scf`, `dft`, `blyp`, `b3lyp`, ... |
+| `scfType` | `rhf` | HF: `rhf`/`uhf`; with DFT: XC functional (`blyp`, ...) |
 | `charge` | `0` | Molecular charge |
 | `multiplicity` | `1` | 2S+1 |
 | `enginePath` | `""` | Frontend: explicit `libnwchemc.so` path; empty -> env/probe |
