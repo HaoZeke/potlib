@@ -125,7 +125,9 @@ if(RGPOT_WITH_RPC)
     ptlrpc
     PUBLIC $<BUILD_INTERFACE:${CAPNP_OUTPUT_DIR}/rgpot/rpc>
            $<BUILD_INTERFACE:${CAPNP_OUTPUT_DIR}>
-           $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+           $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+           $<INSTALL_INTERFACE:include/rgpot/rpc>
+           $<INSTALL_INTERFACE:include>)
 
   # Client Bridge
   if(APPLE)
@@ -277,6 +279,8 @@ if(RGPOT_IS_TOP_LEVEL)
     # Install the bridge header in the correct directory structure
     install(FILES CppCore/rgpot/rpc/pot_bridge.h
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgpot/rpc)
+    install(FILES ${CAPNP_HEADERS} CppCore/rgpot/rpc/Potentials.capnp
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgpot/rpc)
   endif()
 
   if(NOT RGPOT_RPC_CLIENT_ONLY)
@@ -304,7 +308,8 @@ if(RGPOT_IS_TOP_LEVEL)
       DIRECTORY CppCore/rgpot
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
       FILES_MATCHING
-      PATTERN "*.hpp")
+      PATTERN "*.hpp"
+      PATTERN "*.h")
   endif()
 
   install(
