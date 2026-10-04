@@ -214,7 +214,8 @@ bool register_engine_adopter(const EngineBundle &b) {
   DynLib library(b.loaded_path);
   if (library.sym_optional<AdoptCommFn>("cpmdc_adopt_calculator_comm") !=
       b.adopt_comm)
-    throw std::runtime_error("CPMD communicator callback changed while loading");
+    throw std::runtime_error(
+        "CPMD communicator callback changed while loading");
   engines->push_back({std::move(library), b.adopt_comm});
   return addCalculatorCommAdopter(b.adopt_comm);
 }
