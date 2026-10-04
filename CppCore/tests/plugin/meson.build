@@ -22,7 +22,7 @@ foreach item : [
     plugin_test = executable(
         item[1], item[2], dependencies: test_deps,
         include_directories: _incdirs, cpp_args: test_args, link_with: _linkto,
-        link_language: 'cpp',
+        link_language: 'cpp', build_rpath: _metatomic_build_rpath,
     )
     test(item[0], plugin_test, env: plugin_env,
          depends: [plugin_null, plugin_morse], suite: 'plugin')
@@ -36,7 +36,7 @@ if has_fortran
     plugin_fortran_test = executable(
         'external_fortran_plugin_test', '../ExternalFortranPluginTest.cc',
         dependencies: test_deps, include_directories: _incdirs,
-        cpp_args: test_args, link_with: _linkto, link_language: 'cpp',
+        cpp_args: test_args, link_with: _linkto, link_language: 'cpp', build_rpath: _metatomic_build_rpath,
     )
     test('ExternalFortranPluginTest', plugin_fortran_test, env: plugin_env,
          depends: plugin_coulomb, suite: 'plugin')
@@ -44,8 +44,8 @@ endif
 plugin_lifetime = executable(
     'plugin_lifetime_test', '../PluginLifetimeTest.cc',
     dependencies: test_deps, include_directories: _incdirs,
-    cpp_args: test_args, link_with: _linkto, link_language: 'cpp',
+    cpp_args: test_args, link_with: _linkto, link_language: 'cpp', build_rpath: _metatomic_build_rpath,
 )
 test('PluginLifetimeTest', find_program('python3', 'python'),
-     args: [files('../test_plugin_lifetime.py'), plugin_lifetime.full_path(), plugin_fixture.full_path()],
+     args: [files('../test_plugin_lifetime.py')[0], plugin_lifetime.full_path(), plugin_fixture.full_path()],
      depends: [plugin_lifetime, plugin_fixture], timeout: 30, suite: 'plugin')

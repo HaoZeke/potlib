@@ -421,6 +421,9 @@ if get_option('with_tests')
         # directory), whether or not they link MPI themselves.
         test_args += ['-DRGPOT_HAS_MPI']
     endif
+    if not get_option('with_rpc_client_only')
+        subdir('tests/plugin')
+    endif
     # Client-only builds skip rgpot_core; UnitsTest still needs units.cc.
     if get_option('with_rpc_client_only')
         units_for_tests = static_library(

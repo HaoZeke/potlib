@@ -389,6 +389,8 @@ if(RGPOT_BUILD_TESTS)
       add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endfunction()
 
+    add_subdirectory(CppCore/tests/plugin)
+
     add_pot_test(LJClusterPotTest CppCore/tests/LJClusterPotTest.cc)
     add_pot_test(PairListTest CppCore/tests/PairListTest.cc)
     add_pot_test(MorsePotTest CppCore/tests/MorsePotTest.cc)
