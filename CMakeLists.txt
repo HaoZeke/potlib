@@ -377,6 +377,20 @@ if(RGPOT_BUILD_TESTS)
 
     if(RGPOT_WITH_RPC)
       add_pot_test(CapnpAdapterTest CppCore/tests/CapnpAdapterTest.cc)
+      find_package(Python3 COMPONENTS Interpreter REQUIRED)
+      add_library(nwchemc_lifetime_engine SHARED
+                  CppCore/tests/nwchemc_lifetime_engine.cc)
+      target_include_directories(nwchemc_lifetime_engine PRIVATE CppCore)
+      add_executable(NWChemPotLifetimeTest CppCore/tests/NWChemPotLifetimeTest.cc)
+      target_link_libraries(NWChemPotLifetimeTest PRIVATE rgpot::rgpot)
+      foreach(_lifetime_mode ordinary probe)
+        add_test(
+          NAME NWChemPotLifetime-${_lifetime_mode}
+          COMMAND Python3::Interpreter
+                  "${CMAKE_CURRENT_SOURCE_DIR}/CppCore/tests/test_nwchem_lifetime.py"
+                  $<TARGET_FILE:NWChemPotLifetimeTest>
+                  $<TARGET_FILE:nwchemc_lifetime_engine> ${_lifetime_mode})
+      endforeach()
       add_executable(potserv CppCore/rgpot/rpc/server.cpp)
       target_link_libraries(potserv PRIVATE rgpot::rgpot ptlrpc
                                             CapnProto::capnp-rpc)

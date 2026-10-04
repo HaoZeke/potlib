@@ -557,6 +557,36 @@ if get_option('with_tests')
             include_directories: include_directories('rgpot/NWChemPot'),
             install: false,
         )
+        nwchemc_lifetime_engine = shared_library(
+            'nwchemc_lifetime_engine',
+            sources: ['tests/nwchemc_lifetime_engine.cc'],
+            include_directories: _incdirs,
+            install: false,
+        )
+        nwchem_lifetime_test = executable(
+            'nwchem_lifetime_test',
+            sources: ['tests/NWChemPotLifetimeTest.cc'],
+            dependencies: test_deps + [ptlrpc_dep],
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+            link_language: 'cpp',
+            build_rpath: _metatomic_build_rpath,
+        )
+        foreach lifetime_mode : ['ordinary', 'probe']
+            test(
+                'NWChemPotLifetime-' + lifetime_mode,
+                find_program('python3'),
+                args: [
+                    meson.current_source_dir() / 'tests/test_nwchem_lifetime.py',
+                    nwchem_lifetime_test.full_path(),
+                    nwchemc_lifetime_engine.full_path(),
+                    lifetime_mode,
+                ],
+                depends: [nwchem_lifetime_test, nwchemc_lifetime_engine],
+                suite: 'nwchem',
+            )
+        endforeach
         nwchemc_fake_env = environment()
         nwchemc_fake_env.set(
             'RGPOT_NWCHEM_ENGINE',
