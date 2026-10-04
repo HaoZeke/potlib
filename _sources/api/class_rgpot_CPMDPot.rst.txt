@@ -25,6 +25,10 @@ Overview
 	
 		struct :ref:`Impl<doxid-structrgpot_1_1_c_p_m_d_pot_1_1_impl>`;
 
+		// fields
+	
+		static uint64_t :ref:`kKernelVersion<doxid-classrgpot_1_1_c_p_m_d_pot_1a48e796e26a7f755d4d4fc11d68810e46>` = 1;
+
 		// construction
 	
 		:target:`CPMDPot<doxid-classrgpot_1_1_c_p_m_d_pot_1a65b0eeb93b61b5079ccd7f0dcbe5e412>`();
@@ -35,14 +39,18 @@ Overview
 		// methods
 	
 		CPMDPot& :target:`operator=<doxid-classrgpot_1_1_c_p_m_d_pot_1a5b11785bd07e721e29fc21603cd0198a>`(const CPMDPot&);
-		void :target:`forceImpl<doxid-classrgpot_1_1_c_p_m_d_pot_1a7ce83b3efda939edaecd8c9691d52ba9>`(const :ref:`ForceInput<doxid-structrgpot_1_1_force_input>`& in, :ref:`ForceOut<doxid-structrgpot_1_1_force_out>`* out) const;
+		void :ref:`forceImpl<doxid-classrgpot_1_1_c_p_m_d_pot_1a7ce83b3efda939edaecd8c9691d52ba9>`(const :ref:`ForceInput<doxid-structrgpot_1_1_force_input>`& in, :ref:`ForceOut<doxid-structrgpot_1_1_force_out>`* out) const;
 		virtual :ref:`PotCaps<doxid-structrgpot_1_1_pot_caps>` :ref:`caps<doxid-classrgpot_1_1_c_p_m_d_pot_1a52e734d25d7da5f6660d904e0140b60f>`() const;
+		virtual uint64_t :ref:`paramsKey<doxid-classrgpot_1_1_c_p_m_d_pot_1a43fabf217aef4c3b44447e27f13ea26c>`() const;
 		bool :target:`setParams<doxid-classrgpot_1_1_c_p_m_d_pot_1a80b707459bab810f682ba9f337b76e62>`(const ::CPMDParams::Reader& params);
+		void :ref:`selectOrbitals<doxid-classrgpot_1_1_c_p_m_d_pot_1ab0cd64e4148605d57e0242b7452874f0>`(int64_t key);
+		bool :ref:`keepsOrbitalsPerKey<doxid-classrgpot_1_1_c_p_m_d_pot_1a7245c4f34cb1e7bde3fbf8a00c0e7d19>`() const;
 		void :target:`getParams<doxid-classrgpot_1_1_c_p_m_d_pot_1a29db37ef0464ae0c4086320515e02d5d>`(::CPMDParams::Builder out) const;
 		bool :target:`setPotentialConfig<doxid-classrgpot_1_1_c_p_m_d_pot_1ab2c8fdfbd07db81f8d023ba1d01fbefc>`(const ::PotentialConfig::Reader& cfg, std::string* message_out = nullptr);
 		bool :target:`available<doxid-classrgpot_1_1_c_p_m_d_pot_1a9b006e0439de5445527c23332c16b88c>`() const;
 		static bool :target:`probe_available<doxid-classrgpot_1_1_c_p_m_d_pot_1a055db00e0a19a8ed3d4bb0b6ddba1eaf>`();
 		static bool :target:`abi_available<doxid-classrgpot_1_1_c_p_m_d_pot_1aa6d5fa95440d78578a67318a6f94ebca>`();
+		static int :ref:`bindCalculators<doxid-classrgpot_1_1_c_p_m_d_pot_1adaecbf76c0c5f2fda166136873c07e7b>`(int ranks_per_calc);
 	};
 .. _details-classrgpot_1_1_c_p_m_d_pot:
 
@@ -51,8 +59,31 @@ Detailed Documentation
 
 
 
+Fields
+------
+
+.. index:: pair: variable; kKernelVersion
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1a48e796e26a7f755d4d4fc11d68810e46:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	static uint64_t kKernelVersion = 1
+
+Bump whenever the engine-facing numerics change.
+
 Methods
 -------
+
+.. index:: pair: function; forceImpl
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1a7ce83b3efda939edaecd8c9691d52ba9:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	void forceImpl(const :ref:`ForceInput<doxid-structrgpot_1_1_force_input>`& in, :ref:`ForceOut<doxid-structrgpot_1_1_force_out>`* out) const
+
+Every rank of the calling calculator enters this call together; other calculators need not (a host may give them no system in a batch). The call fills :ref:`ForceOut <doxid-structrgpot_1_1_force_out>` on the rank that calls it. A failure is printed on every rank of the calculator, then MPI_Abort runs on MPI_COMM_WORLD, and then the exception leaves the call.
 
 .. index:: pair: function; caps
 .. _doxid-classrgpot_1_1_c_p_m_d_pot_1a52e734d25d7da5f6660d904e0140b60f:
@@ -62,5 +93,47 @@ Methods
 
 	virtual :ref:`PotCaps<doxid-structrgpot_1_1_pot_caps>` caps() const
 
-The dlopen'd engine keeps global session state: serialize process-wide.
+The dlopen'd engine keeps global session state: serialize process-wide. Every rank of a calculator enters forceImpl together: the engine's SCF and the error exchange are collectives on the calculator's communicator.
+
+.. index:: pair: function; paramsKey
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1a43fabf217aef4c3b44447e27f13ea26c:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	virtual uint64_t paramsKey() const
+
+FNV-1a over the serialized CPMDParams bytes plus kKernelVersion, so two :ref:`CPMDPot <doxid-classrgpot_1_1_c_p_m_d_pot>` instances with different params never share result-cache entries. Recomputed by the constructors and setParams.
+
+.. index:: pair: function; selectOrbitals
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1ab0cd64e4148605d57e0242b7452874f0:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	void selectOrbitals(int64_t key)
+
+Names the calculation the following forces belong to: an image of a band, a bead of a ring polymer. The engine keeps the converged orbitals per key, so a calculator that evaluates several of them in turn starts each SCF from that key's own previous orbitals instead of from whichever calculation it ran last. Every rank of a calculator names the same key before the same force. An engine without cpmdc_session_select_orbitals ignores the key.
+
+.. index:: pair: function; keepsOrbitalsPerKey
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1a7245c4f34cb1e7bde3fbf8a00c0e7d19:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	bool keepsOrbitalsPerKey() const
+
+True when the loaded engine keeps orbitals per key.
+
+.. index:: pair: function; bindCalculators
+.. _doxid-classrgpot_1_1_c_p_m_d_pot_1adaecbf76c0c5f2fda166136873c07e7b:
+
+.. ref-code-block:: cpp
+	:class: doxyrest-title-code-block
+
+	static int bindCalculators(int ranks_per_calc)
+
+Collective on MPI_COMM_WORLD. rgpot splits into calculators of ranks_per_calc ranks and cpmdc_adopt_calculator_comm gives the engine that same communicator. One NEB image is one calculator. A second band calls this on its own world. Every rank must call it before the first force. Returns the group index, or -1 before the split when the engine has no communicator-adoption symbol.
+
+Instances may be constructed before or after calculator binding. Every rank uses the same construction and binding order. Each engine adopts the split once and stays loaded through process exit. Constructing an instance after :ref:`rgpot::bindCalculators <doxid-namespacergpot_1a9cfa05e9b4282c3111dd0507ebce1e32>` gives its engine the existing communicator without another split.
 
