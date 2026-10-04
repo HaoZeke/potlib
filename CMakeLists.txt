@@ -51,8 +51,9 @@ endif()
 
 # 1. Server/Physics Dependencies
 if(NOT RGPOT_RPC_CLIENT_ONLY)
-  # The Fortran 2018 pot kernels (rgpot/fortran) build under meson only; this
-  # CMake path is a consumer smoke build of the pure C++ surface.
+  # Core builds provide every public Fortran potential. The RPC-only
+  # bridge has no numerical kernels and does not need a Fortran compiler.
+  enable_language(Fortran)
   if(RGPOT_WITH_CACHE)
     # Conda macOS runners sometimes fail FindThreads before RocksDB; set the
     # pthread hint explicitly so RocksDBConfig's find_dependency(Threads) works.
@@ -148,7 +149,8 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
       CppCore/rgpot/LennardJones/LJClusterPot.cc
       CppCore/rgpot/Morse/MorsePot.cc
       CppCore/rgpot/ZBL/ZBLPot.cc
-      CppCore/rgpot/CuH2/cuh2Utils.cc)
+      CppCore/rgpot/CuH2/cuh2Utils.cc
+      CppCore/rgpot/fortran/FortranPots.cc)
 
   # NWChemPot / CPMDPot are pure dlopen consumers of the split nwchemc / cpmdc
   # engines (parity with meson). Cap'n Proto params live in the generated schema,
@@ -158,8 +160,18 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
          CppCore/rgpot/CPMDPot/CPMDPot.cc)
   endif()
 
+  if(RGPOT_BUILD_TESTS)
+    enable_testing()
+  endif()
+  add_subdirectory(CppCore/rgpot/fortran)
   add_library(rgpot ${RGPOT_SOURCES})
   set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX)
+  target_link_libraries(rgpot PRIVATE rgpot_fortran_kernels)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(
+      rgpot PRIVATE
+      "LINKER:--exclude-libs,$<TARGET_FILE_NAME:rgpot_fortran_kernels>")
+  endif()
 
   # librgpot never links MPI; it loads librgpot_mpi with dlopen when a host
   # asks for calculator groups (CppCore/rgpot/calculator_mpi_abi.h).
@@ -241,13 +253,16 @@ if(RGPOT_IS_TOP_LEVEL)
 
   if(NOT RGPOT_RPC_CLIENT_ONLY)
     install(
-      TARGETS rgpot
+      TARGETS rgpot rgpot_fortran_kernels
       EXPORT rgpotTargets
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
       INCLUDES
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(TARGETS rgpot_cuh2
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     if(TARGET rgpot_mpi)
       install(TARGETS rgpot_mpi
               LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -310,6 +325,14 @@ if(RGPOT_BUILD_TESTS)
     add_pot_test(LJClusterPotTest CppCore/tests/LJClusterPotTest.cc)
     add_pot_test(PairListTest CppCore/tests/PairListTest.cc)
     add_pot_test(MorsePotTest CppCore/tests/MorsePotTest.cc)
+    add_pot_test(FortranPotsTest CppCore/tests/FortranPotsTest.cc)
+    target_link_libraries(FortranPotsTest PRIVATE Threads::Threads)
+    add_pot_test(CuH2PotTest CppCore/tests/CuH2PotTest.cc)
+    if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      add_test(NAME FortranSymbolAudit
+               COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/audit_fortran_symbols.sh"
+                       $<TARGET_FILE:rgpot>)
+    endif()
 
     if(RGPOT_WITH_CACHE)
       add_pot_test(InvarianceTest CppCore/tests/InvarianceTest.cc)
