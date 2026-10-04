@@ -170,6 +170,17 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   if(RGPOT_BUILD_TESTS)
     enable_testing()
   endif()
+  find_package(Threads REQUIRED)
+  add_library(rgpot_vesin STATIC third_party/vesin/vesin-single-build.cpp)
+  add_library(rgpot::vesin ALIAS rgpot_vesin)
+  set_target_properties(rgpot_vesin PROPERTIES
+    EXPORT_NAME vesin
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden)
+  target_include_directories(rgpot_vesin
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/vesin>
+           $<INSTALL_INTERFACE:include/rgpot/vesin>)
+  target_link_libraries(rgpot_vesin PRIVATE Threads::Threads)
   add_subdirectory(CppCore/rgpot/fortran)
   add_library(rgpot ${RGPOT_SOURCES})
   set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX
@@ -261,13 +272,15 @@ if(RGPOT_IS_TOP_LEVEL)
 
   if(NOT RGPOT_RPC_CLIENT_ONLY)
     install(
-      TARGETS rgpot rgpot_fortran_kernels
+      TARGETS rgpot rgpot_fortran_kernels rgpot_vesin
       EXPORT rgpotTargets
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
       INCLUDES
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(FILES third_party/vesin/vesin.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgpot/vesin)
     install(TARGETS rgpot_cuh2
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
