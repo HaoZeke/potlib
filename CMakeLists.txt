@@ -190,6 +190,15 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
     target_link_options(
       rgpot PRIVATE
       "LINKER:--exclude-libs,$<TARGET_FILE_NAME:rgpot_fortran_kernels>")
+    get_target_property(_rgpot_library_type rgpot TYPE)
+    if(_rgpot_library_type STREQUAL "STATIC_LIBRARY")
+      # Static consumers perform the final link and must hide the kernel
+      # archive's internal Fortran entries in their own shared objects.
+      target_link_options(
+        rgpot INTERFACE
+        "$<BUILD_INTERFACE:LINKER:--exclude-libs,$<TARGET_FILE_NAME:rgpot_fortran_kernels>>"
+        "$<INSTALL_INTERFACE:LINKER:--exclude-libs,$<TARGET_FILE_NAME:rgpot::rgpot_fortran_kernels>>")
+    endif()
   endif()
 
   # librgpot never links MPI; it loads librgpot_mpi with dlopen when a host
