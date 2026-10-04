@@ -172,7 +172,8 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   endif()
   add_subdirectory(CppCore/rgpot/fortran)
   add_library(rgpot ${RGPOT_SOURCES})
-  set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX)
+  set_target_properties(rgpot PROPERTIES LINKER_LANGUAGE CXX
+                                        POSITION_INDEPENDENT_CODE ON)
   target_link_libraries(rgpot PRIVATE rgpot_fortran_kernels)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(
