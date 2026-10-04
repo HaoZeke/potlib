@@ -52,6 +52,17 @@ add_library(rgpot_fortran_kernels STATIC
 rgpot_fortran_target(rgpot_fortran_kernels "${CMAKE_CURRENT_BINARY_DIR}/modules" TRUE)
 set_target_properties(rgpot_fortran_kernels PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
+# A C++-only installed consumer does not initialize CMake's Fortran
+# runtime discovery. Carry the additional runtime libraries in the
+# archive's link interface without requiring a Fortran compiler there.
+set(_rgpot_fortran_runtime ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+list(REMOVE_ITEM _rgpot_fortran_runtime ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+list(REMOVE_DUPLICATES _rgpot_fortran_runtime)
+foreach(runtime IN LISTS _rgpot_fortran_runtime)
+  target_link_libraries(rgpot_fortran_kernels PRIVATE
+    "$<INSTALL_INTERFACE:${runtime}>")
+endforeach()
+
 # The direct CuH2 plugin is a separate public bind(c) entry point.
 add_library(rgpot_cuh2 SHARED ${_rgpot_vesin_sources} ${_rgpot_common_sources}
   rgpot_cuh2.f90 rgpot_cuh2_capi.f90)

@@ -279,15 +279,20 @@ if(RGPOT_IS_TOP_LEVEL)
 
   install(
     EXPORT rgpotTargets
-    FILE rgpotConfig.cmake
+    FILE rgpotTargets.cmake
     NAMESPACE rgpot::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rgpot)
 
   include(CMakePackageConfigHelpers)
+  configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rgpotConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rgpot)
   write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfigVersion.cmake"
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfig.cmake"
+                "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfigVersion.cmake"
           DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rgpot)
 endif()
 
