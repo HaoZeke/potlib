@@ -91,6 +91,7 @@ Overview
 		namespace :ref:`rgpot::details<doxid-namespacergpot_1_1details>`;
 		namespace :ref:`rgpot::fortranpots<doxid-namespacergpot_1_1fortranpots>`;
 		namespace :ref:`rgpot::nlist<doxid-namespacergpot_1_1nlist>`;
+		namespace :ref:`rgpot::tools<doxid-namespacergpot_1_1tools>`;
 		namespace :ref:`rgpot::types<doxid-namespacergpot_1_1types>`;
 			namespace :ref:`rgpot::types::adapt<doxid-namespacergpot_1_1types_1_1adapt>`;
 				namespace :ref:`rgpot::types::adapt::capnp<doxid-namespacergpot_1_1types_1_1adapt_1_1capnp>`;
@@ -346,7 +347,8 @@ Overview
 	void :ref:`pot_client_free<doxid-pot__bridge_8h_1a605cb8b056e3d895be066472fe1c116e>`(:ref:`PotClient<doxid-struct_pot_client>`* client);
 	int32_t :ref:`pot_calculate<doxid-pot__bridge_8h_1ab471aef52e0227fbb98588e8366ad646>`(:ref:`PotClient<doxid-struct_pot_client>`* client, int32_t natoms, const double* pos, const int32_t* atmnrs, const double* box, double* out_energy, double* out_forces);
 	const char* :ref:`pot_get_last_error<doxid-pot__bridge_8h_1a669a1a1ce89314ebbfec4c91438bd782>`(:ref:`PotClient<doxid-struct_pot_client>`* client);
-	int :ref:`main<doxid-server_8cpp_1a0ddf1224851353fc92bfbff6f499fa97>`(int argc, char* argv[]);
+	int :ref:`runServer<doxid-server_8cpp_1a46b7d52e9feae7b71cb54690fd608c99>`(int argc, char* argv[]);
+	int :target:`main<doxid-server_8cpp_1a3c04138a5bfe5d72780bb7e82a18e627>`(int argc, char** argv);
 	static void :target:`set_err<doxid-_uma_engine_abi_8cc_1a3cbaa0d62282e2faf4f8f8267c065187>`(char* errbuf, size_t errlen, const char* msg);
 	int :target:`rgpot_engine_abi_version<doxid-_uma_engine_abi_8cc_1a98cc4c5e859160b4cc816ee692cef651>`(void);
 	int :target:`rgpot_engine_available<doxid-_uma_engine_abi_8cc_1a6e1e42d077dbc8cbbd1b8299b7f6c04a>`(void);
@@ -1516,13 +1518,13 @@ Checks if a valid client handle is provided and if the ``last_error`` buffer con
 
 String containing the error description.
 
-.. index:: pair: function; main
-.. _doxid-server_8cpp_1a0ddf1224851353fc92bfbff6f499fa97:
+.. index:: pair: function; runServer
+.. _doxid-server_8cpp_1a46b7d52e9feae7b71cb54690fd608c99:
 
 .. ref-code-block:: cpp
 	:class: doxyrest-title-code-block
 
-	int main(int argc, char* argv[])
+	int runServer(int argc, char* argv[])
 
 The main entry point handles command-line arguments to specify the network port and the potential type. It instantiates the requested physics engine and blocks until the server is terminated.
 
