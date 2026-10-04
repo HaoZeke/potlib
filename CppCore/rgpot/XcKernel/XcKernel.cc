@@ -85,7 +85,7 @@ int XcKernel::contract(const XcGrid &grid,
     return 1;
   }
   if (grid.npts <= 0 || grid.nbf <= 0 || grid.chi == nullptr ||
-      grid.dchi == nullptr) {
+      (grid.dchi == nullptr && m_name.rfind("xck_lda_", 0) != 0)) {
     return 2;
   }
   if (m_name.rfind("xck_mgga_lapl_", 0) == 0 && grid.lapl_chi == nullptr) {
