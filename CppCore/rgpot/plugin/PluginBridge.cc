@@ -15,15 +15,16 @@
 
 namespace rgpot::plugin {
 namespace {
-std::recursive_mutex &serialPluginMutex() {
-  static std::recursive_mutex mutex;
+using SerialMutex = std::shared_ptr<std::recursive_mutex>;
+SerialMutex serialPluginMutex() {
+  static const auto mutex = std::make_shared<std::recursive_mutex>();
   return mutex;
 }
 
 std::string pluginError(const rgpot_plugin_descriptor_t &descriptor,
                         const rgpot_plugin_instance *instance,
                         const char *fallback) {
-  if (descriptor.last_error) {
+  if (descriptor.last_error && instance) {
     const char *message = descriptor.last_error(instance);
     if (message && message[0])
       return message;
@@ -33,9 +34,10 @@ std::string pluginError(const rgpot_plugin_descriptor_t &descriptor,
 
 struct InstanceDeleter {
   rgpot_plugin_destroy_fn destroy;
+  SerialMutex mutex;
   void operator()(rgpot_plugin_instance *instance) const {
     if (instance) {
-      std::lock_guard lock(serialPluginMutex());
+      std::lock_guard lock(*mutex);
       destroy(instance);
     }
   }
@@ -66,7 +68,7 @@ public:
         (input.nAtoms && (!input.pos || !input.atmnrs || !output->F)))
       throw std::invalid_argument("invalid plugin force buffers");
     const size_t count = 3 * input.nAtoms;
-    std::unique_lock lock(serialPluginMutex(), std::defer_lock);
+    std::unique_lock lock(*m_instance.get_deleter().mutex, std::defer_lock);
     if (!(m_capabilities & RGPOT_CAP_INSTANCE_SAFE))
       lock.lock();
     m_positions.resize(count);
@@ -127,10 +129,18 @@ std::unique_ptr<PotentialBase> create_from_plugin(
       energy <= 0.0 || !std::isfinite(length * energy) ||
       !std::isfinite(energy * energy))
     throw std::invalid_argument("invalid plugin unit conversion");
-  std::lock_guard lock(serialPluginMutex());
+  const auto mutex = serialPluginMutex();
+  std::lock_guard lock(*mutex);
+  Instance instance(nullptr, InstanceDeleter{descriptor.destroy, mutex});
   rgpot_plugin_instance *raw = nullptr;
-  const auto status = descriptor.create(config.c_str(), &raw);
-  Instance instance(raw, InstanceDeleter{descriptor.destroy});
+  rgpot_plugin_status_t status;
+  try {
+    status = descriptor.create(config.c_str(), &raw);
+  } catch (...) {
+    instance.reset(raw);
+    throw;
+  }
+  instance.reset(raw);
   if (status != RGPOT_PLUGIN_OK || !instance)
     throw std::runtime_error(pluginError(descriptor, raw, "plugin create failed"));
   const uint32_t capabilities = descriptor.capabilities
