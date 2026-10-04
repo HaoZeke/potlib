@@ -63,7 +63,9 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
     find_package(RocksDB REQUIRED)
-    find_package(xxHash CONFIG QUIET)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    find_package(xxHash QUIET)
+    list(POP_BACK CMAKE_MODULE_PATH)
     if(NOT xxHash_FOUND)
       message(
         STATUS "xxHash not found via find_package, fetching from source...")
@@ -72,9 +74,14 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
         GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
         GIT_TAG v0.8.3)
       FetchContent_MakeAvailable(xxHash)
-      if(TARGET xxhash AND NOT TARGET xxHash::xxhash)
-        add_library(xxHash::xxhash ALIAS xxhash)
+      if(NOT TARGET xxHash::xxhash)
+        # The pinned release keeps its CMake project below the source root.
+        set(XXHASH_BUILD_XXHSUM OFF)
+        set(XXHASH_BUNDLED_MODE OFF)
+        add_subdirectory("${xxhash_SOURCE_DIR}/cmake_unofficial"
+                         "${xxhash_BINARY_DIR}")
       endif()
+      set_target_properties(xxhash PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
   endif()
 
@@ -188,7 +195,7 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
 
   if(RGPOT_WITH_CACHE)
     target_sources(rgpot PRIVATE CppCore/rgpot/PotentialCache.cc)
-    target_link_libraries(rgpot PUBLIC RocksDB::rocksdb xxhash)
+    target_link_libraries(rgpot PUBLIC RocksDB::rocksdb xxHash::xxhash)
     target_compile_definitions(rgpot PUBLIC RGPOT_HAS_CACHE)
   endif()
 
@@ -291,7 +298,8 @@ if(RGPOT_IS_TOP_LEVEL)
   write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfig.cmake"
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindxxHash.cmake"
+                "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfig.cmake"
                 "${CMAKE_CURRENT_BINARY_DIR}/rgpotConfigVersion.cmake"
           DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rgpot)
 endif()
