@@ -987,7 +987,17 @@ def main() -> int:
     for attempt, kwargs in attempts:
         try:
             print("try export", attempt, flush=True)
-            exported = torch.export.export(wrap, example, **kwargs)
+            candidate = torch.export.export(wrap, example, **kwargs)
+            # Export acceptance requires executable tensors and the same
+            # reference comparison as the packaged model.
+            with torch.enable_grad():
+                e_trial, f_trial = candidate.module()(*example)
+            if not compare_batched(
+                f"exported-{attempt}", e_trial.detach().cpu(),
+                f_trial.detach().cpu().numpy(), e_ref, f_ref, len(atoms)
+            ):
+                raise RuntimeError("exported program does not match ASE")
+            exported = candidate
             print("export ok", attempt, type(exported), flush=True)
             export_path = attempt
             break
