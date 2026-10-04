@@ -9,6 +9,8 @@ Global Namespace
 
 	namespace_cache.rst
 	namespace_fortranpots.rst
+	namespace_plugin.rst
+	namespace_plugin-2.rst
 	namespace_rgpot.rst
 	namespace_rgpot-2.rst
 	namespace_rgpot-3.rst
@@ -48,6 +50,8 @@ Global Namespace
 	namespace_xckernel.rst
 	enum_CPMDCFeatureKind.rst
 	enum_rgpot_engine_acquire_reason.rst
+	enum_rgpot_plugin_caps_t.rst
+	enum_rgpot_plugin_status_t.rst
 	struct_CPMDCFeatureEntry.rst
 	struct_CPMDCResult.rst
 	struct_MopacCParams.rst
@@ -65,6 +69,9 @@ Global Namespace
 	struct_eindir_objective_t.rst
 	struct_rgpot_mpi_api_t.rst
 	struct_rgpot_mpi_group_t.rst
+	struct_rgpot_plugin_descriptor_t.rst
+	struct_rgpot_plugin_input_t.rst
+	struct_rgpot_plugin_output_t.rst
 	class_AtomMatrix.rst
 	class_GenericPotImpl.rst
 	class_PotClient.rst
@@ -83,7 +90,10 @@ Overview
 
 	namespace :ref:`cache<doxid-namespacergpot_1_1cache_1_1_0d261167336225376374140272062266340312002227136254>`;
 	namespace :ref:`fortranpots<doxid-namespacergpot_1_1fortranpots_1_1_0d017001224324206200337367221155254133040031122062>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d337352007255267004147224254224242242326302051001>`;
+	namespace :ref:`plugin<doxid-namespacergpot_1_1plugin_1_1_0d074353006046316056125133311173326117274224055170>`;
+	namespace :ref:`plugin<doxid-namespacergpot_1_1plugin_1_1_0d173253327115127344356305210034204005374022247317>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d346301061146142077127217320160222115154062166171>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d364340043037035135215131234013203140115136056347>`;
 	namespace :ref:`rgpot<doxid-namespacergpot>`;
 		namespace :ref:`rgpot::abi<doxid-namespacergpot_1_1abi>`;
 		namespace :ref:`rgpot::aoti_execstack<doxid-namespacergpot_1_1aoti__execstack>`;
@@ -91,6 +101,9 @@ Overview
 		namespace :ref:`rgpot::details<doxid-namespacergpot_1_1details>`;
 		namespace :ref:`rgpot::fortranpots<doxid-namespacergpot_1_1fortranpots>`;
 		namespace :ref:`rgpot::nlist<doxid-namespacergpot_1_1nlist>`;
+		namespace :ref:`rgpot::plugin<doxid-namespacergpot_1_1plugin>`;
+			namespace :ref:`rgpot::plugin::detail<doxid-namespacergpot_1_1plugin_1_1detail>`;
+			namespace :ref:`rgpot::plugin::dynlib<doxid-namespacergpot_1_1plugin_1_1dynlib>`;
 		namespace :ref:`rgpot::tools<doxid-namespacergpot_1_1tools>`;
 		namespace :ref:`rgpot::types<doxid-namespacergpot_1_1types>`;
 			namespace :ref:`rgpot::types::adapt<doxid-namespacergpot_1_1types_1_1adapt>`;
@@ -100,17 +113,16 @@ Overview
 		namespace :ref:`rgpot::uma<doxid-namespacergpot_1_1uma>`;
 		namespace :ref:`rgpot::units<doxid-namespacergpot_1_1units>`;
 		namespace :ref:`rgpot::vesin_compat<doxid-namespacergpot_1_1vesin__compat>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d346301061146142077127217320160222115154062166171>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d364340043037035135215131234013203140115136056347>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d337352007255267004147224254224242242326302051001>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d145167115207357141062124300273234306165133267174>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d120034326304317355202070362054131335227273355103>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d313044231245255167144270007377336063024373151375>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d120034326304317355202070362054131335227273355103>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d030311243032225121222324141211321036320155111122>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d001026066302245075326165043057056171113301022163>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d074056026306035374365244261052156153150246157020>`;
-	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d031337317006200233164153001375316211023054131326>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d064232103046260025377045261373072326147161333042>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d031337317006200233164153001375316211023054131326>`;
 	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d073250274327216307175236064132335300352057017020>`;
+	namespace :ref:`rgpot<doxid-namespacergpot_1_1_0d074056026306035374365244261052156153150246157020>`;
 	namespace :ref:`rgpot_cuh2<doxid-namespacergpot__cuh2>`;
 	namespace :ref:`rgpot_cuh2_capi<doxid-namespacergpot__cuh2__capi>`;
 	namespace :ref:`rgpot_eam_al<doxid-namespacergpot__eam__al>`;
@@ -165,6 +177,28 @@ Overview
 	typedef struct RgpotXtbConfig :target:`RgpotXtbConfig<doxid-xtb__c__abi_8h_1a1786d9f1df089ee1d5b41e1389567afe>`;
 	typedef struct eindir_objective_t :target:`eindir_objective_t<doxid-eindir__abi_8hpp_1a2cd0da5d11e8702270a9a1f4ad8e2256>`;
 	typedef struct eindir_abi_stamp_t :target:`eindir_abi_stamp_t<doxid-eindir__abi_8hpp_1af98f5d743d120e3f73a6e524045f6b12>`;
+	typedef enum rgpot_plugin_status_t :target:`rgpot_plugin_status_t<doxid-plugin_8h_1a78f06d449570a1b0a9f4f73f03264e40>`;
+	typedef enum rgpot_plugin_caps_t :target:`rgpot_plugin_caps_t<doxid-plugin_8h_1a8d5b357b452188c5d2d8c49cafafe616>`;
+	typedef struct rgpot_plugin_input_t :target:`rgpot_plugin_input_t<doxid-plugin_8h_1a5dfe8cbd36f6932fcb5ca063233ac420>`;
+	typedef struct rgpot_plugin_output_t :target:`rgpot_plugin_output_t<doxid-plugin_8h_1a784cab91c95849d6def2a6cbed652955>`;
+	typedef struct rgpot_plugin_instance :target:`rgpot_plugin_instance<doxid-plugin_8h_1a1f234b9095072836be99fad25ad3eecc>`;
+
+	typedef rgpot_plugin_status_t (*:target:`rgpot_plugin_create_fn<doxid-plugin_8h_1aa03269493b9cd964d4c0c21e7c913f4f>`)(
+		const char *config_json,
+		rgpot_plugin_instance **out
+		);
+
+	typedef rgpot_plugin_status_t (*:target:`rgpot_plugin_calculate_fn<doxid-plugin_8h_1a3442a4bb46fdeeb71e021d7505136ad1>`)(
+		rgpot_plugin_instance *instance,
+		const rgpot_plugin_input_t *input,
+		rgpot_plugin_output_t *output
+		);
+
+	typedef void (*:target:`rgpot_plugin_destroy_fn<doxid-plugin_8h_1a5f6f43dbeda03521d85e1a7bf904a2d9>`)(rgpot_plugin_instance *instance);
+	typedef uint32_t (*:target:`rgpot_plugin_capabilities_fn<doxid-plugin_8h_1a1b42c3987d883dd92d911f73d1cb107f>`)(const rgpot_plugin_instance *instance);
+	typedef const char* (*:target:`rgpot_plugin_last_error_fn<doxid-plugin_8h_1a9a6c44157d29b55a2bdcf652abe6b4a2>`)(const rgpot_plugin_instance *instance);
+	typedef struct rgpot_plugin_descriptor_t :target:`rgpot_plugin_descriptor_t<doxid-plugin_8h_1af4177f0b4a7e3044f2333b98096fc3b5>`;
+	typedef const :ref:`rgpot_plugin_descriptor_t<doxid-structrgpot__plugin__descriptor__t>`* (*:target:`rgpot_plugin_init_fn<doxid-plugin_8h_1a23a5a0bc30df2871caf2e7739c8465c6>`)(void);
 
 	// enums
 
@@ -177,6 +211,8 @@ Overview
 
 	enum :ref:`CPMDCFeatureKind<doxid-cpmd__c__abi_8h_1af730055345a93286960ba9ef1a3f05b2>`;
 	enum :ref:`rgpot_engine_acquire_reason<doxid-engine__c__abi_8h_1a0de09379b1e277b837472f09146bffef>`;
+	enum :ref:`rgpot_plugin_caps_t<doxid-plugin_8h_1a7df2183b0ca1d11b867b12962ba06303>`;
+	enum :ref:`rgpot_plugin_status_t<doxid-plugin_8h_1a2c97aed5acd2481502d9f1a54718c2ee>`;
 
 	// structs
 
@@ -197,6 +233,9 @@ Overview
 	struct :ref:`eindir_objective_t<doxid-structeindir__objective__t>`;
 	struct :ref:`rgpot_mpi_api_t<doxid-structrgpot__mpi__api__t>`;
 	struct :ref:`rgpot_mpi_group_t<doxid-structrgpot__mpi__group__t>`;
+	struct :ref:`rgpot_plugin_descriptor_t<doxid-structrgpot__plugin__descriptor__t>`;
+	struct :ref:`rgpot_plugin_input_t<doxid-structrgpot__plugin__input__t>`;
+	struct :ref:`rgpot_plugin_output_t<doxid-structrgpot__plugin__output__t>`;
 
 	// classes
 
@@ -396,6 +435,8 @@ Overview
 	#define :target:`RGPOT_MTA_API<doxid-metatomic__c__abi_8h_1a409c918f350af84ff87227c561b27aa3>`
 	#define :target:`RGPOT_MTA_ENGINE_BUILD<doxid-_metatomic_engine_abi_8cc_1a8eaafdf8bea9f6c384cda06d3e8eea42>`
 	#define :target:`RGPOT_NWCHEMC_API<doxid-nwchem__c__abi_8h_1a6ad5679b2111999202bb48844af14a93>`
+	#define :target:`RGPOT_PLUGIN_API_VERSION<doxid-plugin_8h_1a48d5453009a11f3438b43bf0a6e458ae>`
+	#define :target:`RGPOT_PLUGIN_EXPORT<doxid-plugin_8h_1a13213db8b02569a359c573df47689cb8>`
 	#define :ref:`RGPOT_ROCKSDB_UNIQUE_PTR_OPEN<doxid-_potential_cache_8hpp_1a4d2e3dd07b69975ea6e7a022076e0a4b>`
 	#define :target:`RGPOT_XTB_ABI_VERSION<doxid-xtb__c__abi_8h_1aa3b73c6a3161c5d0da0ec0b357f13b8f>`
 	#define :target:`RGPOT_XTB_API<doxid-xtb__c__abi_8h_1a1c2e4e9e5c694894e8e5e08ae2c99479>`
