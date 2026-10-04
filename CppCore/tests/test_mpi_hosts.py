@@ -23,14 +23,23 @@ def run(command: list[str], env: dict[str, str], expected: int = 0) -> str:
     return output
 
 
+def mpi_command(launcher: str, ranks: int, env: dict[str, str]) -> list[str]:
+    version = subprocess.run([launcher, "--version"], env=env, capture_output=True,
+                             text=True, timeout=10)
+    command = [launcher]
+    if "Open MPI" in version.stdout + version.stderr or "OpenRTE" in version.stdout + version.stderr:
+        # Slurm can grant hardware threads that share a physical core.
+        # The job's CPU mask supplies placement for these correctness tests.
+        command += ["--map-by", "slot", "--bind-to", "none"]
+    return command + ["-n", str(ranks)]
+
+
 def main() -> None:
     mode = sys.argv[1]
     env = os.environ.copy()
-    env.setdefault("OMPI_MCA_rmaps_base_oversubscribe", "1")
-    env.setdefault("OMPI_MCA_hwloc_base_binding_policy", "none")
     if mode in {"owned", "borrowed"}:
         mpiexec, executable = sys.argv[2:4]
-        output = run([mpiexec, "-n", "4", executable, mode], env)
+        output = run([*mpi_command(mpiexec, 4, env), executable, mode], env)
         if mode == "owned":
             for rank in range(4):
                 if f"engine exit rank={rank} participants=4" not in output:
@@ -42,7 +51,7 @@ def main() -> None:
         return
     if mode == "force":
         mpiexec, executable, engine = sys.argv[2:5]
-        command = [mpiexec, "-n", "2", executable, "--engine", engine]
+        command = [*mpi_command(mpiexec, 2, env), executable, "--engine", engine]
         output = run(command + ["--system", "h2"], env)
         match = re.search(r"energy_ev=([^ ]+) maxabs_f=([^ ]+)", output)
         if not match:
@@ -80,7 +89,7 @@ def main() -> None:
         port = probe.getsockname()[1]
     command = [server, str(port), backend]
     if layout == "mpi":
-        command = [mpiexec, "-n", "2", *command]
+        command = [*mpi_command(mpiexec, 2, env), *command]
     with tempfile.TemporaryFile(mode="w+") as output:
         process = subprocess.Popen(command, env=env, stdout=output, stderr=subprocess.STDOUT,
                                    start_new_session=True)

@@ -16,6 +16,15 @@
 #include <string>
 
 namespace {
+constexpr CPMDCFeatureEntry kFeatures[] = {
+    {"abi.cpmdc_set_params", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_energy_gradient", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_version", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_available", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_feature_count", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_feature_table", CPMDC_FEATURE_ABI, 1, 0},
+    {"abi.cpmdc_feature_find", CPMDC_FEATURE_ABI, 1, 0},
+};
 int charge = 0;
 bool registered = false;
 int calls = 0;
@@ -123,3 +132,17 @@ extern "C" CPMDCResult cpmdc_energy_gradient(
 }
 extern "C" const char *cpmdc_version() { return "cpmd-collective-fixture"; }
 extern "C" int cpmdc_available() { return 1; }
+
+extern "C" size_t cpmdc_feature_count() {
+  return sizeof(kFeatures) / sizeof(kFeatures[0]);
+}
+extern "C" const CPMDCFeatureEntry *cpmdc_feature_table() { return kFeatures; }
+extern "C" const CPMDCFeatureEntry *cpmdc_feature_find(const char *feature_id) {
+  if (feature_id == nullptr)
+    return nullptr;
+  for (const auto &feature : kFeatures) {
+    if (std::strcmp(feature.feature_id, feature_id) == 0)
+      return &feature;
+  }
+  return nullptr;
+}
