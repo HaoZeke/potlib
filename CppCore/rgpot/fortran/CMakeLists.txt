@@ -27,7 +27,7 @@ set(_rgpot_kernel_sources
     rgpot_tersoff.f90 rgpot_tersoff_capi.f90
     rgpot_water_h.f90 rgpot_water_h_capi.f90)
 
-function(rgpot_fortran_target target module_directory)
+function(rgpot_fortran_target target module_directory hide_symbols)
   file(MAKE_DIRECTORY "${module_directory}")
   set_target_properties(${target} PROPERTIES
     POSITION_INDEPENDENT_CODE ON
@@ -37,6 +37,9 @@ function(rgpot_fortran_target target module_directory)
     PUBLIC "$<BUILD_INTERFACE:${module_directory}>")
   target_link_libraries(${target} PRIVATE Threads::Threads)
   foreach(flag IN LISTS _rgpot_fortran_options)
+    if(NOT hide_symbols AND flag STREQUAL "-fvisibility=hidden")
+      continue()
+    endif()
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Fortran>:${flag}>")
   endforeach()
@@ -46,13 +49,13 @@ endfunction()
 # bind(c) symbols while leaving the C++ potential classes visible.
 add_library(rgpot_fortran_kernels STATIC
   ${_rgpot_vesin_sources} ${_rgpot_common_sources} ${_rgpot_kernel_sources})
-rgpot_fortran_target(rgpot_fortran_kernels "${CMAKE_CURRENT_BINARY_DIR}/modules")
+rgpot_fortran_target(rgpot_fortran_kernels "${CMAKE_CURRENT_BINARY_DIR}/modules" TRUE)
 set_target_properties(rgpot_fortran_kernels PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
 # The direct CuH2 plugin is a separate public bind(c) entry point.
 add_library(rgpot_cuh2 SHARED ${_rgpot_vesin_sources} ${_rgpot_common_sources}
   rgpot_cuh2.f90 rgpot_cuh2_capi.f90)
-rgpot_fortran_target(rgpot_cuh2 "${CMAKE_CURRENT_BINARY_DIR}/cuh2-modules")
+rgpot_fortran_target(rgpot_cuh2 "${CMAKE_CURRENT_BINARY_DIR}/cuh2-modules" FALSE)
 
 if(RGPOT_BUILD_TESTS)
   function(rgpot_fortran_test name source timeout)
