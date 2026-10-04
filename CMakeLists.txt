@@ -265,10 +265,32 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
   endif()
 endif()
 
+# The MPI hosts are explicit executables; the serial server and core library
+# do not acquire an MPI load dependency.
+if(RGPOT_WITH_RPC AND NOT RGPOT_RPC_CLIENT_ONLY)
+  add_executable(potserv CppCore/rgpot/rpc/server.cpp)
+  target_link_libraries(potserv PRIVATE rgpot::rgpot ptlrpc CapnProto::capnp-rpc)
+  if(TARGET MPI::MPI_CXX)
+    add_executable(potserv_mpi CppCore/rgpot/rpc/server.cpp)
+    target_compile_definitions(potserv_mpi PRIVATE RGPOT_POTSERV_MPI)
+    target_link_libraries(potserv_mpi PRIVATE rgpot::rgpot ptlrpc
+                                            CapnProto::capnp-rpc MPI::MPI_CXX)
+    add_executable(nwchem_mpi_force_host CppCore/tools/nwchem_mpi_force_host.cc)
+    target_link_libraries(nwchem_mpi_force_host PRIVATE rgpot::rgpot MPI::MPI_CXX)
+  endif()
+endif()
+
 # --- Installation ---
 include(GNUInstallDirs)
 
 if(RGPOT_IS_TOP_LEVEL)
+  if(TARGET potserv)
+    install(TARGETS potserv RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+  if(TARGET potserv_mpi)
+    install(TARGETS potserv_mpi nwchem_mpi_force_host
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
   if(RGPOT_WITH_RPC)
     install(
       TARGETS ptlrpc rgpot_client_bridge
@@ -396,10 +418,42 @@ if(RGPOT_BUILD_TESTS)
                   $<TARGET_FILE:NWChemPotLifetimeTest>
                   $<TARGET_FILE:nwchemc_lifetime_engine> ${_lifetime_mode})
       endforeach()
-      add_executable(potserv CppCore/rgpot/rpc/server.cpp)
-      target_link_libraries(potserv PRIVATE rgpot::rgpot ptlrpc
-                                            CapnProto::capnp-rpc)
-      set_target_properties(potserv PROPERTIES LINKER_LANGUAGE CXX)
+      if(TARGET MPI::MPI_CXX)
+        add_executable(MpiHostContractTest CppCore/tests/MpiHostContractTest.cc)
+        target_include_directories(MpiHostContractTest PRIVATE CppCore)
+        target_link_libraries(MpiHostContractTest PRIVATE MPI::MPI_CXX)
+        add_library(collective_engine SHARED CppCore/tests/nwchemc_collective_engine.cc)
+        target_link_libraries(collective_engine PRIVATE rgpot::rgpot MPI::MPI_CXX)
+        add_executable(MpiRpcContractClient CppCore/tests/MpiRpcContractClient.cc)
+        target_link_libraries(MpiRpcContractClient PRIVATE rgpot::rgpot CapnProto::capnp-rpc)
+        set(_mpi_host_script "${CMAKE_CURRENT_SOURCE_DIR}/CppCore/tests/test_mpi_hosts.py")
+        foreach(_mode owned borrowed)
+          add_test(NAME MpiHost-${_mode}
+                   COMMAND Python3::Interpreter "${_mpi_host_script}" ${_mode}
+                           "${MPIEXEC_EXECUTABLE}" $<TARGET_FILE:MpiHostContractTest>)
+          set_tests_properties(MpiHost-${_mode} PROPERTIES TIMEOUT 60 PROCESSORS 4)
+        endforeach()
+        add_test(NAME NWChemMpiForceHost
+                 COMMAND Python3::Interpreter "${_mpi_host_script}" force
+                         "${MPIEXEC_EXECUTABLE}" $<TARGET_FILE:nwchem_mpi_force_host>
+                         $<TARGET_FILE:collective_engine>)
+        set_tests_properties(NWChemMpiForceHost PROPERTIES TIMEOUT 60 PROCESSORS 2)
+        foreach(_backend NWChem CPMD)
+          foreach(_layout serial mpi)
+            set(_rpc_server potserv)
+            if(_layout STREQUAL "mpi")
+              set(_rpc_server potserv_mpi)
+            endif()
+            add_test(NAME CollectiveRPC-${_backend}-${_layout}
+                     COMMAND Python3::Interpreter "${_mpi_host_script}" rpc
+                             "${MPIEXEC_EXECUTABLE}" $<TARGET_FILE:${_rpc_server}>
+                             $<TARGET_FILE:MpiRpcContractClient>
+                             $<TARGET_FILE:collective_engine> ${_backend} ${_layout})
+            set_tests_properties(CollectiveRPC-${_backend}-${_layout}
+                                 PROPERTIES TIMEOUT 60 PROCESSORS 2)
+          endforeach()
+        endforeach()
+      endif()
     endif()
   endif()
 endif()

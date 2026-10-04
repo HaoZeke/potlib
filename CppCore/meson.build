@@ -265,6 +265,29 @@ if rpc_enabled and not get_option('with_rpc_client_only')
         link_language: 'cpp',
         install: not meson.is_subproject(),
     )
+    if _mpi_dep.found()
+        mpi_server = executable(
+            'potserv_mpi',
+            ['rgpot/rpc/server.cpp'],
+            link_with: [ptlrpc, _linkto],
+            dependencies: _deps + [capnp_rpc_dep, ptlrpc_hdr_dep, vesin_dep, _mpi_dep] + fortran_rt_deps,
+            cpp_args: _args + ['-DRGPOT_POTSERV_MPI'],
+            build_rpath: _metatomic_build_rpath,
+            include_directories: _incdirs,
+            link_language: 'cpp',
+            install: not meson.is_subproject(),
+        )
+        nwchem_mpi_force_host = executable(
+            'nwchem_mpi_force_host',
+            ['tools/nwchem_mpi_force_host.cc'],
+            link_with: [ptlrpc, _linkto],
+            dependencies: _deps + [ptlrpc_hdr_dep, vesin_dep, _mpi_dep] + fortran_rt_deps,
+            cpp_args: _args,
+            build_rpath: _metatomic_build_rpath,
+            include_directories: _incdirs,
+            install: not meson.is_subproject(),
+        )
+    endif
 endif
 
 # ------------------------ Examples
@@ -717,6 +740,60 @@ if get_option('with_tests')
         )
         mpiexec = find_program('mpirun', 'mpiexec', required: false)
         if _mpi_dep.found() and mpiexec.found()
+            mpi_host_contract = executable(
+                'mpi_host_contract',
+                'tests/MpiHostContractTest.cc',
+                dependencies: [_mpi_dep],
+                include_directories: _incdirs,
+            )
+            collective_engine = shared_library(
+                'collective_engine',
+                'tests/nwchemc_collective_engine.cc',
+                dependencies: [ptlrpc_dep, _mpi_dep],
+                include_directories: _incdirs,
+                install: false,
+            )
+            mpi_rpc_client = executable(
+                'mpi_rpc_contract_client',
+                'tests/MpiRpcContractClient.cc',
+                dependencies: _deps + [ptlrpc_dep],
+                include_directories: _incdirs,
+                link_with: _linkto,
+                cpp_args: test_args,
+                build_rpath: _metatomic_build_rpath,
+            )
+            mpi_host_script = meson.current_source_dir() / 'tests/test_mpi_hosts.py'
+            foreach mode : ['owned', 'borrowed']
+                test(
+                    'MpiHost-' + mode,
+                    find_program('python3'),
+                    args: [mpi_host_script, mode, mpiexec.full_path(), mpi_host_contract.full_path()],
+                    depends: mpi_host_contract,
+                    timeout: 60,
+                    suite: 'mpi-host',
+                )
+            endforeach
+            test(
+                'NWChemMpiForceHost',
+                find_program('python3'),
+                args: [mpi_host_script, 'force', mpiexec.full_path(), nwchem_mpi_force_host.full_path(), collective_engine.full_path()],
+                depends: [nwchem_mpi_force_host, collective_engine],
+                timeout: 60,
+                suite: 'mpi-host',
+            )
+            foreach backend : ['NWChem', 'CPMD']
+                foreach layout : ['serial', 'mpi']
+                    rpc_server = layout == 'mpi' ? mpi_server : server
+                    test(
+                        'CollectiveRPC-' + backend + '-' + layout,
+                        find_program('python3'),
+                        args: [mpi_host_script, 'rpc', mpiexec.full_path(), rpc_server.full_path(), mpi_rpc_client.full_path(), collective_engine.full_path(), backend, layout],
+                        depends: [rpc_server, mpi_rpc_client, collective_engine],
+                        timeout: 60,
+                        suite: 'mpi-host',
+                    )
+                endforeach
+            endforeach
             rank_exception = executable(
                 'rank_exception_abort',
                 sources: ['tests/RankExceptionAbort.cc'],
