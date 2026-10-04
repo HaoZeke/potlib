@@ -558,6 +558,14 @@ TEST_CASE("UmaPot band batch matches per-system evaluation",
   const rgpot::ForceBatch batch{3, in.data(), out.data()};
   pot.forceBatch(batch);
 
+  REQUIRE_THAT(out[0].energy, WithinAbs(kHcnAseOmolEnergy, 1e-4));
+  for (size_t atom = 0; atom < 3; ++atom) {
+    for (size_t component = 0; component < 3; ++component) {
+      REQUIRE_THAT(f_batch[0][3 * atom + component],
+                   WithinAbs(kHcnAseOmolForces[atom][component], 1e-4));
+    }
+  }
+
   for (size_t s = 0; s < 3; ++s) {
     REQUIRE_THAT(out[s].energy, WithinAbs(e_single[s], 1e-8));
     for (size_t k = 0; k < 9; ++k) {
