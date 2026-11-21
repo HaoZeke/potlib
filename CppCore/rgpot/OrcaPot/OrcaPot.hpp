@@ -88,6 +88,9 @@ public:
   OrcaPot(const OrcaPot &) = delete;
   OrcaPot &operator=(const OrcaPot &) = delete;
 
+  /// Potential kind exposed to native ORCA callers.
+  [[nodiscard]] PotType get_type() const { return getType(); }
+
   void forceImpl(const ForceInput &in, ForceOut *out) const override;
 
   /// One scratch directory and one `.gbw`. A saddle image needs its own
