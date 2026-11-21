@@ -1,0 +1,16 @@
+--- a/Potentials.capnp
++++ b/Potentials.capnp
+@@ -2845,3 +2845,13 @@
+   # System id of each pair. Empty when the request named one system.
+   system @10 :List(Int32);
+ }
++
++# Native ORCA molecular engine configuration.
++struct OrcaParams {
++  method       @0 :Text = "HF";
++  basis        @1 :Text = "STO-3G";
++  charge       @2 :Int32 = 0;
++  multiplicity @3 :Int32 = 1;
++  keywords     @4 :Text = "";
++  executable   @5 :Text = "";
++}

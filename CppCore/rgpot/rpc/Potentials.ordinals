@@ -1974,3 +1974,9 @@ D2CpmdParams @3 field functional :Text local
 PotentialConfig @20 arm d2cpmd :D2CpmdParams local
 D4Params @3 field periodic :Bool local
 D2CpmdParams @4 field symmetry :Int32 local
+OrcaParams @0 field method :Text local
+OrcaParams @1 field basis :Text local
+OrcaParams @2 field charge :Int32 local
+OrcaParams @3 field multiplicity :Int32 local
+OrcaParams @4 field keywords :Text local
+OrcaParams @5 field executable :Text local
