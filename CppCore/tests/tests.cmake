@@ -540,6 +540,10 @@ add_subdirectory(CppCore/tests/plugin)
 # empty the variable itself: the MSVC runtime has no setenv.
 add_library(mopacc_fake_engine SHARED CppCore/tests/mopacc_fake_engine.c)
 target_include_directories(mopacc_fake_engine PRIVATE CppCore/rgpot/MOPACPot)
+rgpot_test_executable(orca_pot_test CppCore/tests/OrcaPotTest.cc)
+add_test(NAME OrcaPotTest COMMAND orca_pot_test)
+set_tests_properties(OrcaPotTest PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" TIMEOUT 900)
+
 rgpot_test_executable(mopac_pot_test CppCore/tests/MOPACPotTest.cc)
 set(_rgpot_mopacc_env "RGPOT_MOPACC_ENGINE=$<TARGET_FILE:mopacc_fake_engine>")
 rgpot_add_test(MOPACPotTest COMMAND mopac_pot_test

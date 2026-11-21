@@ -290,6 +290,8 @@ if(NOT RGPOT_RPC_CLIENT_ONLY)
        CppCore/rgpot/Gupta/gupta.c
        CppCore/rgpot/EAM/EAM.cpp
        CppCore/rgpot/EAM/EAMPot.cc
+       CppCore/rgpot/OrcaPot/OrcaPot.cc
+       CppCore/rgpot/OrcaPot/OrcaEngineAbi.cc
        CppCore/rgpot/MOPACPot/MOPACPot.cc
        CppCore/rgpot/XTBPot/XTBDlopen.cc
        CppCore/rgpot/ExternalPot/ExternalPot.cc

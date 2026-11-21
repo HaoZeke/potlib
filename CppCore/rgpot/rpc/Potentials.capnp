@@ -2719,3 +2719,13 @@ interface Potential {
   # buildVersion and buildRevision are empty when the build does not know them.
   getCapabilities @12 () -> (capabilities :Capabilities);
 }
+
+// Native ORCA molecular engine configuration.
+struct OrcaParams {
+  method       @0 :Text = "HF";
+  basis        @1 :Text = "STO-3G";
+  charge       @2 :Int32 = 0;
+  multiplicity @3 :Int32 = 1;
+  keywords     @4 :Text = "";
+  executable   @5 :Text = "";
+}

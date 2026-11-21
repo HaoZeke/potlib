@@ -416,6 +416,8 @@ if not get_option('with_rpc_client_only')
     rgpotentials += [reduced_pair]
 
     # Pure dlopen consumer of split mopacc (no Cap'n Proto, no OpenMOPAC embed).
+    subdir('rgpot/OrcaPot')
+    rgpotentials += [orcapot]
     subdir('rgpot/MOPACPot')  # 'mopacpot'
     rgpotentials += [mopacpot]
 
@@ -631,6 +633,17 @@ if not get_option('with_rpc_client_only')
                 rgpot_exact_fma,
             ],
             link_whole: _composite_whole,
+            cpp_args: _engine_args,
+            include_directories: _incdirs,
+            gnu_symbol_visibility: 'default',
+            install: not meson.is_subproject(),
+        )
+        orca_engine = shared_library(
+            'orca_engine',
+            [_engine_common, files('rgpot/engine/OrcaEngine.cc')],
+            dependencies: _engine_deps,
+            link_with: [rgpot_core],
+            link_whole: [orcapot],
             cpp_args: _engine_args,
             include_directories: _incdirs,
             gnu_symbol_visibility: 'default',
@@ -1965,6 +1978,15 @@ if get_option('with_tests')
         endif
     endif
     if not get_option('with_rpc_client_only')
+        orca_pot_test = executable(
+            'orca_pot_test',
+            sources: ['tests/OrcaPotTest.cc'],
+            dependencies: test_deps,
+            include_directories: _incdirs + ['.'],
+            cpp_args: test_args,
+            link_with: _linkto,
+        )
+        test('OrcaPotTest', orca_pot_test, workdir: meson.project_source_root(), timeout: 900)
         mopacc_fake_engine = shared_library(
             'mopacc_fake_engine',
             sources: ['tests/mopacc_fake_engine.c'],
