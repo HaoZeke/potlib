@@ -638,12 +638,22 @@ if not get_option('with_rpc_client_only')
             gnu_symbol_visibility: 'default',
             install: not meson.is_subproject(),
         )
+        # A host can load the engine beside a different version of librgpot.
+        # Bind the plugin's C++ implementation to its own static archives.
+        _orca_exports = []
+        _orca_export_args = []
+        if host_machine.system() == 'linux'
+            _orca_exports = files('rgpot/engine/orca.exports')
+            _orca_export_args = ['-Wl,--version-script=' + _orca_exports[0].full_path()]
+        endif
         orca_engine = shared_library(
             'orca_engine',
             [_engine_common, files('rgpot/engine/OrcaEngine.cc')],
             dependencies: _engine_deps,
             link_with: [rgpot_core],
             link_whole: [orcapot],
+            link_args: _orca_export_args,
+            link_depends: _orca_exports,
             cpp_args: _engine_args,
             include_directories: _incdirs,
             gnu_symbol_visibility: 'default',

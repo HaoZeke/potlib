@@ -1,0 +1,7 @@
+{
+  global:
+    rgpot_engine_*;
+    rgpot_orca_*;
+  local:
+    *;
+};
