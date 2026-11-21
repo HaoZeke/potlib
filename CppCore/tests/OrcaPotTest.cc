@@ -213,15 +213,19 @@ TEST_CASE("ORCA input writer matches the golden files", "[orca]") {
 
 TEST_CASE("ORCA input coordinates round-trip to the requested binary64 values",
           "[orca]") {
-  const std::array<double, 6> coords{0.740000000021, 0.0, 1.2e-13,
+  const std::array<double, 6> coords{0.740000000021,
+                                     0.0,
+                                     1.2e-13,
                                      std::nextafter(0.740000000021, 1.0),
-                                     -1.2345678901234567, 19.314159265358979};
+                                     -1.2345678901234567,
+                                     19.314159265358979};
   auto atoms = hydrogen();
   atoms.positions = coords.data();
   const auto deck = rgpot::renderOrcaInput(tightConfig(), atoms, false, "");
   const auto start = deck.find("* xyz 0 1\n");
   REQUIRE(start != std::string::npos);
-  std::istringstream data(deck.substr(start + std::string("* xyz 0 1\n").size()));
+  std::istringstream data(
+      deck.substr(start + std::string("* xyz 0 1\n").size()));
   for (std::size_t i = 0; i < atoms.n; ++i) {
     std::string element;
     REQUIRE(data >> element);
