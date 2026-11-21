@@ -211,6 +211,29 @@ TEST_CASE("ORCA input writer matches the golden files", "[orca]") {
   REQUIRE(raw.find("! HF STO-3G EnGrad\n") == 0);
 }
 
+TEST_CASE("ORCA input coordinates round-trip to the requested binary64 values",
+          "[orca]") {
+  const std::array<double, 6> coords{0.740000000021, 0.0, 1.2e-13,
+                                     std::nextafter(0.740000000021, 1.0),
+                                     -1.2345678901234567, 19.314159265358979};
+  auto atoms = hydrogen();
+  atoms.positions = coords.data();
+  const auto deck = rgpot::renderOrcaInput(tightConfig(), atoms, false, "");
+  const auto start = deck.find("* xyz 0 1\n");
+  REQUIRE(start != std::string::npos);
+  std::istringstream data(deck.substr(start + std::string("* xyz 0 1\n").size()));
+  for (std::size_t i = 0; i < atoms.n; ++i) {
+    std::string element;
+    REQUIRE(data >> element);
+    REQUIRE(element == "H");
+    for (std::size_t j = 0; j < 3; ++j) {
+      double value;
+      REQUIRE(data >> value);
+      REQUIRE(value == coords[3 * i + j]);
+    }
+  }
+}
+
 TEST_CASE("ORCA reports a missing binary", "[orca]") {
   rgpot::OrcaConfig cfg;
   cfg.executable = "/no/such/rgpot-orca-binary";
