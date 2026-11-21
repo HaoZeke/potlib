@@ -6,9 +6,11 @@
 #include "rgpot/ParamHash.hpp"
 #include "rgpot/units.hpp"
 
+#include <array>
 #include <atomic>
 #include <cctype>
 #include <cerrno>
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -81,6 +83,31 @@ const char *symbolFor(int z) {
                                 std::to_string(z));
   }
   return kSymbols[z];
+}
+
+std::string coordinateText(double value) {
+  if (!std::isfinite(value)) {
+    throw std::invalid_argument("ORCA input: nonfinite Cartesian coordinate");
+  }
+  std::array<char, 64> buffer;
+  const auto [end, ec] =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                    std::chars_format::general);
+  if (ec != std::errc{}) {
+    throw std::runtime_error("ORCA input: cannot format Cartesian coordinate");
+  }
+  std::string text(buffer.data(), end);
+  // Retain the fixed-width deck layout for short decimal coordinates.
+  if (text.find('e') == std::string::npos) {
+    if (text.find('.') == std::string::npos) {
+      text.push_back('.');
+    }
+    const auto minimum = text.find('.') + 11;
+    if (text.size() < minimum) {
+      text.resize(minimum, '0');
+    }
+  }
+  return text;
 }
 
 bool isExecutable(const std::filesystem::path &path) {
@@ -486,13 +513,14 @@ std::string renderOrcaInput(const OrcaConfig &cfg, const OrcaAtoms &atoms,
     }
   }
   out << "* xyz " << cfg.charge << ' ' << cfg.multiplicity << '\n';
-  out << std::fixed << std::setprecision(10);
   for (std::size_t i = 0; i < atoms.n; ++i) {
     const int z = atoms.atomic_numbers[i];
     const double *p = atoms.positions + 3 * i;
     out << symbolFor(z);
-    out << ' ' << std::setw(16) << p[0] << ' ' << std::setw(16) << p[1] << ' '
-        << std::setw(16) << p[2] << '\n';
+    for (int j = 0; j < 3; ++j) {
+      out << ' ' << std::setw(16) << coordinateText(p[j]);
+    }
+    out << '\n';
   }
   out << "*\n";
   return out.str();
@@ -640,7 +668,7 @@ void OrcaPot::validate(const OrcaConfig &cfg) const {
 
 uint64_t OrcaPot::hashConfig(const OrcaConfig &cfg) const {
   Fnv1a fp;
-  fp.str("orca-engrad-1");
+  fp.str("orca-engrad-2");
   fp.i64(cfg.charge);
   fp.i64(cfg.multiplicity);
   fp.str(cfg.method);
